@@ -3,7 +3,7 @@ import React, { useMemo, useState } from "react";
 import { MapContainer, TileLayer, Marker, Popup } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
-import "./styles.css";
+import "./styles.css"; // or "./App.css" – just make sure the file exists
 
 // Fix default Leaflet marker icons when bundling
 delete L.Icon.Default.prototype._getIconUrl;
@@ -14,21 +14,48 @@ L.Icon.Default.mergeOptions({
   shadowUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
 });
 
-// ---------- Demo merged dataset ----------
+// ---------- Demo merged dataset (Doc A + Doc B flavoured) ----------
+
 const RAW_PROPERTIES = [
   {
     id: 1,
-    uprn: "100012345001",
-    address: "12 Caledonia Street",
+    clientName: "Example Housing Association",
+    policyReference: "EX-2024-0001",
+    productType: "Social Housing Property",
+    propertyReference: "EXA1",
+    blockReference: "Block 1",
+    occupancyType: "Rented",
+    deductible: 2500,
+    floodDeductible: 5000,
+    stormDeductible: 2500,
+    deductibleBasis: "Each and every loss",
+    address1: "12 Caledonia Street",
+    address2: "",
+    address3: "",
+    postcode: "EH7 5QX",
     city: "Edinburgh",
     region: "Scotland",
-    postcode: "EH7 5QX",
-    lat: 55.957,
-    lon: -3.177,
-    buildYear: 1935,
-    type: "Tenement Flat",
-    tenure: "Social Rent",
-    landlord: "Forth Housing Association",
+    numberOfUnits: 8,
+    sumInsured: 1200000,
+    sumInsuredType: "Reinstatement",
+    avidPropertyType: "Traditional Tenement",
+    propertyType: "Tenement Flat",
+    wallConstruction: "Solid masonry",
+    roofConstruction: "Pitched slate",
+    floorConstruction: "Timber",
+    yearBuilt: 1935,
+    ageBanding: "1901-1919",
+    numberOfBedrooms: 2,
+    numberOfStoreys: 4,
+    basementLocation: "None",
+    listedBuilding: "Not listed",
+    securityFeatures: "Secure entry, intercom",
+    fireProtection: "Mains-wired detectors, compartmentation",
+    alarms: "LD2 fire alarm",
+    floodInsured: true,
+    stormInsured: true,
+
+    // Risk / telemetry
     epcRating: "D",
     deprivationIndex: 8.2,
     floodScore: 0.7,
@@ -40,20 +67,57 @@ const RAW_PROPERTIES = [
     maintenanceScore: 6.5,
     voidDaysLastYear: 12,
     riskBand: "High",
+    lat: 55.957,
+    lon: -3.177,
+
+    // Doc B-style high value info (example)
+    docBRef: "2023CP123456 Block A",
+    singleLocationOrPortfolio: "Part of portfolio",
+    floorsAboveGround: 4,
+    floorsBelowGround: 0,
+    claddingType: "Masonry with limited ACM panels",
+    ewsStatus: "EWS1 Form B1",
+    fireRiskManagementSummary: "FRAs annually, weekly alarm tests",
+    evacuationStrategy: "Stay put with PEEPs for vulnerable tenants",
   },
   {
     id: 2,
-    uprn: "100012345002",
-    address: "5 Meadow Close",
+    clientName: "Example Housing Association",
+    policyReference: "EX-2024-0001",
+    productType: "Social Housing Property",
+    propertyReference: "EXA2",
+    blockReference: "Block 1",
+    occupancyType: "Rented",
+    deductible: 2500,
+    floodDeductible: 2500,
+    stormDeductible: 2500,
+    deductibleBasis: "Each and every loss",
+    address1: "5 Meadow Close",
+    address2: "",
+    address3: "",
+    postcode: "EH11 3PL",
     city: "Edinburgh",
     region: "Scotland",
-    postcode: "EH11 3PL",
-    lat: 55.935,
-    lon: -3.244,
-    buildYear: 2004,
-    type: "Terraced House",
-    tenure: "Social Rent",
-    landlord: "Lothian Homes",
+    numberOfUnits: 6,
+    sumInsured: 900000,
+    sumInsuredType: "Reinstatement",
+    avidPropertyType: "Modern terraced",
+    propertyType: "Terraced House",
+    wallConstruction: "Brick cavity",
+    roofConstruction: "Tiled pitched",
+    floorConstruction: "Beam and block",
+    yearBuilt: 2004,
+    ageBanding: "2000-2009",
+    numberOfBedrooms: 3,
+    numberOfStoreys: 2,
+    basementLocation: "None",
+    listedBuilding: "Not listed",
+    securityFeatures: "Multi-point locks, external lighting",
+    fireProtection: "Mains-wired detectors",
+    alarms: "LD3 fire alarm",
+    floodInsured: true,
+    stormInsured: true,
+
     epcRating: "B",
     deprivationIndex: 3.2,
     floodScore: 0.15,
@@ -65,20 +129,47 @@ const RAW_PROPERTIES = [
     maintenanceScore: 8.1,
     voidDaysLastYear: 3,
     riskBand: "Low",
+    lat: 55.935,
+    lon: -3.244,
   },
   {
     id: 3,
-    uprn: "100012345003",
-    address: "27 Riverside Court",
+    clientName: "Example Housing Association",
+    policyReference: "EX-2024-0001",
+    productType: "Social Housing Property",
+    propertyReference: "EXA3",
+    blockReference: "Block 1",
+    occupancyType: "Rented",
+    deductible: 5000,
+    floodDeductible: 5000,
+    stormDeductible: 5000,
+    deductibleBasis: "Each and every loss",
+    address1: "27 Riverside Court",
+    address2: "",
+    address3: "",
+    postcode: "G5 9AB",
     city: "Glasgow",
     region: "Scotland",
-    postcode: "G5 9AB",
-    lat: 55.847,
-    lon: -4.259,
-    buildYear: 1988,
-    type: "High-Rise Flat",
-    tenure: "Social Rent",
-    landlord: "Clyde Housing",
+    numberOfUnits: 30,
+    sumInsured: 5140000,
+    sumInsuredType: "Reinstatement",
+    avidPropertyType: "High-rise",
+    propertyType: "High-Rise Flat",
+    wallConstruction: "Reinforced concrete with cladding",
+    roofConstruction: "Flat roof (felt)",
+    floorConstruction: "Concrete slab",
+    yearBuilt: 1988,
+    ageBanding: "1980-1989",
+    numberOfBedrooms: 2,
+    numberOfStoreys: 12,
+    basementLocation: "Car park",
+    listedBuilding: "Not listed",
+    securityFeatures: "Door entry, CCTV, concierge",
+    fireProtection: "Dry risers, smoke detection",
+    alarms: "L1 fire alarm",
+    floodInsured: true,
+    stormInsured: true,
+
     epcRating: "C",
     deprivationIndex: 9.0,
     floodScore: 0.55,
@@ -90,20 +181,57 @@ const RAW_PROPERTIES = [
     maintenanceScore: 5.2,
     voidDaysLastYear: 25,
     riskBand: "Very High",
+    lat: 55.847,
+    lon: -4.259,
+
+    docBRef: "2023CP123456 Block B",
+    singleLocationOrPortfolio: "Part of portfolio",
+    floorsAboveGround: 12,
+    floorsBelowGround: 1,
+    claddingType: "Mixed ACM / brick",
+    ewsStatus: "EWS1 Form B2 – remediation in progress",
+    fireRiskManagementSummary:
+      "24/7 waking watch previously, interim measures still in place",
+    evacuationStrategy: "Simultaneous evacuation",
   },
   {
     id: 4,
-    uprn: "100012345004",
-    address: "3 Bramble Grove",
+    clientName: "Example Housing Association",
+    policyReference: "EX-2024-0001",
+    productType: "Social Housing Property",
+    propertyReference: "EXA4",
+    blockReference: "Block 2",
+    occupancyType: "Leasehold",
+    deductible: 2500,
+    floodDeductible: 2500,
+    stormDeductible: 2500,
+    deductibleBasis: "Each and every loss",
+    address1: "3 Bramble Grove",
+    address2: "",
+    address3: "",
+    postcode: "NE4 7RT",
     city: "Newcastle",
     region: "North East",
-    postcode: "NE4 7RT",
-    lat: 54.974,
-    lon: -1.632,
-    buildYear: 1975,
-    type: "Semi-Detached",
-    tenure: "Private Rent",
-    landlord: "Private Landlord",
+    numberOfUnits: 10,
+    sumInsured: 1585000,
+    sumInsuredType: "Reinstatement",
+    avidPropertyType: "Semi-detached",
+    propertyType: "Semi-Detached",
+    wallConstruction: "Brick cavity",
+    roofConstruction: "Pitched tile",
+    floorConstruction: "Timber",
+    yearBuilt: 1975,
+    ageBanding: "1970-1979",
+    numberOfBedrooms: 3,
+    numberOfStoreys: 2,
+    basementLocation: "None",
+    listedBuilding: "Not listed",
+    securityFeatures: "Locks, neighbourhood watch",
+    fireProtection: "Battery smoke alarms",
+    alarms: "LD3",
+    floodInsured: true,
+    stormInsured: true,
+
     epcRating: "C",
     deprivationIndex: 5.5,
     floodScore: 0.25,
@@ -115,220 +243,47 @@ const RAW_PROPERTIES = [
     maintenanceScore: 7.3,
     voidDaysLastYear: 7,
     riskBand: "Medium",
+    lat: 54.974,
+    lon: -1.632,
   },
   {
     id: 5,
-    uprn: "100012345005",
-    address: "84 Oakview Crescent",
-    city: "Leeds",
-    region: "Yorkshire",
-    postcode: "LS9 8FG",
-    lat: 53.805,
-    lon: -1.508,
-    buildYear: 2015,
-    type: "Apartment Block",
-    tenure: "Student Accommodation",
-    landlord: "CampusLiving",
-    epcRating: "A",
-    deprivationIndex: 4.1,
-    floodScore: 0.1,
-    crimeIndex: 4.8,
-    lastClaimDate: "2020-02-18",
-    claimFrequency: 0.03,
-    expectedSeverity: 2000,
-    purePremium: 84,
-    maintenanceScore: 8.8,
-    voidDaysLastYear: 0,
-    riskBand: "Low",
-  },
-  {
-    id: 6,
-    uprn: "100012345006",
-    address: "102 Dockside Row",
-    city: "Liverpool",
-    region: "North West",
-    postcode: "L3 2HB",
-    lat: 53.408,
-    lon: -2.999,
-    buildYear: 1968,
-    type: "Tower Block",
-    tenure: "Social Rent",
-    landlord: "Mersey Homes",
-    epcRating: "E",
-    deprivationIndex: 9.3,
-    floodScore: 0.4,
-    crimeIndex: 8.2,
-    lastClaimDate: "2023-04-09",
-    claimFrequency: 0.32,
-    expectedSeverity: 2800,
-    purePremium: 700,
-    maintenanceScore: 4.9,
-    voidDaysLastYear: 40,
-    riskBand: "Very High",
-  },
-  {
-    id: 7,
-    uprn: "100012345007",
-    address: "6 Willowbank Terrace",
-    city: "Glasgow",
-    region: "Scotland",
-    postcode: "G20 6NB",
-    lat: 55.876,
-    lon: -4.279,
-    buildYear: 1905,
-    type: "Tenement Flat",
-    tenure: "Mid-Market Rent",
-    landlord: "Kelvin Associations",
-    epcRating: "D",
-    deprivationIndex: 6.7,
-    floodScore: 0.35,
-    crimeIndex: 6.9,
-    lastClaimDate: "2022-11-21",
-    claimFrequency: 0.16,
-    expectedSeverity: 2300,
-    purePremium: 368,
-    maintenanceScore: 6.1,
-    voidDaysLastYear: 10,
-    riskBand: "High",
-  },
-  {
-    id: 8,
-    uprn: "100012345008",
-    address: "41 Harbour View",
-    city: "Cardiff",
-    region: "Wales",
-    postcode: "CF10 4DJ",
-    lat: 51.462,
-    lon: -3.162,
-    buildYear: 2008,
-    type: "Apartment Block",
-    tenure: "Private Rent",
-    landlord: "Bay Lettings",
-    epcRating: "B",
-    deprivationIndex: 2.9,
-    floodScore: 0.3,
-    crimeIndex: 3.9,
-    lastClaimDate: "2021-09-02",
-    claimFrequency: 0.06,
-    expectedSeverity: 1700,
-    purePremium: 122,
-    maintenanceScore: 8.2,
-    voidDaysLastYear: 4,
-    riskBand: "Low",
-  },
-  {
-    id: 9,
-    uprn: "100012345009",
-    address: "19 Ffordd y Parc",
-    city: "Swansea",
-    region: "Wales",
-    postcode: "SA6 8EH",
-    lat: 51.659,
-    lon: -3.935,
-    buildYear: 1972,
-    type: "Terraced House",
-    tenure: "Social Rent",
-    landlord: "West Glamorgan Homes",
-    epcRating: "C",
-    deprivationIndex: 7.4,
-    floodScore: 0.6,
-    crimeIndex: 5.7,
-    lastClaimDate: "2023-02-15",
-    claimFrequency: 0.21,
-    expectedSeverity: 1900,
-    purePremium: 399,
-    maintenanceScore: 6.0,
-    voidDaysLastYear: 18,
-    riskBand: "High",
-  },
-  {
-    id: 10,
-    uprn: "100012345010",
-    address: "2 Parkside Lane",
-    city: "Manchester",
-    region: "North West",
-    postcode: "M14 5LP",
-    lat: 53.453,
-    lon: -2.219,
-    buildYear: 1999,
-    type: "HMO",
-    tenure: "Student Accommodation",
-    landlord: "Urban Student Lets",
-    epcRating: "C",
-    deprivationIndex: 6.0,
-    floodScore: 0.2,
-    crimeIndex: 7.1,
-    lastClaimDate: "2022-03-28",
-    claimFrequency: 0.17,
-    expectedSeverity: 2100,
-    purePremium: 357,
-    maintenanceScore: 6.8,
-    voidDaysLastYear: 5,
-    riskBand: "Medium",
-  },
-  {
-    id: 11,
-    uprn: "100012345011",
-    address: "58 Orchard Way",
-    city: "Bristol",
-    region: "South West",
-    postcode: "BS5 8DA",
-    lat: 51.468,
-    lon: -2.547,
-    buildYear: 1954,
-    type: "Semi-Detached",
-    tenure: "Social Rent",
-    landlord: "Avon Housing",
-    epcRating: "D",
-    deprivationIndex: 5.9,
-    floodScore: 0.18,
-    crimeIndex: 5.4,
-    lastClaimDate: "2020-12-10",
-    claimFrequency: 0.09,
-    expectedSeverity: 1900,
-    purePremium: 171,
-    maintenanceScore: 7.1,
-    voidDaysLastYear: 9,
-    riskBand: "Medium",
-  },
-  {
-    id: 12,
-    uprn: "100012345012",
-    address: "12 Fenbrook Close",
-    city: "Cambridge",
-    region: "East of England",
-    postcode: "CB4 1LR",
-    lat: 52.219,
-    lon: 0.142,
-    buildYear: 2018,
-    type: "Terraced House",
-    tenure: "Shared Ownership",
-    landlord: "Fenland Homes",
-    epcRating: "A",
-    deprivationIndex: 1.8,
-    floodScore: 0.05,
-    crimeIndex: 2.3,
-    lastClaimDate: "2019-07-01",
-    claimFrequency: 0.02,
-    expectedSeverity: 2100,
-    purePremium: 50,
-    maintenanceScore: 9.1,
-    voidDaysLastYear: 0,
-    riskBand: "Low",
-  },
-  {
-    id: 13,
-    uprn: "100012345013",
-    address: "73 Eastgate Tower",
+    clientName: "Example Housing Association",
+    policyReference: "EX-2024-0001",
+    productType: "High value student / mixed use",
+    propertyReference: "HV1",
+    blockReference: "Block A – High value",
+    occupancyType: "Student",
+    deductible: 10000,
+    floodDeductible: 10000,
+    stormDeductible: 10000,
+    deductibleBasis: "Each and every loss",
+    address1: "73 Eastgate Tower",
+    address2: "",
+    address3: "",
+    postcode: "E1 3QA",
     city: "London",
     region: "London",
-    postcode: "E1 3QA",
-    lat: 51.514,
-    lon: -0.055,
-    buildYear: 1964,
-    type: "High-Rise Flat",
-    tenure: "Social Rent",
-    landlord: "City Homes",
+    numberOfUnits: 120,
+    sumInsured: 30000000,
+    sumInsuredType: "Declared value",
+    avidPropertyType: "High-rise PRS / Student",
+    propertyType: "High-Rise Flat",
+    wallConstruction: "Concrete frame with rainscreen cladding",
+    roofConstruction: "Flat roof (single ply membrane)",
+    floorConstruction: "Concrete slab",
+    yearBuilt: 1964,
+    ageBanding: "1960-1969",
+    numberOfBedrooms: 1,
+    numberOfStoreys: 20,
+    basementLocation: "Plant / car park",
+    listedBuilding: "Not listed",
+    securityFeatures: "Manned reception, CCTV, access control",
+    fireProtection: "Automatic sprinklers, wet riser, AOV, compartmentation",
+    alarms: "Addressable L1 system",
+    floodInsured: true,
+    stormInsured: true,
+
     epcRating: "E",
     deprivationIndex: 8.8,
     floodScore: 0.25,
@@ -340,66 +295,36 @@ const RAW_PROPERTIES = [
     maintenanceScore: 5.0,
     voidDaysLastYear: 30,
     riskBand: "Very High",
+    lat: 51.514,
+    lon: -0.055,
+
+    docBRef: "2023CP123456 Block C",
+    singleLocationOrPortfolio: "Single location within programme",
+    floorsAboveGround: 20,
+    floorsBelowGround: 2,
+    claddingType: "Mixed metal / HPL panels",
+    ewsStatus: "Intrusive survey completed – remediation planned",
+    fireRiskManagementSummary:
+      "Enhanced FRA; weekly tests, monthly drills, stay-put under review",
+    evacuationStrategy: "Phased evacuation",
   },
-  {
-    id: 14,
-    uprn: "100012345014",
-    address: "4 Greenvale Close",
-    city: "York",
-    region: "Yorkshire",
-    postcode: "YO10 5SQ",
-    lat: 53.951,
-    lon: -1.058,
-    buildYear: 1983,
-    type: "Detached",
-    tenure: "Private Rent",
-    landlord: "Private Landlord",
-    epcRating: "B",
-    deprivationIndex: 2.5,
-    floodScore: 0.22,
-    crimeIndex: 3.1,
-    lastClaimDate: "2018-11-12",
-    claimFrequency: 0.03,
-    expectedSeverity: 2500,
-    purePremium: 95,
-    maintenanceScore: 8.4,
-    voidDaysLastYear: 2,
-    riskBand: "Low",
-  },
-  {
-    id: 15,
-    uprn: "100012345015",
-    address: "9 Moorfield Court",
-    city: "Sheffield",
-    region: "Yorkshire",
-    postcode: "S5 7HR",
-    lat: 53.419,
-    lon: -1.458,
-    buildYear: 1970,
-    type: "Low-Rise Block",
-    tenure: "Social Rent",
-    landlord: "Steel City Housing",
-    epcRating: "D",
-    deprivationIndex: 7.9,
-    floodScore: 0.45,
-    crimeIndex: 6.5,
-    lastClaimDate: "2023-06-16",
-    claimFrequency: 0.22,
-    expectedSeverity: 2050,
-    purePremium: 451,
-    maintenanceScore: 5.7,
-    voidDaysLastYear: 22,
-    riskBand: "High",
-  },
+];
+
+const TABS = [
+  { id: "portfolio", label: "Portfolio view" },
+  { id: "stock", label: "Stock listing (Doc A)" },
+  { id: "highvalue", label: "High value (Doc B)" },
 ];
 
 const unique = (arr) => [...new Set(arr)];
 
 function App() {
+  const [activeTab, setActiveTab] = useState("portfolio");
+
   const [search, setSearch] = useState("");
   const [cityFilter, setCityFilter] = useState("All");
   const [riskFilter, setRiskFilter] = useState("All");
-  const [tenureFilter, setTenureFilter] = useState("All");
+  const [tenureFilter, setTenureFilter] = useState("All"); // treated as occupancy/tenant type
   const [maxPremium, setMaxPremium] = useState(700);
   const [minEpc, setMinEpc] = useState("Any");
   const [sortBy, setSortBy] = useState("purePremiumDesc");
@@ -410,7 +335,7 @@ function App() {
     []
   );
   const tenures = useMemo(
-    () => unique(RAW_PROPERTIES.map((p) => p.tenure)),
+    () => unique(RAW_PROPERTIES.map((p) => p.occupancyType)),
     []
   );
 
@@ -419,14 +344,19 @@ function App() {
     const minEpcIndex = epcOrder.indexOf(minEpc);
 
     let out = RAW_PROPERTIES.filter((p) => {
+      const fullAddress =
+        `${p.address1} ${p.address2} ${p.address3}`.toLowerCase();
       const matchesSearch =
         !search ||
-        p.address.toLowerCase().includes(search.toLowerCase()) ||
+        fullAddress.includes(search.toLowerCase()) ||
         p.postcode.toLowerCase().includes(search.toLowerCase()) ||
-        p.uprn.includes(search);
+        (p.propertyReference || "")
+          .toLowerCase()
+          .includes(search.toLowerCase());
       const matchesCity = cityFilter === "All" || p.city === cityFilter;
       const matchesRisk = riskFilter === "All" || p.riskBand === riskFilter;
-      const matchesTenure = tenureFilter === "All" || p.tenure === tenureFilter;
+      const matchesTenure =
+        tenureFilter === "All" || p.occupancyType === tenureFilter;
       const matchesPremium = p.purePremium <= maxPremium;
       const matchesEpc =
         minEpc === "Any" || epcOrder.indexOf(p.epcRating) <= minEpcIndex;
@@ -476,11 +406,16 @@ function App() {
     const highRiskCount = filtered.filter(
       (p) => p.riskBand === "High" || p.riskBand === "Very High"
     ).length;
+    const totalSumInsured = filtered.reduce(
+      (s, p) => s + (p.sumInsured || 0),
+      0
+    );
     return {
       n,
       avgPremium,
       avgFrequency,
       highRiskCount,
+      totalSumInsured,
     };
   }, [filtered]);
 
@@ -497,344 +432,673 @@ function App() {
         ]
       : [55.9533, -3.1883];
 
+  const highValueProps = useMemo(
+    () => RAW_PROPERTIES.filter((p) => !!p.docBRef),
+    []
+  );
+
+  // Simple Doc A validation-style aggregates (mimicking the pivot)
+  const byOccupancy = useMemo(() => {
+    const map = new Map();
+    RAW_PROPERTIES.forEach((p) => {
+      const key = p.occupancyType || "Unknown";
+      const prev = map.get(key) || { units: 0, sum: 0 };
+      map.set(key, {
+        units: prev.units + (p.numberOfUnits || 0),
+        sum: prev.sum + (p.sumInsured || 0),
+      });
+    });
+    return Array.from(map.entries()).map(([k, v]) => ({
+      occupancy: k,
+      units: v.units,
+      sumInsured: v.sum,
+    }));
+  }, []);
+
+  const byBlock = useMemo(() => {
+    const map = new Map();
+    RAW_PROPERTIES.forEach((p) => {
+      const key = p.blockReference || "Unknown";
+      const prev = map.get(key) || { units: 0, sum: 0 };
+      map.set(key, {
+        units: prev.units + (p.numberOfUnits || 0),
+        sum: prev.sum + (p.sumInsured || 0),
+      });
+    });
+    return Array.from(map.entries()).map(([k, v]) => ({
+      block: k,
+      units: v.units,
+      sumInsured: v.sum,
+    }));
+  }, []);
+
   return (
     <div className="app-root">
       <div className="app-shell">
         {/* Header */}
         <header className="app-header">
           <div>
-            <div className="app-badge">Hoplon • Internal Prototype</div>
-            <h1 className="app-title">Property Risk Explorer</h1>
+            <div className="app-badge">Hoplon • Underwriter dashboard</div>
+            <h1 className="app-title">Property &amp; risk workspace</h1>
             <p className="app-subtitle">
-              Slice a demo housing portfolio by geography, risk band and tenure.
-              Inspect the technical drivers behind each property’s modelled
-              risk.
+              Integrated view of the stock listing (Document A), high-value
+              blocks (Document B) and portfolio risk telemetry. Built for
+              underwriters to interrogate values, perils and completeness.
             </p>
           </div>
-          <div className="app-meta">Demo dataset · Not real properties</div>
+          <div className="app-meta">
+            Demo dataset · Mirrors Document A &amp; B structure
+          </div>
         </header>
 
-        {/* Layout */}
-        <div className="app-layout">
-          {/* Filters */}
-          <aside className="sidebar-card">
-            <h2 className="card-title">Filters</h2>
+        {/* Tabs */}
+        <nav className="tab-bar">
+          {TABS.map((tab) => (
+            <button
+              key={tab.id}
+              className={`tab ${activeTab === tab.id ? "tab-active" : ""}`}
+              onClick={() => setActiveTab(tab.id)}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </nav>
 
-            <div className="field">
-              <label className="field-label">
-                Search (address, postcode, UPRN)
-              </label>
-              <input
-                type="text"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="input"
-                placeholder="e.g. Caledonia, EH7, 1000123…"
-              />
-            </div>
+        {/* Layout varies by tab */}
+        {activeTab === "portfolio" && (
+          <div className="app-layout">
+            {/* Filters */}
+            <aside className="sidebar-card">
+              <h2 className="card-title">Filters</h2>
 
-            <div className="field-grid">
               <div className="field">
-                <label className="field-label">City</label>
+                <label className="field-label">
+                  Search (address, postcode, property ref)
+                </label>
+                <input
+                  type="text"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  className="input"
+                  placeholder="e.g. Caledonia, EH7, EXA1…"
+                />
+              </div>
+
+              <div className="field-grid">
+                <div className="field">
+                  <label className="field-label">City</label>
+                  <select
+                    value={cityFilter}
+                    onChange={(e) => setCityFilter(e.target.value)}
+                    className="input"
+                  >
+                    <option value="All">All</option>
+                    {cities.map((c) => (
+                      <option key={c} value={c}>
+                        {c}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="field">
+                  <label className="field-label">Risk band</label>
+                  <select
+                    value={riskFilter}
+                    onChange={(e) => setRiskFilter(e.target.value)}
+                    className="input"
+                  >
+                    <option value="All">All</option>
+                    {riskBands.map((r) => (
+                      <option key={r} value={r}>
+                        {r}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div className="field">
+                <label className="field-label">Occupancy / tenancy</label>
                 <select
-                  value={cityFilter}
-                  onChange={(e) => setCityFilter(e.target.value)}
+                  value={tenureFilter}
+                  onChange={(e) => setTenureFilter(e.target.value)}
                   className="input"
                 >
                   <option value="All">All</option>
-                  {cities.map((c) => (
-                    <option key={c} value={c}>
-                      {c}
+                  {tenures.map((t) => (
+                    <option key={t} value={t}>
+                      {t}
                     </option>
                   ))}
                 </select>
               </div>
 
               <div className="field">
-                <label className="field-label">Risk band</label>
+                <label className="field-label">Max pure premium (£)</label>
+                <input
+                  type="range"
+                  min={50}
+                  max={700}
+                  step={10}
+                  value={maxPremium}
+                  onChange={(e) => setMaxPremium(Number(e.target.value))}
+                  className="range"
+                />
+                <div className="range-value">≤ £{maxPremium}</div>
+              </div>
+
+              <div className="field">
+                <label className="field-label">Minimum EPC rating</label>
                 <select
-                  value={riskFilter}
-                  onChange={(e) => setRiskFilter(e.target.value)}
+                  value={minEpc}
+                  onChange={(e) => setMinEpc(e.target.value)}
                   className="input"
                 >
-                  <option value="All">All</option>
-                  {riskBands.map((r) => (
-                    <option key={r} value={r}>
-                      {r}
-                    </option>
-                  ))}
+                  <option value="Any">Any</option>
+                  <option value="A">A</option>
+                  <option value="B">B or better</option>
+                  <option value="C">C or better</option>
+                  <option value="D">D or better</option>
                 </select>
               </div>
-            </div>
 
-            <div className="field">
-              <label className="field-label">Tenure</label>
-              <select
-                value={tenureFilter}
-                onChange={(e) => setTenureFilter(e.target.value)}
-                className="input"
-              >
-                <option value="All">All</option>
-                {tenures.map((t) => (
-                  <option key={t} value={t}>
-                    {t}
+              <div className="field">
+                <label className="field-label">Sort by</label>
+                <select
+                  value={sortBy}
+                  onChange={(e) => setSortBy(e.target.value)}
+                  className="input"
+                >
+                  <option value="purePremiumDesc">
+                    Pure premium (high → low)
                   </option>
-                ))}
-              </select>
-            </div>
-
-            <div className="field">
-              <label className="field-label">Max pure premium (£)</label>
-              <input
-                type="range"
-                min={50}
-                max={700}
-                step={10}
-                value={maxPremium}
-                onChange={(e) => setMaxPremium(Number(e.target.value))}
-                className="range"
-              />
-              <div className="range-value">≤ £{maxPremium}</div>
-            </div>
-
-            <div className="field">
-              <label className="field-label">Minimum EPC rating</label>
-              <select
-                value={minEpc}
-                onChange={(e) => setMinEpc(e.target.value)}
-                className="input"
-              >
-                <option value="Any">Any</option>
-                <option value="A">A</option>
-                <option value="B">B or better</option>
-                <option value="C">C or better</option>
-                <option value="D">D or better</option>
-              </select>
-            </div>
-
-            <div className="field">
-              <label className="field-label">Sort by</label>
-              <select
-                value={sortBy}
-                onChange={(e) => setSortBy(e.target.value)}
-                className="input"
-              >
-                <option value="purePremiumDesc">
-                  Pure premium (high → low)
-                </option>
-                <option value="purePremiumAsc">
-                  Pure premium (low → high)
-                </option>
-                <option value="claimFrequencyDesc">
-                  Claim frequency (high → low)
-                </option>
-                <option value="deprivationDesc">
-                  Deprivation index (high → low)
-                </option>
-              </select>
-            </div>
-          </aside>
-
-          {/* Main content */}
-          <main className="main-column">
-            {/* Summary cards */}
-            {summary && (
-              <section className="summary-grid">
-                <div className="summary-card">
-                  <div className="summary-label">Properties in view</div>
-                  <div className="summary-value">{summary.n}</div>
-                  <div className="summary-footnote">
-                    out of {RAW_PROPERTIES.length} in portfolio
-                  </div>
-                </div>
-                <div className="summary-card">
-                  <div className="summary-label">Avg pure premium</div>
-                  <div className="summary-value">
-                    £{summary.avgPremium.toFixed(0)}
-                  </div>
-                  <div className="summary-footnote">
-                    modelled annual technical rate
-                  </div>
-                </div>
-                <div className="summary-card">
-                  <div className="summary-label">High / very-high risk</div>
-                  <div className="summary-value">{summary.highRiskCount}</div>
-                  <div className="summary-footnote">
-                    properties flagged for enhanced underwriting
-                  </div>
-                </div>
-              </section>
-            )}
-
-            {/* Edinburgh Map */}
-            <section className="card map-card">
-              <div className="card-header">
-                <h2 className="card-title">Edinburgh property view</h2>
-                <span className="card-badge">
-                  {edinburghProps.length} demo properties
-                </span>
-              </div>
-              <div className="map-wrapper">
-                <MapContainer
-                  center={edinburghCenter}
-                  zoom={12}
-                  style={{ height: "100%", width: "100%" }}
-                  scrollWheelZoom={false}
-                >
-                  <TileLayer
-                    attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-                    url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                  />
-                  {edinburghProps.map((p) => (
-                    <Marker key={p.id} position={[p.lat, p.lon]}>
-                      <Popup>
-                        <div className="popup">
-                          <strong>{p.address}</strong>
-                          <br />
-                          {p.postcode}
-                          <br />
-                          {p.type} • {p.tenure}
-                          <br />
-                          Risk band: <strong>{p.riskBand}</strong>
-                          <br />
-                          Pure premium: £{p.purePremium.toFixed(0)}
-                        </div>
-                      </Popup>
-                    </Marker>
-                  ))}
-                </MapContainer>
-              </div>
-            </section>
-
-            {/* Table */}
-            <section className="card">
-              <div className="card-header">
-                <h2 className="card-title">Property &amp; risk detail</h2>
-                <span className="card-badge">
-                  Showing {filtered.length} of {RAW_PROPERTIES.length}
-                </span>
+                  <option value="purePremiumAsc">
+                    Pure premium (low → high)
+                  </option>
+                  <option value="claimFrequencyDesc">
+                    Claim frequency (high → low)
+                  </option>
+                  <option value="deprivationDesc">
+                    Deprivation index (high → low)
+                  </option>
+                </select>
               </div>
 
-              <div className="table-wrapper">
-                <table className="risk-table">
-                  <thead>
-                    <tr>
-                      <th>Property</th>
-                      <th>Geo / Deprivation</th>
-                      <th>Hazards</th>
-                      <th>Claims</th>
-                      <th>Risk metrics</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {filtered.map((p) => (
-                      <tr key={p.id}>
-                        <td>
-                          <div className="prop-main">{p.address}</div>
-                          <div className="prop-sub">
-                            {p.city}, {p.region} {p.postcode}
-                          </div>
-                          <div className="prop-sub">
-                            {p.type} • {p.tenure}
-                          </div>
-                          <div className="prop-meta">
-                            UPRN {p.uprn} · Built {p.buildYear} · EPC{" "}
-                            {p.epcRating}
-                          </div>
-                        </td>
+              <div className="field">
+                <label className="field-label">Data quality notes</label>
+                <div className="field-note">
+                  All information to be included where available. Best
+                  endeavours should be used to populate missing fields, in line
+                  with Document A notes.
+                </div>
+              </div>
+            </aside>
 
-                        <td>
-                          <div className="cell-strong">
-                            Deprivation index:{" "}
-                            <span>{p.deprivationIndex.toFixed(1)}</span>
-                          </div>
-                          <div className="cell-muted">
-                            Void days last year: {p.voidDaysLastYear}
-                          </div>
-                          <div className="cell-meta">
-                            lat {p.lat.toFixed(3)}, lon {p.lon.toFixed(3)}
-                          </div>
-                          <div className="pill pill-risk">
-                            <span
-                              className={`pill-dot pill-dot-${p.riskBand
-                                .toLowerCase()
-                                .replace(" ", "")}`}
-                            />
-                            {p.riskBand} risk
-                          </div>
-                        </td>
+            {/* Main column: summary + map + detailed table */}
+            <main className="main-column">
+              {/* Summary cards */}
+              {summary && (
+                <section className="summary-grid">
+                  <div className="summary-card">
+                    <div className="summary-label">Properties in view</div>
+                    <div className="summary-value">{summary.n}</div>
+                    <div className="summary-footnote">
+                      out of {RAW_PROPERTIES.length} in this demo portfolio
+                    </div>
+                  </div>
+                  <div className="summary-card">
+                    <div className="summary-label">Avg pure premium</div>
+                    <div className="summary-value">
+                      £{summary.avgPremium.toFixed(0)}
+                    </div>
+                    <div className="summary-footnote">
+                      modelled annual technical rate
+                    </div>
+                  </div>
+                  <div className="summary-card">
+                    <div className="summary-label">Sum insured in view</div>
+                    <div className="summary-value">
+                      £{(summary.totalSumInsured / 1_000_000).toFixed(1)}m
+                    </div>
+                    <div className="summary-footnote">
+                      aggregate declared values for filtered properties
+                    </div>
+                  </div>
+                </section>
+              )}
 
-                        <td>
-                          <div className="cell-strong">
-                            Flood score: <span>{p.floodScore.toFixed(2)}</span>
-                          </div>
-                          <div className="cell-strong">
-                            Crime index: <span>{p.crimeIndex.toFixed(1)}</span>
-                          </div>
-                          <div className="cell-muted">
-                            Maintenance score: {p.maintenanceScore.toFixed(1)}
-                          </div>
-                        </td>
-
-                        <td>
-                          <div className="cell-strong">
-                            Claim frequency:{" "}
-                            <span>{p.claimFrequency.toFixed(2)}</span> / year
-                          </div>
-                          <div className="cell-strong">
-                            Expected severity:{" "}
-                            <span>
-                              £{p.expectedSeverity.toLocaleString("en-GB")}
-                            </span>
-                          </div>
-                          <div className="cell-muted">
-                            Last claim: {p.lastClaimDate || "None"}
-                          </div>
-                        </td>
-
-                        <td>
-                          <div className="cell-strong">
+              {/* Edinburgh Map */}
+              <section className="card map-card">
+                <div className="card-header">
+                  <h2 className="card-title">Edinburgh property view</h2>
+                  <span className="card-badge">
+                    {edinburghProps.length} demo properties
+                  </span>
+                </div>
+                <div className="map-wrapper">
+                  <MapContainer
+                    center={edinburghCenter}
+                    zoom={12}
+                    style={{ height: "100%", width: "100%" }}
+                    scrollWheelZoom={false}
+                  >
+                    <TileLayer
+                      attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+                      url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                    />
+                    {edinburghProps.map((p) => (
+                      <Marker key={p.id} position={[p.lat, p.lon]}>
+                        <Popup>
+                          <div className="popup">
+                            <strong>
+                              {p.address1} {p.address2}
+                            </strong>
+                            <br />
+                            {p.postcode}
+                            <br />
+                            {p.propertyType} • {p.occupancyType}
+                            <br />
+                            Risk band: <strong>{p.riskBand}</strong>
+                            <br />
                             Pure premium: £{p.purePremium.toFixed(0)}
                           </div>
-                          <div className="cell-muted">
-                            Roughly frequency × severity × loading
-                          </div>
-                          <div className="cell-muted flags-label">
-                            Underwriter flags:
-                          </div>
-                          <ul className="flags-list">
-                            {p.deprivationIndex > 8 && (
-                              <li>High deprivation area</li>
-                            )}
-                            {p.floodScore > 0.5 && <li>Elevated flood risk</li>}
-                            {p.claimFrequency > 0.2 && (
-                              <li>Frequent claims history</li>
-                            )}
-                            {p.maintenanceScore < 6 && (
-                              <li>Maintenance concerns</li>
-                            )}
-                            {p.deprivationIndex <= 8 &&
-                              p.floodScore <= 0.5 &&
-                              p.claimFrequency <= 0.2 &&
-                              p.maintenanceScore >= 6 && <li>None</li>}
-                          </ul>
-                        </td>
-                      </tr>
+                        </Popup>
+                      </Marker>
                     ))}
+                  </MapContainer>
+                </div>
+              </section>
 
-                    {filtered.length === 0 && (
+              {/* Detailed table – merged technical view */}
+              <section className="card">
+                <div className="card-header">
+                  <h2 className="card-title">
+                    Property, exposure &amp; risk detail
+                  </h2>
+                  <span className="card-badge">
+                    Showing {filtered.length} of {RAW_PROPERTIES.length}
+                  </span>
+                </div>
+
+                <div className="table-wrapper">
+                  <table className="risk-table">
+                    <thead>
                       <tr>
-                        <td colSpan={5} className="empty-row">
-                          No properties match the current filters.
-                        </td>
+                        <th>Property (Doc A)</th>
+                        <th>Geo / Deprivation</th>
+                        <th>Construction &amp; features</th>
+                        <th>Perils &amp; claims</th>
+                        <th>Risk metrics</th>
                       </tr>
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            </section>
-          </main>
-        </div>
+                    </thead>
+                    <tbody>
+                      {filtered.map((p) => (
+                        <tr key={p.id}>
+                          <td>
+                            <div className="prop-main">
+                              {p.address1} {p.address2}
+                            </div>
+                            <div className="prop-sub">
+                              {p.city}, {p.region} {p.postcode}
+                            </div>
+                            <div className="prop-sub">
+                              {p.propertyType} • {p.occupancyType}
+                            </div>
+                            <div className="prop-meta">
+                              Ref {p.propertyReference} · Block{" "}
+                              {p.blockReference} · Units {p.numberOfUnits}
+                            </div>
+                            <div className="prop-meta">
+                              Sum insured: £
+                              {p.sumInsured.toLocaleString("en-GB")} (
+                              {p.sumInsuredType})
+                            </div>
+                          </td>
+
+                          <td>
+                            <div className="cell-strong">
+                              Deprivation index:{" "}
+                              <span>{p.deprivationIndex.toFixed(1)}</span>
+                            </div>
+                            <div className="cell-muted">
+                              Void days last year: {p.voidDaysLastYear}
+                            </div>
+                            <div className="cell-meta">
+                              lat {p.lat.toFixed(3)}, lon {p.lon.toFixed(3)}
+                            </div>
+                            <div className="pill pill-risk">
+                              <span
+                                className={`pill-dot pill-dot-${p.riskBand
+                                  .toLowerCase()
+                                  .replace(" ", "")}`}
+                              />
+                              {p.riskBand} risk
+                            </div>
+                          </td>
+
+                          <td>
+                            <div className="cell-strong">
+                              Construction: <span>{p.wallConstruction}</span>
+                            </div>
+                            <div className="cell-muted">
+                              Roof: {p.roofConstruction}
+                            </div>
+                            <div className="cell-muted">
+                              Floors: {p.numberOfStoreys} storeys, basement:{" "}
+                              {p.basementLocation}
+                            </div>
+                            <div className="cell-muted">
+                              Features: {p.securityFeatures}
+                            </div>
+                            <div className="cell-meta">
+                              Age band: {p.ageBanding} · EPC {p.epcRating}
+                            </div>
+                          </td>
+
+                          <td>
+                            <div className="cell-strong">
+                              Flood insured:{" "}
+                              <span>{p.floodInsured ? "Yes" : "No"}</span>
+                            </div>
+                            <div className="cell-strong">
+                              Storm insured:{" "}
+                              <span>{p.stormInsured ? "Yes" : "No"}</span>
+                            </div>
+                            <div className="cell-muted">
+                              Flood score: {p.floodScore.toFixed(2)}
+                            </div>
+                            <div className="cell-muted">
+                              Crime index: {p.crimeIndex.toFixed(1)}
+                            </div>
+                            <div className="cell-muted">
+                              Claim frequency: {p.claimFrequency.toFixed(2)} /
+                              year
+                            </div>
+                            <div className="cell-meta">
+                              Last claim: {p.lastClaimDate || "None"}
+                            </div>
+                          </td>
+
+                          <td>
+                            <div className="cell-strong">
+                              Pure premium: £{p.purePremium.toFixed(0)}
+                            </div>
+                            <div className="cell-muted">
+                              Expected severity: £
+                              {p.expectedSeverity.toLocaleString("en-GB")}
+                            </div>
+                            <div className="cell-muted">
+                              Maintenance score: {p.maintenanceScore.toFixed(1)}
+                            </div>
+                            <div className="cell-muted flags-label">
+                              Underwriter flags:
+                            </div>
+                            <ul className="flags-list">
+                              {p.deprivationIndex > 8 && (
+                                <li>High deprivation area</li>
+                              )}
+                              {p.floodScore > 0.5 && (
+                                <li>Elevated flood risk</li>
+                              )}
+                              {p.claimFrequency > 0.2 && (
+                                <li>Frequent claims history</li>
+                              )}
+                              {p.maintenanceScore < 6 && (
+                                <li>Maintenance concerns</li>
+                              )}
+                              {p.deprivationIndex <= 8 &&
+                                p.floodScore <= 0.5 &&
+                                p.claimFrequency <= 0.2 &&
+                                p.maintenanceScore >= 6 && <li>None</li>}
+                            </ul>
+                          </td>
+                        </tr>
+                      ))}
+
+                      {filtered.length === 0 && (
+                        <tr>
+                          <td colSpan={5} className="empty-row">
+                            No properties match the current filters.
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </section>
+            </main>
+          </div>
+        )}
+
+        {/* Stock listing tab – closer to Document A layout */}
+        {activeTab === "stock" && (
+          <div className="card" style={{ marginTop: 20 }}>
+            <div className="card-header">
+              <h2 className="card-title">
+                Stock listing – Document A structure
+              </h2>
+              <span className="card-badge">
+                Simplified view of the June 24 stock listing format
+              </span>
+            </div>
+            <div className="table-wrapper">
+              <table className="risk-table">
+                <thead>
+                  <tr>
+                    <th>Client / Policy</th>
+                    <th>Property / Block</th>
+                    <th>Occupancy</th>
+                    <th>Units / Sum insured</th>
+                    <th>Construction &amp; age</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {RAW_PROPERTIES.map((p) => (
+                    <tr key={p.id}>
+                      <td>
+                        <div className="cell-strong">
+                          {p.clientName || "Client"}
+                        </div>
+                        <div className="cell-muted">
+                          Policy: {p.policyReference}
+                        </div>
+                        <div className="cell-meta">{p.productType}</div>
+                      </td>
+                      <td>
+                        <div className="prop-main">
+                          {p.address1} {p.address2}
+                        </div>
+                        <div className="prop-sub">
+                          Ref {p.propertyReference} · Block {p.blockReference}
+                        </div>
+                        <div className="prop-meta">
+                          {p.city} {p.postcode}
+                        </div>
+                      </td>
+                      <td>
+                        <div className="cell-strong">
+                          Occupancy: <span>{p.occupancyType}</span>
+                        </div>
+                        <div className="cell-muted">
+                          Avid property type: {p.avidPropertyType}
+                        </div>
+                      </td>
+                      <td>
+                        <div className="cell-strong">
+                          Units: <span>{p.numberOfUnits}</span>
+                        </div>
+                        <div className="cell-muted">
+                          Sum insured: £{p.sumInsured.toLocaleString("en-GB")}
+                        </div>
+                        <div className="cell-meta">
+                          Basis: {p.sumInsuredType}
+                        </div>
+                      </td>
+                      <td>
+                        <div className="cell-strong">
+                          Year built: <span>{p.yearBuilt}</span>
+                        </div>
+                        <div className="cell-muted">
+                          Age band: {p.ageBanding}
+                        </div>
+                        <div className="cell-muted">
+                          Walls: {p.wallConstruction}
+                        </div>
+                        <div className="cell-muted">
+                          Roof: {p.roofConstruction}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Very light validation summary, echoing the pivot */}
+            <div className="card-header">
+              <h3 className="card-title">Validation snapshots</h3>
+            </div>
+            <div className="table-wrapper">
+              <table className="risk-table">
+                <thead>
+                  <tr>
+                    <th>By tenancy / ownership</th>
+                    <th>Units</th>
+                    <th>Sum insured (£)</th>
+                    <th>By block</th>
+                    <th>Units</th>
+                    <th>Sum insured (£)</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {byOccupancy.map((occ, idx) => (
+                    <tr key={occ.occupancy}>
+                      <td>{occ.occupancy}</td>
+                      <td>{occ.units}</td>
+                      <td>
+                        £
+                        {occ.sumInsured.toLocaleString("en-GB", {
+                          maximumFractionDigits: 0,
+                        })}
+                      </td>
+                      <td>{byBlock[idx] ? byBlock[idx].block : ""}</td>
+                      <td>{byBlock[idx] ? byBlock[idx].units : ""}</td>
+                      <td>
+                        {byBlock[idx]
+                          ? "£" +
+                            byBlock[idx].sumInsured.toLocaleString("en-GB", {
+                              maximumFractionDigits: 0,
+                            })
+                          : ""}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {/* High value tab – Document B-flavoured */}
+        {activeTab === "highvalue" && (
+          <div className="card" style={{ marginTop: 20 }}>
+            <div className="card-header">
+              <h2 className="card-title">
+                High value blocks – Document B view
+              </h2>
+              <span className="card-badge">
+                Pulling out properties with Document B-style information
+              </span>
+            </div>
+            <div className="table-wrapper">
+              <table className="risk-table">
+                <thead>
+                  <tr>
+                    <th>Block / Policy</th>
+                    <th>High value attributes</th>
+                    <th>Fire risk management</th>
+                    <th>Evacuation &amp; EWS</th>
+                    <th>Claims &amp; risk</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {highValueProps.map((p) => (
+                    <tr key={p.id}>
+                      <td>
+                        <div className="prop-main">{p.address1}</div>
+                        <div className="prop-sub">
+                          {p.city} {p.postcode}
+                        </div>
+                        <div className="prop-meta">
+                          Ref {p.docBRef} · Policy {p.policyReference}
+                        </div>
+                        <div className="prop-meta">
+                          Sum insured: £{p.sumInsured.toLocaleString("en-GB")}
+                        </div>
+                      </td>
+                      <td>
+                        <div className="cell-strong">
+                          Storeys above ground:{" "}
+                          <span>{p.floorsAboveGround}</span>
+                        </div>
+                        <div className="cell-muted">
+                          Below ground: {p.floorsBelowGround}
+                        </div>
+                        <div className="cell-muted">
+                          Construction: {p.wallConstruction}
+                        </div>
+                        <div className="cell-muted">
+                          Cladding: {p.claddingType}
+                        </div>
+                      </td>
+                      <td>
+                        <div className="cell-strong">Fire risk management</div>
+                        <div className="cell-muted">
+                          {p.fireRiskManagementSummary}
+                        </div>
+                      </td>
+                      <td>
+                        <div className="cell-strong">
+                          EWS / façade status:{" "}
+                          <span>{p.ewsStatus || "N/A"}</span>
+                        </div>
+                        <div className="cell-muted">
+                          Evacuation strategy: {p.evacuationStrategy}
+                        </div>
+                      </td>
+                      <td>
+                        <div className="cell-strong">
+                          Risk band: <span>{p.riskBand}</span>
+                        </div>
+                        <div className="cell-muted">
+                          Pure premium: £{p.purePremium.toFixed(0)}
+                        </div>
+                        <div className="cell-muted">
+                          Claim frequency: {p.claimFrequency.toFixed(2)} / year
+                        </div>
+                        <div className="cell-meta">
+                          Last claim: {p.lastClaimDate || "None"}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            <div className="card-header">
+              <h3 className="card-title">Document B notes (summary)</h3>
+            </div>
+            <div style={{ padding: "10px 18px 16px", fontSize: 12 }}>
+              This view mirrors the intent of Document B: to capture
+              high-resolution information for complex or high-value blocks,
+              including construction features, fire safety measures and
+              remediation status (for example EWS, ACM/HPL panels). It is
+              designed to sit alongside the stock listing, not replace it.
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
