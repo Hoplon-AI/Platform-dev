@@ -314,6 +314,7 @@ const TABS = [
   { id: "portfolio", label: "Portfolio view" },
   { id: "stock", label: "Stock listing (Doc A)" },
   { id: "highvalue", label: "High value (Doc B)" },
+  { id: "upload", label: "Upload CSV" },
 ];
 
 const unique = (arr) => [...new Set(arr)];
@@ -328,6 +329,39 @@ function App() {
   const [maxPremium, setMaxPremium] = useState(700);
   const [minEpc, setMinEpc] = useState("Any");
   const [sortBy, setSortBy] = useState("purePremiumDesc");
+  const [uploadedData, setUploadedData] = useState(null);
+const [isUploading, setIsUploading] = useState(false);
+const [uploadError, setUploadError] = useState(null);
+
+const handleFileUpload = async (event) => {
+  const file = event.target.files[0];
+  if (!file) return;
+
+  setIsUploading(true);
+  setUploadError(null);
+
+  const formData = new FormData();
+  formData.append("file", file);
+
+  try {
+    const response = await fetch("http://localhost:8000/upload-csv", {
+      method: "POST",
+      body: formData,
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.detail || "Upload failed");
+    }
+
+    const result = await response.json();
+    setUploadedData(result);
+  } catch (error) {
+    setUploadError(error.message);
+  } finally {
+    setIsUploading(false);
+  }
+};
 
   const cities = useMemo(() => unique(RAW_PROPERTIES.map((p) => p.city)), []);
   const riskBands = useMemo(
@@ -1099,6 +1133,129 @@ function App() {
             </div>
           </div>
         )}
+
+        {activeTab === "upload" && (
+  <div className="card" style={{ marginTop: 20 }}>
+    <div className="card-header">
+      <h2 className="card-title">Upload CSV File</h2>
+      <span className="card-badge">
+        Upload and standardize property data
+      </span>
+    </div>
+
+    <div style={{ padding: "20px" }}>
+      {/* File upload input */}
+      <div className="field">
+        <label className="field-label">Select CSV File</label>
+        <input
+          type="file"
+          accept=".csv"
+          onChange={handleFileUpload}
+          disabled={isUploading}
+          className="input"
+          style={{ padding: "8px" }}
+        />
+      </div>
+
+      {/* Loading indicator */}
+      {isUploading && (
+        <div style={{ marginTop: 20, textAlign: "center" }}>
+          <p>Processing file...</p>
+        </div>
+      )}
+
+      {/* Error message */}
+      {uploadError && (
+        <div
+          style={{
+            marginTop: 20,
+            padding: 15,
+            backgroundColor: "#fee",
+            borderRadius: 4,
+            color: "#c00",
+          }}
+        >
+          <strong>Error:</strong> {uploadError}
+        </div>
+      )}
+
+      {/* Success message and data display */}
+      {uploadedData && !isUploading && (
+        <div style={{ marginTop: 20 }}>
+          <div
+            style={{
+              padding: 15,
+              backgroundColor: "#efe",
+              borderRadius: 4,
+              marginBottom: 20,
+            }}
+          >
+            <strong>✓ Success!</strong> {uploadedData.message}
+            <br />
+            <small>File: {uploadedData.original_filename}</small>
+          </div>
+
+          {/* Column mapping info */}
+          {Object.keys(uploadedData.column_mapping).length > 0 && (
+            <div style={{ marginBottom: 20 }}>
+              <h3 className="card-title">Standardized Columns</h3>
+              <table className="risk-table">
+                <thead>
+                  <tr>
+                    <th>Original Column</th>
+                    <th>Standardized Column</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {Object.entries(uploadedData.column_mapping).map(
+                    ([original, standardized]) => (
+                      <tr key={original}>
+                        <td>{original}</td>
+                        <td>
+                          <strong>{standardized}</strong>
+                        </td>
+                      </tr>
+                    )
+                  )}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {/* Display standardized data */}
+          <div>
+            <h3 className="card-title">Standardized Data Preview</h3>
+            <div className="table-wrapper">
+              <table className="risk-table">
+                <thead>
+                  <tr>
+                    {uploadedData.columns.map((col) => (
+                      <th key={col}>{col}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {uploadedData.data.slice(0, 50).map((row, idx) => (
+                    <tr key={idx}>
+                      {uploadedData.columns.map((col) => (
+                        <td key={col}>{row[col] ?? "—"}</td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            {uploadedData.row_count > 50 && (
+              <p style={{ marginTop: 10, fontSize: 12, color: "#666" }}>
+                Showing first 50 of {uploadedData.row_count} rows
+              </p>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  </div>
+)}
       </div>
     </div>
   );

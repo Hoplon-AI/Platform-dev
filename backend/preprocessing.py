@@ -51,10 +51,5 @@ def standardize_columns(df, mapping=COLUMN_MAPPING):
 
     df_standardized = df.rename(columns=rename_dict)
 
-    # Print the renamed columns
-    if rename_dict:
-        print("Renamed columns:")
-        for old, new in rename_dict.items():
-            print(f"  '{old}' → '{new}'")
 
     return df_standardized
