@@ -5,8 +5,7 @@ import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import "./styles.css";
 import LandingPage from "./LandingPage";
-import  { RAW_PROPERTIES } from "./data/properties";
-
+import { RAW_PROPERTIES } from "./data/properties";
 
 // Fix default Leaflet marker icons when bundling
 delete L.Icon.Default.prototype._getIconUrl;
@@ -16,7 +15,6 @@ L.Icon.Default.mergeOptions({
   iconUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png",
   shadowUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
 });
-
 
 const TABS = [
   { id: "portfolio", label: "Portfolio view" },
@@ -217,7 +215,14 @@ function App() {
 
   // Conditional rendering - AFTER all hooks
   if (showLanding) {
-    return <LandingPage onGetStarted={() => setShowLanding(false)} />;
+    return (
+      <LandingPage
+        onGetStarted={(tab = "portfolio") => {
+          setShowLanding(false);
+          setActiveTab(tab); // <-- opens to Portfolio (with map)
+        }}
+      />
+    );
   }
 
   return (
@@ -849,127 +854,127 @@ function App() {
         )}
 
         {activeTab === "upload" && (
-  <div className="card" style={{ marginTop: 20 }}>
-    <div className="card-header">
-      <h2 className="card-title">Upload CSV File</h2>
-      <span className="card-badge">
-        Upload and standardize property data
-      </span>
-    </div>
+          <div className="card" style={{ marginTop: 20 }}>
+            <div className="card-header">
+              <h2 className="card-title">Upload CSV File</h2>
+              <span className="card-badge">
+                Upload and standardize property data
+              </span>
+            </div>
 
-    <div style={{ padding: "20px" }}>
-      {/* File upload input */}
-      <div className="field">
-        <label className="field-label">Select CSV File</label>
-        <input
-          type="file"
-          accept=".csv"
-          onChange={handleFileUpload}
-          disabled={isUploading}
-          className="input"
-          style={{ padding: "8px" }}
-        />
-      </div>
+            <div style={{ padding: "20px" }}>
+              {/* File upload input */}
+              <div className="field">
+                <label className="field-label">Select CSV File</label>
+                <input
+                  type="file"
+                  accept=".csv"
+                  onChange={handleFileUpload}
+                  disabled={isUploading}
+                  className="input"
+                  style={{ padding: "8px" }}
+                />
+              </div>
 
-      {/* Loading indicator */}
-      {isUploading && (
-        <div style={{ marginTop: 20, textAlign: "center" }}>
-          <p>Processing file...</p>
-        </div>
-      )}
+              {/* Loading indicator */}
+              {isUploading && (
+                <div style={{ marginTop: 20, textAlign: "center" }}>
+                  <p>Processing file...</p>
+                </div>
+              )}
 
-      {/* Error message */}
-      {uploadError && (
-        <div
-          style={{
-            marginTop: 20,
-            padding: 15,
-            backgroundColor: "#fee",
-            borderRadius: 4,
-            color: "#c00",
-          }}
-        >
-          <strong>Error:</strong> {uploadError}
-        </div>
-      )}
+              {/* Error message */}
+              {uploadError && (
+                <div
+                  style={{
+                    marginTop: 20,
+                    padding: 15,
+                    backgroundColor: "#fee",
+                    borderRadius: 4,
+                    color: "#c00",
+                  }}
+                >
+                  <strong>Error:</strong> {uploadError}
+                </div>
+              )}
 
-      {/* Success message and data display */}
-      {uploadedData && !isUploading && (
-        <div style={{ marginTop: 20 }}>
-          <div
-            style={{
-              padding: 15,
-              backgroundColor: "#efe",
-              borderRadius: 4,
-              marginBottom: 20,
-            }}
-          >
-            <strong>✓ Success!</strong> {uploadedData.message}
-            <br />
-            <small>File: {uploadedData.original_filename}</small>
-          </div>
+              {/* Success message and data display */}
+              {uploadedData && !isUploading && (
+                <div style={{ marginTop: 20 }}>
+                  <div
+                    style={{
+                      padding: 15,
+                      backgroundColor: "#efe",
+                      borderRadius: 4,
+                      marginBottom: 20,
+                    }}
+                  >
+                    <strong>✓ Success!</strong> {uploadedData.message}
+                    <br />
+                    <small>File: {uploadedData.original_filename}</small>
+                  </div>
 
-          {/* Column mapping info */}
-          {Object.keys(uploadedData.column_mapping).length > 0 && (
-            <div style={{ marginBottom: 20 }}>
-              <h3 className="card-title">Standardized Columns</h3>
-              <table className="risk-table">
-                <thead>
-                  <tr>
-                    <th>Original Column</th>
-                    <th>Standardized Column</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {Object.entries(uploadedData.column_mapping).map(
-                    ([original, standardized]) => (
-                      <tr key={original}>
-                        <td>{original}</td>
-                        <td>
-                          <strong>{standardized}</strong>
-                        </td>
-                      </tr>
-                    )
+                  {/* Column mapping info */}
+                  {Object.keys(uploadedData.column_mapping).length > 0 && (
+                    <div style={{ marginBottom: 20 }}>
+                      <h3 className="card-title">Standardized Columns</h3>
+                      <table className="risk-table">
+                        <thead>
+                          <tr>
+                            <th>Original Column</th>
+                            <th>Standardized Column</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {Object.entries(uploadedData.column_mapping).map(
+                            ([original, standardized]) => (
+                              <tr key={original}>
+                                <td>{original}</td>
+                                <td>
+                                  <strong>{standardized}</strong>
+                                </td>
+                              </tr>
+                            )
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
                   )}
-                </tbody>
-              </table>
-            </div>
-          )}
 
-          {/* Display standardized data */}
-          <div>
-            <h3 className="card-title">Standardized Data Preview</h3>
-            <div className="table-wrapper">
-              <table className="risk-table">
-                <thead>
-                  <tr>
-                    {uploadedData.columns.map((col) => (
-                      <th key={col}>{col}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {uploadedData.data.slice(0, 50).map((row, idx) => (
-                    <tr key={idx}>
-                      {uploadedData.columns.map((col) => (
-                        <td key={col}>{row[col] ?? "—"}</td>
-                      ))}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+                  {/* Display standardized data */}
+                  <div>
+                    <h3 className="card-title">Standardized Data Preview</h3>
+                    <div className="table-wrapper">
+                      <table className="risk-table">
+                        <thead>
+                          <tr>
+                            {uploadedData.columns.map((col) => (
+                              <th key={col}>{col}</th>
+                            ))}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {uploadedData.data.slice(0, 50).map((row, idx) => (
+                            <tr key={idx}>
+                              {uploadedData.columns.map((col) => (
+                                <td key={col}>{row[col] ?? "—"}</td>
+                              ))}
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                    {uploadedData.row_count > 50 && (
+                      <p style={{ marginTop: 10, fontSize: 12, color: "#666" }}>
+                        Showing first 50 of {uploadedData.row_count} rows
+                      </p>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
-            {uploadedData.row_count > 50 && (
-              <p style={{ marginTop: 10, fontSize: 12, color: "#666" }}>
-                Showing first 50 of {uploadedData.row_count} rows
-              </p>
-            )}
           </div>
-        </div>
-      )}
-    </div>
-  </div>
-)}
+        )}
       </div>
     </div>
   );
