@@ -73,15 +73,8 @@
 }
 
 .hero-city-chip {
-  position: absolute;
-  left: 16px;
-  bottom: 16px;
-  padding: 6px 12px;
-  border-radius: 999px;
-  background: rgba(0, 0, 0, 0.55);
-  color: #fff;
-  font-size: 12px;
-}
+    display: none !important;
+  }
 
 /* Sections */
 .services,
