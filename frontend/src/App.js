@@ -201,68 +201,156 @@ function App() {
     if (uploadedData && uploadedData.data.length) {
       // Map uploaded data to property format
       return uploadedData.data.map((row, idx) => {
-        const colsLower = uploadedData.columns.map((c) => c.toLowerCase());
-
-        // Helper to find column value
-        const getCol = (keywords) => {
-          const index = colsLower.findIndex((c) =>
-            keywords.some((kw) => c.includes(kw))
-          );
-          return index !== -1 ? row[uploadedData.columns[index]] : "";
+        // Helper to check if column is empty/missing in original data
+        const isColMissing = (colName) => {
+          const val = row[colName];
+          return val === undefined || val === null || val === "" || String(val).trim() === "";
         };
 
-        // Try to extract as much data as possible from uploaded file
+        // Helper to get column value with fallback
+        const getCol = (colName, fallback = "") => {
+          return row[colName] !== undefined && row[colName] !== "" ? row[colName] : fallback;
+        };
+
+        // Parse numeric values safely
+        const parseNum = (val, fallback = 0) => {
+          const num = parseFloat(String(val).replace(/[^0-9.-]/g, ""));
+          return isNaN(num) ? fallback : num;
+        };
+
+        const parseInt_ = (val, fallback = 0) => {
+          const num = parseInt(String(val).replace(/[^0-9]/g, ""));
+          return isNaN(num) ? fallback : num;
+        };
+
+        // Track if ANY critical fields are missing in original CSV
+        const hasOriginalAddress = !isColMissing("address");
+        const hasOriginalPostcode = !isColMissing("zip_code");
+        const hasOriginalCity = !isColMissing("city");
+        const hasOriginalRegion = !isColMissing("region");
+        const hasOriginalLat = !isColMissing("lat");
+        const hasOriginalLon = !isColMissing("lon");
+        const hasOriginalBuildYear = !isColMissing("buildYear");
+        const hasOriginalType = !isColMissing("type");
+        const hasOriginalTenure = !isColMissing("tenure");
+        const hasOriginalLandlord = !isColMissing("landlord");
+        const hasOriginalEpcRating = !isColMissing("epcRating");
+        const hasOriginalDeprivationIndex = !isColMissing("deprivationIndex");
+        const hasOriginalFloodScore = !isColMissing("floodScore");
+        const hasOriginalCrimeIndex = !isColMissing("crimeIndex");
+        const hasOriginalClaimFrequency = !isColMissing("claimFrequency");
+        const hasOriginalPurePremium = !isColMissing("purePremium") && parseNum(getCol("purePremium")) > 0;
+        const hasOriginalRiskBand = !isColMissing("riskBand");
+        const hasOriginalMaintenanceScore = !isColMissing("maintenanceScore");
+        const hasOriginalVoidDays = !isColMissing("voidDaysLastYear");
+
+        // Count how many critical fields are missing
+        const missingFieldsCount = [
+          hasOriginalAddress,
+          hasOriginalPostcode,
+          hasOriginalCity,
+          hasOriginalRegion,
+          hasOriginalLat,
+          hasOriginalLon,
+          hasOriginalBuildYear,
+          hasOriginalType,
+          hasOriginalTenure,
+          hasOriginalLandlord,
+          hasOriginalEpcRating,
+          hasOriginalDeprivationIndex,
+          hasOriginalFloodScore,
+          hasOriginalCrimeIndex,
+          hasOriginalClaimFrequency,
+          hasOriginalPurePremium,
+          hasOriginalRiskBand,
+          hasOriginalMaintenanceScore,
+          hasOriginalVoidDays
+        ].filter(hasField => !hasField).length;
+
+        // Map the uploaded CSV format to internal property structure
+        const lat = parseNum(getCol("lat"), 55.9533 + (Math.random() - 0.5) * 0.1);
+        const lon = parseNum(getCol("lon"), -3.1883 + (Math.random() - 0.5) * 0.1);
+
         return {
-          id: `uploaded-${idx}`,
-          address1: getCol(["address", "street", "location"]) || `Property ${idx + 1}`,
-          address2: getCol(["address2", "address 2"]) || "",
-          address3: getCol(["address3", "address 3"]) || "",
-          postcode: getCol(["postcode", "postal", "zip"]) || "N/A",
-          city: getCol(["city", "town"]) || "Unknown",
-          region: getCol(["region", "county", "state"]) || "Unknown",
-          propertyType: getCol(["property type", "type"]) || "Unknown",
-          propertyReference: getCol(["property ref", "prop ref", "reference"]) || `REF${idx + 1}`,
-          blockReference: getCol(["block", "block ref"]) || `BLK${idx + 1}`,
-          occupancyType: getCol(["occupancy", "tenure", "tenancy"]) || "Unknown",
-          numberOfUnits: parseInt(getCol(["units", "number of units"])) || 1,
-          sumInsured: parseFloat(String(getCol(["sum insured", "insured value", "value"])).replace(/[^0-9.]/g, "")) || 0,
-          sumInsuredType: getCol(["sum insured type", "basis"]) || "Unknown",
-          riskBand: getCol(["risk", "risk band", "risk level"]) || "Medium",
-          yearBuilt: parseInt(getCol(["year built", "built", "construction year"])) || 2000,
-          ageBanding: getCol(["age", "age band"]) || "Unknown",
-          wallConstruction: getCol(["wall", "construction"]) || "Unknown",
-          roofConstruction: getCol(["roof"]) || "Unknown",
-          numberOfStoreys: parseInt(getCol(["storeys", "floors", "stories"])) || 1,
-          basementLocation: getCol(["basement"]) || "None",
-          securityFeatures: getCol(["security"]) || "Standard",
-          epcRating: getCol(["epc", "energy"]) || "N/A",
-          deprivationIndex: parseFloat(getCol(["deprivation"])) || 5.0,
-          voidDaysLastYear: parseInt(getCol(["void", "vacant"])) || 0,
-          floodInsured: getCol(["flood"]).toLowerCase().includes("yes") || true,
-          stormInsured: getCol(["storm"]).toLowerCase().includes("yes") || true,
-          floodScore: parseFloat(getCol(["flood score"])) || 0.5,
-          crimeIndex: parseFloat(getCol(["crime"])) || 5.0,
-          claimFrequency: parseFloat(getCol(["claim"])) || 0.1,
-          // Default coordinates (would need geocoding in real app)
-          lat: 55.9533 + (Math.random() - 0.5) * 0.1,
-          lon: -3.1883 + (Math.random() - 0.5) * 0.1,
-          clientName: getCol(["client"]) || "Client",
-          policyReference: getCol(["policy"]) || `POL${idx + 1}`,
-          productType: getCol(["product"]) || "Property Insurance",
-          avidPropertyType: getCol(["avid", "property type"]) || "Unknown",
+          id: getCol("id", `uploaded-${idx}`),
+          uprn: getCol("uprn", ""),
+          address1: getCol("address", `Property ${idx + 1}`),
+          address2: "",
+          address3: "",
+          postcode: getCol("zip_code", "N/A"),
+          city: getCol("city", "Unknown"),
+          region: getCol("region", "Unknown"),
+          propertyType: getCol("type", "Unknown"),
+          propertyReference: getCol("id", `REF${idx + 1}`),
+          blockReference: `BLK${idx + 1}`,
+          occupancyType: getCol("tenure", "Unknown"),
+          numberOfUnits: 1,
+          sumInsured: parseNum(getCol("purePremium")) * 100 || 500000, // Estimate based on premium
+          sumInsuredType: "Reinstatement",
+          riskBand: getCol("riskBand", "Medium"),
+          yearBuilt: parseInt_(getCol("buildYear"), 2000),
+          ageBanding: calculateAgeBanding(parseInt_(getCol("buildYear"), 2000)),
+          wallConstruction: "Unknown",
+          roofConstruction: "Unknown",
+          numberOfStoreys: 2,
+          basementLocation: "None",
+          securityFeatures: "Standard",
+          epcRating: getCol("epcRating", "N/A"),
+          deprivationIndex: parseNum(getCol("deprivationIndex"), 5.0),
+          voidDaysLastYear: parseInt_(getCol("voidDaysLastYear"), 0),
+          floodInsured: true,
+          stormInsured: true,
+          floodScore: parseNum(getCol("floodScore"), 0.5),
+          crimeIndex: parseNum(getCol("crimeIndex"), 5.0),
+          claimFrequency: parseNum(getCol("claimFrequency"), 0.1),
+          expectedSeverity: parseNum(getCol("expectedSeverity"), 0),
+          purePremium: parseNum(getCol("purePremium"), 0),
+          maintenanceScore: parseNum(getCol("maintenanceScore"), 5.0),
+          lastClaimDate: getCol("lastClaimDate", null),
+          // Use uploaded coordinates or generate random ones around UK
+          lat: lat,
+          lon: lon,
+          clientName: getCol("landlord", "Client"),
+          policyReference: `POL-${getCol("id", idx + 1)}`,
+          productType: "Property Insurance",
+          avidPropertyType: getCol("type", "Unknown"),
           docBRef: "",
-          floorsAboveGround: parseInt(getCol(["floors above"])) || 0,
-          floorsBelowGround: parseInt(getCol(["floors below"])) || 0,
-          claddingType: getCol(["cladding"]) || "N/A",
-          fireRiskManagementSummary: getCol(["fire risk", "fire management"]) || "Standard measures",
-          ewsStatus: getCol(["ews"]) || "N/A",
-          evacuationStrategy: getCol(["evacuation"]) || "Standard",
-          lastClaimDate: getCol(["last claim"]) || null,
+          floorsAboveGround: 2,
+          floorsBelowGround: 0,
+          claddingType: "N/A",
+          fireRiskManagementSummary: "Standard measures",
+          ewsStatus: "N/A",
+          evacuationStrategy: "Standard",
+          numberOfBedrooms: 2,
+          listedBuilding: "Not listed",
+          fireProtection: "Standard",
+          alarms: "Standard",
+          deductible: 2500,
+          floodDeductible: 5000,
+          stormDeductible: 2500,
+          deductibleBasis: "Each and every loss",
+          floorConstruction: "Unknown",
+          // Track missing data - if ANY field is missing, flag this record
+          _hasMissingData: missingFieldsCount > 0,
+          _missingFieldsCount: missingFieldsCount,
         };
       });
     }
     return RAW_PROPERTIES;
   }, [uploadedData]);
+
+  // Helper function to calculate age banding
+  function calculateAgeBanding(year) {
+    if (year < 1900) return "Pre-1900";
+    if (year <= 1919) return "1901-1919";
+    if (year <= 1944) return "1920-1944";
+    if (year <= 1964) return "1945-1964";
+    if (year <= 1980) return "1965-1980";
+    if (year <= 1990) return "1981-1990";
+    if (year <= 2000) return "1991-2000";
+    if (year <= 2010) return "2001-2010";
+    return "Post-2010";
+  }
 
   const cities = useMemo(() => unique(properties.map((p) => p.city)), [properties]);
   const riskBands = useMemo(
@@ -351,9 +439,31 @@ function App() {
   const portfolioSnapshot = useMemo(() => {
     const propertyCount = properties.length;
     const totalValue = properties.reduce((s, p) => s + (p.sumInsured || 0), 0);
-    const missingCore = properties.filter(
-      (p) => !p.postcode || !p.address1 || !p.sumInsured
-    ).length;
+
+    // Check for missing or invalid core fields
+    const missingCore = properties.filter((p) => {
+      // For uploaded data, use the tracking flag
+      if (uploadedData && p._hasMissingData !== undefined) {
+        return p._hasMissingData;
+      }
+
+      // For demo data, use the old logic
+      const hasValidPostcode = p.postcode &&
+        p.postcode !== "N/A" &&
+        p.postcode !== "Unknown" &&
+        p.postcode.trim() !== "";
+
+      const hasValidAddress = p.address1 &&
+        p.address1 !== "N/A" &&
+        p.address1 !== "Unknown" &&
+        !p.address1.startsWith("Property ") &&
+        p.address1.trim() !== "";
+
+      const hasValidSumInsured = p.sumInsured &&
+        p.sumInsured > 0;
+
+      return !hasValidPostcode || !hasValidAddress || !hasValidSumInsured;
+    }).length;
 
     return {
       source: uploadedData ? "Uploaded SOV" : "Demo portfolio",
