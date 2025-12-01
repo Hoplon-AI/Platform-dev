@@ -4,6 +4,7 @@ import { MapContainer, TileLayer, Marker, Popup } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import Papa from "papaparse";
+import * as XLSX from "xlsx";
 
 import "./styles.css";
 import LandingPage from "./LandingPage";
@@ -18,7 +19,7 @@ L.Icon.Default.mergeOptions({
   shadowUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
 });
 
-// Tabs refocused around ingestion & overview first
+// Tabs focused around ingestion & overview first
 const TABS = [
   { id: "ingestion", label: "Ingestion & overview" },
   { id: "portfolio", label: "Portfolio explorer" },
@@ -32,7 +33,7 @@ function App() {
   const [showLanding, setShowLanding] = useState(true);
   const [activeTab, setActiveTab] = useState("ingestion");
 
-  // Filters (used only in the portfolio explorer now)
+  // Filters (portfolio explorer)
   const [search, setSearch] = useState("");
   const [cityFilter, setCityFilter] = useState("All");
   const [riskFilter, setRiskFilter] = useState("All");
@@ -45,7 +46,36 @@ function App() {
   const [uploadError, setUploadError] = useState(null);
   const fileInputRef = useRef(null);
 
-  // --- Ingestion: fully client-side CSV parsing (no backend) ---
+  // ---------- Ingestion helpers (shared by CSV + Excel) ----------
+
+  function handleParsedData(rows, columns) {
+    const cleanedColumns = (columns || []).map((c) => c.trim());
+
+    const cleanedData = rows.map((row) => {
+      const newRow = {};
+      cleanedColumns.forEach((col) => {
+        newRow[col] = (row[col] ?? "").toString().trim();
+      });
+      return newRow;
+    });
+
+    setUploadedData({
+      message: "File parsed successfully",
+      columns: cleanedColumns,
+      data: cleanedData,
+      row_count: cleanedData.length,
+    });
+
+    setIsUploading(false);
+  }
+
+  function markFileParsed(file) {
+    setUploadedFiles((prev) =>
+      prev.map((f) => (f.name === file.name ? { ...f, status: "Parsed" } : f))
+    );
+  }
+
+  // ---------- Ingestion: client-side CSV + Excel parsing ----------
 
   const parseFiles = (fileList) => {
     const files = Array.from(fileList || []);
@@ -54,60 +84,88 @@ function App() {
     setIsUploading(true);
     setUploadError(null);
 
-    const fileSummaries = files.map((f) => ({
-      name: f.name,
-      size: f.size,
-      type: f.type || "unknown",
-      status: f.name.toLowerCase().endsWith(".csv")
-        ? "Parsing"
-        : "Queued (demo – structure only)",
-    }));
+    const fileSummaries = files.map((f) => {
+      const nameLower = f.name.toLowerCase();
+      const isTabular =
+        nameLower.endsWith(".csv") ||
+        nameLower.endsWith(".xlsx") ||
+        nameLower.endsWith(".xls");
+
+      return {
+        name: f.name,
+        size: f.size,
+        type: f.type || "unknown",
+        status: isTabular ? "Parsing" : "Queued (unsupported type)",
+      };
+    });
+
     setUploadedFiles(fileSummaries);
 
-    const csvFile = files.find((f) => f.name.toLowerCase().endsWith(".csv"));
+    // take the first tabular file (CSV / Excel)
+    const file = files.find((f) => {
+      const nameLower = f.name.toLowerCase();
+      return (
+        nameLower.endsWith(".csv") ||
+        nameLower.endsWith(".xlsx") ||
+        nameLower.endsWith(".xls")
+      );
+    });
 
-    if (!csvFile) {
+    if (!file) {
       setUploadedData(null);
       setIsUploading(false);
       return;
     }
 
-    Papa.parse(csvFile, {
-      header: true,
-      skipEmptyLines: true,
-      complete: (results) => {
-        const cleanedColumns = Object.keys(results.data[0] || {}).map((col) =>
-          col.trim()
-        );
+    const nameLower = file.name.toLowerCase();
 
-        const cleanedData = results.data.map((row) => {
-          const newRow = {};
-          cleanedColumns.forEach((col) => {
-            newRow[col] = (row[col] ?? "").toString().trim();
-          });
-          return newRow;
-        });
+    // ---- CSV ----
+    if (nameLower.endsWith(".csv")) {
+      Papa.parse(file, {
+        header: true,
+        skipEmptyLines: true,
+        complete: (results) => {
+          const rows = results.data || [];
+          const cols =
+            results.meta?.fields && results.meta.fields.length
+              ? results.meta.fields
+              : Object.keys(rows[0] || {});
+          handleParsedData(rows, cols);
+          markFileParsed(file);
+        },
+        error: (err) => {
+          setUploadError(err.message);
+          setIsUploading(false);
+        },
+      });
+      return;
+    }
 
-        setUploadedData({
-          message: "CSV parsed successfully",
-          columns: cleanedColumns,
-          data: cleanedData,
-          row_count: cleanedData.length,
-        });
+    // ---- Excel (.xlsx / .xls) ----
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      try {
+        const data = evt.target.result;
+        const workbook = XLSX.read(data, { type: "binary" });
 
-        setUploadedFiles((prev) =>
-          prev.map((f) =>
-            f.name === csvFile.name ? { ...f, status: "Parsed" } : f
-          )
-        );
+        // first sheet only for now
+        const sheetName = workbook.SheetNames[0];
+        const sheet = workbook.Sheets[sheetName];
+        const json = XLSX.utils.sheet_to_json(sheet, { defval: "" });
 
+        const columns = Object.keys(json[0] || {});
+        handleParsedData(json, columns);
+        markFileParsed(file);
+      } catch (e) {
+        setUploadError("Failed to parse Excel file.");
         setIsUploading(false);
-      },
-      error: (err) => {
-        setUploadError(err.message);
-        setIsUploading(false);
-      },
-    });
+      }
+    };
+    reader.onerror = () => {
+      setUploadError("Failed to read Excel file.");
+      setIsUploading(false);
+    };
+    reader.readAsBinaryString(file);
   };
 
   const handleFileInputChange = (e) => {
@@ -129,7 +187,7 @@ function App() {
     e.stopPropagation();
   };
 
-  // --- Derived data from your demo portfolio ---
+  // ---------- Derived portfolio data (demo properties) ----------
 
   const cities = useMemo(() => unique(RAW_PROPERTIES.map((p) => p.city)), []);
   const riskBands = useMemo(
@@ -216,7 +274,7 @@ function App() {
     }));
   }, []);
 
-  // Portfolio snapshot – show uploaded SOV if present, else demo portfolio
+  // Portfolio snapshot – uploaded SOV if present, else demo portfolio
   const portfolioSnapshot = useMemo(() => {
     if (uploadedData && uploadedData.data.length) {
       const rows = uploadedData.data;
@@ -276,7 +334,7 @@ function App() {
     };
   }, [uploadedData]);
 
-  // --- Landing vs app ---
+  // ---------- Landing vs app ----------
 
   if (showLanding) {
     return (
@@ -326,14 +384,15 @@ function App() {
           ))}
         </nav>
 
-        {/* 1. Ingestion & overview (first screen, Archipelago-style) */}
+        {/* 1. Ingestion & overview */}
         {activeTab === "ingestion" && (
           <div style={{ padding: "30px 40px", background: "#f5f5f5" }}>
             <section className="card">
               <div className="card-header">
                 <h2 className="card-title">Upload schedules of values</h2>
                 <span className="card-badge">
-                  Excel · CSV · PDF · Word (demo parses CSV only)
+                  Excel · CSV · PDF · Word (demo parses CSV &amp; Excel
+                  client-side)
                 </span>
               </div>
               <div
@@ -389,8 +448,9 @@ function App() {
                     highlights missing or inconsistent information.
                   </div>
                   <div style={{ fontSize: 12, color: "#6b7280" }}>
-                    In this MVP, CSV is parsed client-side and previewed. Other
-                    file types are shown as queued for extraction.
+                    In this MVP, CSV &amp; Excel are parsed client-side and
+                    previewed. Other file types are shown as queued for
+                    extraction.
                   </div>
                 </div>
 
@@ -616,7 +676,7 @@ function App() {
               </div>
             </section>
 
-            {/* Optional: if a CSV is parsed, show a cleaned preview (for QA) */}
+            {/* Standardised SOV preview if a tabular file parsed */}
             {uploadedData && (
               <section className="card" style={{ marginTop: 20 }}>
                 <div className="card-header">
@@ -650,10 +710,9 @@ function App() {
           </div>
         )}
 
-        {/* 2. Portfolio explorer – secondary, row-based view */}
+        {/* 2. Portfolio explorer */}
         {activeTab === "portfolio" && (
           <div className="app-layout">
-            {/* Filters (simplified – no pure premium slider now) */}
             <aside className="sidebar-card">
               <h2 className="card-title">Portfolio explorer</h2>
 
@@ -731,7 +790,6 @@ function App() {
             </aside>
 
             <main className="main-column">
-              {/* Simple overview cards using demo portfolio */}
               <section className="summary-grid">
                 <div className="summary-card">
                   <div className="summary-label">Properties (demo)</div>
@@ -774,7 +832,6 @@ function App() {
                 </div>
               </section>
 
-              {/* Map remains – good for spatial overview */}
               <section className="card map-card">
                 <div className="card-header">
                   <h2 className="card-title">Edinburgh property view</h2>
@@ -814,7 +871,6 @@ function App() {
                 </div>
               </section>
 
-              {/* Row-level detail kept, but clearly secondary */}
               <section className="card">
                 <div className="card-header">
                   <h2 className="card-title">
