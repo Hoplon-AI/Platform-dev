@@ -5,6 +5,7 @@ import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import Papa from "papaparse";
 import * as XLSX from "xlsx";
+import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip, BarChart, Bar, XAxis, YAxis, CartesianGrid } from "recharts";
 
 import "./styles.css";
 import LandingPage from "./LandingPage";
@@ -25,6 +26,7 @@ L.Icon.Default.mergeOptions({
 const TABS = [
   { id: "ingestion", label: "Ingestion & overview" },
   { id: "portfolio", label: "Portfolio explorer" },
+  { id: "analytics", label: "Analytics" },
   { id: "stock", label: "Stock listing (Doc A)" },
   { id: "highvalue", label: "High value (Doc B)" },
 ];
@@ -194,18 +196,86 @@ function App() {
 
   // ---------- Derived portfolio data (demo properties) ----------
 
-  const cities = useMemo(() => unique(RAW_PROPERTIES.map((p) => p.city)), []);
+  // Convert uploaded data to properties format, or use demo data
+  const properties = useMemo(() => {
+    if (uploadedData && uploadedData.data.length) {
+      // Map uploaded data to property format
+      return uploadedData.data.map((row, idx) => {
+        const colsLower = uploadedData.columns.map((c) => c.toLowerCase());
+
+        // Helper to find column value
+        const getCol = (keywords) => {
+          const index = colsLower.findIndex((c) =>
+            keywords.some((kw) => c.includes(kw))
+          );
+          return index !== -1 ? row[uploadedData.columns[index]] : "";
+        };
+
+        // Try to extract as much data as possible from uploaded file
+        return {
+          id: `uploaded-${idx}`,
+          address1: getCol(["address", "street", "location"]) || `Property ${idx + 1}`,
+          address2: getCol(["address2", "address 2"]) || "",
+          address3: getCol(["address3", "address 3"]) || "",
+          postcode: getCol(["postcode", "postal", "zip"]) || "N/A",
+          city: getCol(["city", "town"]) || "Unknown",
+          region: getCol(["region", "county", "state"]) || "Unknown",
+          propertyType: getCol(["property type", "type"]) || "Unknown",
+          propertyReference: getCol(["property ref", "prop ref", "reference"]) || `REF${idx + 1}`,
+          blockReference: getCol(["block", "block ref"]) || `BLK${idx + 1}`,
+          occupancyType: getCol(["occupancy", "tenure", "tenancy"]) || "Unknown",
+          numberOfUnits: parseInt(getCol(["units", "number of units"])) || 1,
+          sumInsured: parseFloat(String(getCol(["sum insured", "insured value", "value"])).replace(/[^0-9.]/g, "")) || 0,
+          sumInsuredType: getCol(["sum insured type", "basis"]) || "Unknown",
+          riskBand: getCol(["risk", "risk band", "risk level"]) || "Medium",
+          yearBuilt: parseInt(getCol(["year built", "built", "construction year"])) || 2000,
+          ageBanding: getCol(["age", "age band"]) || "Unknown",
+          wallConstruction: getCol(["wall", "construction"]) || "Unknown",
+          roofConstruction: getCol(["roof"]) || "Unknown",
+          numberOfStoreys: parseInt(getCol(["storeys", "floors", "stories"])) || 1,
+          basementLocation: getCol(["basement"]) || "None",
+          securityFeatures: getCol(["security"]) || "Standard",
+          epcRating: getCol(["epc", "energy"]) || "N/A",
+          deprivationIndex: parseFloat(getCol(["deprivation"])) || 5.0,
+          voidDaysLastYear: parseInt(getCol(["void", "vacant"])) || 0,
+          floodInsured: getCol(["flood"]).toLowerCase().includes("yes") || true,
+          stormInsured: getCol(["storm"]).toLowerCase().includes("yes") || true,
+          floodScore: parseFloat(getCol(["flood score"])) || 0.5,
+          crimeIndex: parseFloat(getCol(["crime"])) || 5.0,
+          claimFrequency: parseFloat(getCol(["claim"])) || 0.1,
+          // Default coordinates (would need geocoding in real app)
+          lat: 55.9533 + (Math.random() - 0.5) * 0.1,
+          lon: -3.1883 + (Math.random() - 0.5) * 0.1,
+          clientName: getCol(["client"]) || "Client",
+          policyReference: getCol(["policy"]) || `POL${idx + 1}`,
+          productType: getCol(["product"]) || "Property Insurance",
+          avidPropertyType: getCol(["avid", "property type"]) || "Unknown",
+          docBRef: "",
+          floorsAboveGround: parseInt(getCol(["floors above"])) || 0,
+          floorsBelowGround: parseInt(getCol(["floors below"])) || 0,
+          claddingType: getCol(["cladding"]) || "N/A",
+          fireRiskManagementSummary: getCol(["fire risk", "fire management"]) || "Standard measures",
+          ewsStatus: getCol(["ews"]) || "N/A",
+          evacuationStrategy: getCol(["evacuation"]) || "Standard",
+          lastClaimDate: getCol(["last claim"]) || null,
+        };
+      });
+    }
+    return RAW_PROPERTIES;
+  }, [uploadedData]);
+
+  const cities = useMemo(() => unique(properties.map((p) => p.city)), [properties]);
   const riskBands = useMemo(
-    () => unique(RAW_PROPERTIES.map((p) => p.riskBand)),
-    []
+    () => unique(properties.map((p) => p.riskBand)),
+    [properties]
   );
   const tenures = useMemo(
-    () => unique(RAW_PROPERTIES.map((p) => p.occupancyType)),
-    []
+    () => unique(properties.map((p) => p.occupancyType)),
+    [properties]
   );
 
   const filtered = useMemo(() => {
-    let out = RAW_PROPERTIES.filter((p) => {
+    return properties.filter((p) => {
       const fullAddress =
         `${p.address1} ${p.address2} ${p.address3}`.toLowerCase();
       const q = search.toLowerCase();
@@ -223,13 +293,11 @@ function App() {
 
       return matchesSearch && matchesCity && matchesRisk && matchesTenure;
     });
-
-    return out;
-  }, [search, cityFilter, riskFilter, tenureFilter]);
+  }, [properties, search, cityFilter, riskFilter, tenureFilter]);
 
   const edinburghProps = useMemo(
-    () => RAW_PROPERTIES.filter((p) => p.city === "Edinburgh"),
-    []
+    () => properties.filter((p) => p.city === "Edinburgh"),
+    [properties]
   );
 
   const edinburghCenter =
@@ -241,13 +309,13 @@ function App() {
       : [55.9533, -3.1883];
 
   const highValueProps = useMemo(
-    () => RAW_PROPERTIES.filter((p) => !!p.docBRef),
-    []
+    () => properties.filter((p) => !!p.docBRef),
+    [properties]
   );
 
   const byOccupancy = useMemo(() => {
     const map = new Map();
-    RAW_PROPERTIES.forEach((p) => {
+    properties.forEach((p) => {
       const key = p.occupancyType || "Unknown";
       const prev = map.get(key) || { units: 0, sum: 0 };
       map.set(key, {
@@ -260,11 +328,11 @@ function App() {
       units: v.units,
       sumInsured: v.sum,
     }));
-  }, []);
+  }, [properties]);
 
   const byBlock = useMemo(() => {
     const map = new Map();
-    RAW_PROPERTIES.forEach((p) => {
+    properties.forEach((p) => {
       const key = p.blockReference || "Unknown";
       const prev = map.get(key) || { units: 0, sum: 0 };
       map.set(key, {
@@ -277,67 +345,75 @@ function App() {
       units: v.units,
       sumInsured: v.sum,
     }));
-  }, []);
+  }, [properties]);
 
   // Portfolio snapshot – uploaded SOV if present, else demo portfolio
   const portfolioSnapshot = useMemo(() => {
-    if (uploadedData && uploadedData.data.length) {
-      const rows = uploadedData.data;
-      const colsLower = uploadedData.columns.map((c) => c.toLowerCase());
-
-      const sumColIndex = colsLower.findIndex(
-        (c) => c.includes("sum") && c.includes("insured")
-      );
-      const postcodeIndex = colsLower.findIndex((c) => c.includes("postcode"));
-      const addressIndex = colsLower.findIndex((c) => c.includes("address"));
-
-      let totalValue = 0;
-      let missingCore = 0;
-
-      rows.forEach((row) => {
-        if (sumColIndex !== -1) {
-          const key = uploadedData.columns[sumColIndex];
-          const raw = row[key] ?? "";
-          const numeric = parseFloat(String(raw).replace(/[^0-9.]/g, ""));
-          if (!Number.isNaN(numeric)) totalValue += numeric;
-        }
-
-        const postcodeKey =
-          postcodeIndex !== -1 ? uploadedData.columns[postcodeIndex] : null;
-        const addressKey =
-          addressIndex !== -1 ? uploadedData.columns[addressIndex] : null;
-
-        const missingPostcode = !postcodeKey || !row[postcodeKey];
-        const missingAddress = !addressKey || !row[addressKey];
-
-        if (missingPostcode || missingAddress) {
-          missingCore += 1;
-        }
-      });
-
-      return {
-        source: "Uploaded SOV",
-        propertyCount: rows.length,
-        totalValue: totalValue || null,
-        missingCore,
-      };
-    }
-
-    // fallback to demo RAW_PROPERTIES
-    const rows = RAW_PROPERTIES;
-    const propertyCount = rows.length;
-    const totalValue = rows.reduce((s, p) => s + (p.sumInsured || 0), 0);
-    const missingCore = rows.filter(
+    const propertyCount = properties.length;
+    const totalValue = properties.reduce((s, p) => s + (p.sumInsured || 0), 0);
+    const missingCore = properties.filter(
       (p) => !p.postcode || !p.address1 || !p.sumInsured
     ).length;
 
     return {
-      source: "Demo portfolio",
+      source: uploadedData ? "Uploaded SOV" : "Demo portfolio",
       propertyCount,
       totalValue,
       missingCore,
     };
-  }, [uploadedData]);
+  }, [properties, uploadedData]);
+
+  // Analytics data for pie charts
+  const propertyTypesData = useMemo(() => {
+    const map = new Map();
+    properties.forEach((p) => {
+      const type = p.propertyType || "Unknown";
+      map.set(type, (map.get(type) || 0) + 1);
+    });
+    return Array.from(map.entries())
+      .map(([name, value]) => ({ name, value }))
+      .sort((a, b) => a.name.localeCompare(b.name)); // Sort alphabetically
+  }, [properties]);
+
+  const epcRatingsData = useMemo(() => {
+    const map = new Map();
+    properties.forEach((p) => {
+      const rating = p.epcRating || "N/A";
+      map.set(rating, (map.get(rating) || 0) + 1);
+    });
+    return Array.from(map.entries())
+      .map(([name, value]) => ({ name, value }))
+      .sort((a, b) => a.name.localeCompare(b.name)); // Sort alphabetically
+  }, [properties]);
+
+  // Deprivation data grouped by intervals with step=1
+  const deprivationData = useMemo(() => {
+    const map = new Map();
+
+    properties.forEach((p) => {
+      const score = p.deprivationIndex || 0;
+      const bucket = Math.floor(score);
+      const rangeLabel = `${bucket}-${bucket + 1}`;
+
+      const existing = map.get(rangeLabel) || { range: rangeLabel, count: 0, bucketStart: bucket };
+      existing.count += 1;
+      map.set(rangeLabel, existing);
+    });
+
+    return Array.from(map.values())
+      .sort((a, b) => a.bucketStart - b.bucketStart);
+  }, [properties]);
+
+  // Colors for charts
+  const PROPERTY_TYPE_COLORS = [
+    "#4f46e5", "#7c3aed", "#2563eb", "#0891b2", "#059669",
+    "#d97706", "#dc2626", "#ec4899", "#8b5cf6", "#06b6d4"
+  ];
+
+  const EPC_COLORS = [
+    "#16a34a", "#65a30d", "#ca8a04", "#ea580c", "#dc2626",
+    "#991b1b", "#6b7280", "#9ca3af", "#d1d5db", "#e5e7eb"
+  ];
 
   // ---------- Landing vs app ----------
 
@@ -749,6 +825,14 @@ function App() {
                           ))}
                         </tr>
                       ))}
+
+                      {filtered.length === 0 && (
+                        <tr>
+                          <td colSpan={4} className="empty-row">
+                            No properties match the current filters.
+                          </td>
+                        </tr>
+                      )}
                     </tbody>
                   </table>
                 </div>
@@ -839,10 +923,10 @@ function App() {
             <main className="main-column">
               <section className="summary-grid">
                 <div className="summary-card">
-                  <div className="summary-label">Properties (demo)</div>
-                  <div className="summary-value">{RAW_PROPERTIES.length}</div>
+                  <div className="summary-label">Properties</div>
+                  <div className="summary-value">{properties.length}</div>
                   <div className="summary-footnote">
-                    As per current sample portfolio
+                    {uploadedData ? "From uploaded file" : "Demo portfolio"}
                   </div>
                 </div>
                 <div className="summary-card">
@@ -850,7 +934,7 @@ function App() {
                   <div className="summary-value">
                     £
                     {(
-                      RAW_PROPERTIES.reduce(
+                      properties.reduce(
                         (s, p) => s + (p.sumInsured || 0),
                         0
                       ) / 1_000_000
@@ -867,7 +951,7 @@ function App() {
                   </div>
                   <div className="summary-value">
                     {
-                      RAW_PROPERTIES.filter(
+                      properties.filter(
                         (p) =>
                           p.riskBand === "High" || p.riskBand === "Very High"
                       ).length
@@ -881,9 +965,11 @@ function App() {
 
               <section className="card map-card">
                 <div className="card-header">
-                  <h2 className="card-title">Edinburgh property view</h2>
+                  <h2 className="card-title">
+                    {edinburghProps.length > 0 ? `${edinburghProps[0].city} property view` : "Property map"}
+                  </h2>
                   <span className="card-badge">
-                    {edinburghProps.length} demo properties
+                    {edinburghProps.length} properties
                   </span>
                 </div>
                 <div className="map-wrapper">
@@ -924,7 +1010,7 @@ function App() {
                     Property, exposure &amp; risk detail
                   </h2>
                   <span className="card-badge">
-                    Showing {filtered.length} of {RAW_PROPERTIES.length}
+                    Showing {filtered.length} of {properties.length}
                   </span>
                 </div>
 
@@ -1035,7 +1121,7 @@ function App() {
                 Stock listing – Document A structure
               </h2>
               <span className="card-badge">
-                Simplified view of the June 24 stock listing format
+                {uploadedData ? "From uploaded file" : "Demo data"}
               </span>
             </div>
             <div className="table-wrapper">
@@ -1050,7 +1136,7 @@ function App() {
                   </tr>
                 </thead>
                 <tbody>
-                  {RAW_PROPERTIES.map((p) => (
+                  {properties.map((p) => (
                     <tr key={p.id}>
                       <td>
                         <div className="cell-strong">
@@ -1163,90 +1249,286 @@ function App() {
                 High value blocks – Document B view
               </h2>
               <span className="card-badge">
-                Pulling out properties with Document B-style information
+                {highValueProps.length > 0
+                  ? `${highValueProps.length} high value properties`
+                  : "No high value properties found"}
               </span>
             </div>
-            <div className="table-wrapper">
-              <table className="risk-table">
-                <thead>
-                  <tr>
-                    <th>Block / Policy</th>
-                    <th>High value attributes</th>
-                    <th>Fire risk management</th>
-                    <th>Evacuation &amp; EWS</th>
-                    <th>Claims &amp; risk</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {highValueProps.map((p) => (
-                    <tr key={p.id}>
-                      <td>
-                        <div className="prop-main">{p.address1}</div>
-                        <div className="prop-sub">
-                          {p.city} {p.postcode}
-                        </div>
-                        <div className="prop-meta">
-                          Ref {p.docBRef} · Policy {p.policyReference}
-                        </div>
-                        <div className="prop-meta">
-                          Sum insured: £{p.sumInsured.toLocaleString("en-GB")}
-                        </div>
-                      </td>
-                      <td>
-                        <div className="cell-strong">
-                          Storeys above ground:{" "}
-                          <span>{p.floorsAboveGround}</span>
-                        </div>
-                        <div className="cell-muted">
-                          Below ground: {p.floorsBelowGround}
-                        </div>
-                        <div className="cell-muted">
-                          Construction: {p.wallConstruction}
-                        </div>
-                        <div className="cell-muted">
-                          Cladding: {p.claddingType}
-                        </div>
-                      </td>
-                      <td>
-                        <div className="cell-strong">Fire risk management</div>
-                        <div className="cell-muted">
-                          {p.fireRiskManagementSummary}
-                        </div>
-                      </td>
-                      <td>
-                        <div className="cell-strong">
-                          EWS / façade status:{" "}
-                          <span>{p.ewsStatus || "N/A"}</span>
-                        </div>
-                        <div className="cell-muted">
-                          Evacuation strategy: {p.evacuationStrategy}
-                        </div>
-                      </td>
-                      <td>
-                        <div className="cell-strong">
-                          Risk band: <span>{p.riskBand}</span>
-                        </div>
-                        <div className="cell-muted">
-                          Claim frequency: {p.claimFrequency.toFixed(2)} / year
-                        </div>
-                        <div className="cell-meta">
-                          Last claim: {p.lastClaimDate || "None"}
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+            {highValueProps.length > 0 ? (
+              <>
+                <div className="table-wrapper">
+                  <table className="risk-table">
+                    <thead>
+                      <tr>
+                        <th>Block / Policy</th>
+                        <th>High value attributes</th>
+                        <th>Fire risk management</th>
+                        <th>Evacuation &amp; EWS</th>
+                        <th>Claims &amp; risk</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {highValueProps.map((p) => (
+                        <tr key={p.id}>
+                          <td>
+                            <div className="prop-main">{p.address1}</div>
+                            <div className="prop-sub">
+                              {p.city} {p.postcode}
+                            </div>
+                            <div className="prop-meta">
+                              Ref {p.docBRef} · Policy {p.policyReference}
+                            </div>
+                            <div className="prop-meta">
+                              Sum insured: £{p.sumInsured.toLocaleString("en-GB")}
+                            </div>
+                          </td>
+                          <td>
+                            <div className="cell-strong">
+                              Storeys above ground:{" "}
+                              <span>{p.floorsAboveGround}</span>
+                            </div>
+                            <div className="cell-muted">
+                              Below ground: {p.floorsBelowGround}
+                            </div>
+                            <div className="cell-muted">
+                              Construction: {p.wallConstruction}
+                            </div>
+                            <div className="cell-muted">
+                              Cladding: {p.claddingType}
+                            </div>
+                          </td>
+                          <td>
+                            <div className="cell-strong">Fire risk management</div>
+                            <div className="cell-muted">
+                              {p.fireRiskManagementSummary}
+                            </div>
+                          </td>
+                          <td>
+                            <div className="cell-strong">
+                              EWS / façade status:{" "}
+                              <span>{p.ewsStatus || "N/A"}</span>
+                            </div>
+                            <div className="cell-muted">
+                              Evacuation strategy: {p.evacuationStrategy}
+                            </div>
+                          </td>
+                          <td>
+                            <div className="cell-strong">
+                              Risk band: <span>{p.riskBand}</span>
+                            </div>
+                            <div className="cell-muted">
+                              Claim frequency: {p.claimFrequency.toFixed(2)} / year
+                            </div>
+                            <div className="cell-meta">
+                              Last claim: {p.lastClaimDate || "None"}
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                <div className="card-header">
+                  <h3 className="card-title">Document B notes (summary)</h3>
+                </div>
+                <div style={{ padding: "10px 18px 16px", fontSize: 12 }}>
+                  This view mirrors the intent of Document B: to capture
+                  high-resolution information for complex or high-value blocks,
+                  including construction features, fire safety measures and façade /
+                  EWS status. It sits alongside, not instead of, the stock listing.
+                </div>
+              </>
+            ) : (
+              <div style={{ padding: "40px", textAlign: "center", color: "#6b7280" }}>
+                <p>No high value properties with Document B information found in the current dataset.</p>
+                <p style={{ fontSize: 12, marginTop: 8 }}>
+                  High value properties require a "docBRef" field to be displayed here.
+                </p>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* 5. Analytics */}
+        {activeTab === "analytics" && (
+          <div style={{ padding: "30px 40px", background: "#f5f5f5" }}>
+            <div className="card">
+              <div className="card-header">
+                <h2 className="card-title">Portfolio analytics</h2>
+                <span className="card-badge">
+                  {uploadedData ? "From uploaded file" : "Demo portfolio"}
+                </span>
+              </div>
+
+              <div style={{ padding: "24px", display: "grid", gridTemplateColumns: "1fr 1fr", gap: 32 }}>
+                {/* Property Types Chart */}
+                <div>
+                  <h3 style={{ fontSize: 18, fontWeight: 600, marginBottom: 16, color: "#111827" }}>
+                    Property types distribution
+                  </h3>
+                  <ResponsiveContainer width="100%" height={400}>
+                    <PieChart>
+                      <Pie
+                        data={propertyTypesData}
+                        dataKey="value"
+                        nameKey="name"
+                        cx="50%"
+                        cy="50%"
+                        outerRadius={120}
+                        fill="#4f46e5"
+                        label={({ percent }) => `${(percent * 100).toFixed(0)}%`}
+                        labelLine={false}
+                      >
+                        {propertyTypesData.map((entry, index) => (
+                          <Cell
+                            key={`cell-${index}`}
+                            fill={PROPERTY_TYPE_COLORS[index % PROPERTY_TYPE_COLORS.length]}
+                          />
+                        ))}
+                      </Pie>
+                      <Tooltip
+                        formatter={(value) => [`${value} properties`, "Count"]}
+                      />
+                      <Legend
+                        verticalAlign="bottom"
+                        height={36}
+                      />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
+
+                {/* EPC Ratings Chart */}
+                <div>
+                  <h3 style={{ fontSize: 18, fontWeight: 600, marginBottom: 16, color: "#111827" }}>
+                    EPC ratings distribution
+                  </h3>
+                  <ResponsiveContainer width="100%" height={400}>
+                    <PieChart>
+                      <Pie
+                        data={epcRatingsData}
+                        dataKey="value"
+                        nameKey="name"
+                        cx="50%"
+                        cy="50%"
+                        outerRadius={120}
+                        fill="#16a34a"
+                        label={({ percent }) => `${(percent * 100).toFixed(0)}%`}
+                        labelLine={false}
+                      >
+                        {epcRatingsData.map((entry, index) => (
+                          <Cell
+                            key={`cell-${index}`}
+                            fill={EPC_COLORS[index % EPC_COLORS.length]}
+                          />
+                        ))}
+                      </Pie>
+                      <Tooltip
+                        formatter={(value) => [`${value} properties`, "Count"]}
+                      />
+                      <Legend
+                        verticalAlign="bottom"
+                        height={36}
+                      />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
             </div>
 
-            <div className="card-header">
-              <h3 className="card-title">Document B notes (summary)</h3>
-            </div>
-            <div style={{ padding: "10px 18px 16px", fontSize: 12 }}>
-              This view mirrors the intent of Document B: to capture
-              high-resolution information for complex or high-value blocks,
-              including construction features, fire safety measures and façade /
-              EWS status. It sits alongside, not instead of, the stock listing.
+            {/* Summary statistics and Deprivation Chart side by side */}
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 32, marginTop: 20 }}>
+              {/* Portfolio Summary */}
+              <div className="card">
+                <div className="card-header">
+                  <h2 className="card-title">Portfolio summary</h2>
+                </div>
+                <div className="table-wrapper">
+                  <table className="risk-table">
+                    <thead>
+                      <tr>
+                        <th>Metric</th>
+                        <th>Value</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr>
+                        <td>Total properties</td>
+                        <td><strong>{properties.length}</strong></td>
+                      </tr>
+                      <tr>
+                        <td>Unique property types</td>
+                        <td><strong>{propertyTypesData.length}</strong></td>
+                      </tr>
+                      <tr>
+                        <td>Unique EPC ratings</td>
+                        <td><strong>{epcRatingsData.length}</strong></td>
+                      </tr>
+                      <tr>
+                        <td>Total sum insured</td>
+                        <td>
+                          <strong>
+                            £{(properties.reduce((s, p) => s + (p.sumInsured || 0), 0) / 1_000_000).toFixed(2)}m
+                          </strong>
+                        </td>
+                      </tr>
+                      <tr>
+                        <td>Properties with missing data</td>
+                        <td>
+                          <strong style={{ color: portfolioSnapshot.missingCore > 0 ? "#dc2626" : "#16a34a" }}>
+                            {portfolioSnapshot.missingCore}
+                          </strong>
+                        </td>
+                      </tr>
+                      <tr>
+                        <td>High/Very High risk properties</td>
+                        <td>
+                          <strong>
+                            {properties.filter((p) => p.riskBand === "High" || p.riskBand === "Very High").length}
+                          </strong>
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* Deprivation Index Distribution Chart */}
+              <div className="card">
+                <div className="card-header">
+                  <h2 className="card-title">Deprivation Index Distribution</h2>
+                  <span className="card-badge">
+                    Properties grouped by deprivation score ranges
+                  </span>
+                </div>
+                <div style={{ padding: "24px" }}>
+                  <ResponsiveContainer width="100%" height={400}>
+                    <BarChart
+                      data={deprivationData}
+                      margin={{ top: 16, right: 16, bottom: 16, left: 16 }}
+                    >
+                      <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                      <XAxis
+                        dataKey="range"
+                        label={{ value: 'Deprivation Score Range', position: 'insideBottom', offset: -5 }}
+                      />
+                      <YAxis
+                        label={{ value: 'Number of Properties', angle: -90, position: 'insideLeft' }}
+                      />
+                      <Tooltip
+                        formatter={(value) => [`${value} properties`, "Count"]}
+                        contentStyle={{ backgroundColor: '#fff', border: '1px solid #e5e7eb', borderRadius: '6px' }}
+                      />
+                      <Bar
+                        dataKey="count"
+                        name="Properties"
+                        fill="#4f46e5"
+                        radius={[4, 4, 0, 0]}
+                      />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
             </div>
           </div>
         )}
