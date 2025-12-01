@@ -1,10 +1,15 @@
 // App.js
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useRef, useState } from "react";
 import { MapContainer, TileLayer, Marker, Popup } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
+import Papa from "papaparse";
+import * as XLSX from "xlsx";
+
 import "./styles.css";
 import LandingPage from "./LandingPage";
+import LoginPage from "./LoginPage";
+import RegisterPage from "./RegisterPage";
 import { RAW_PROPERTIES } from "./data/properties";
 
 // Fix default Leaflet marker icons when bundling
@@ -16,59 +21,178 @@ L.Icon.Default.mergeOptions({
   shadowUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
 });
 
+// Tabs focused around ingestion & overview first
 const TABS = [
-  { id: "portfolio", label: "Portfolio view" },
+  { id: "ingestion", label: "Ingestion & overview" },
+  { id: "portfolio", label: "Portfolio explorer" },
   { id: "stock", label: "Stock listing (Doc A)" },
   { id: "highvalue", label: "High value (Doc B)" },
-  { id: "upload", label: "Upload CSV" },
 ];
 
 const unique = (arr) => [...new Set(arr)];
 
 function App() {
-  // All hooks must be at the top level of the component
   const [showLanding, setShowLanding] = useState(true);
-  const [activeTab, setActiveTab] = useState("portfolio");
+  const [showLogin, setShowLogin] = useState(false);
+  const [showRegister, setShowRegister] = useState(false);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [activeTab, setActiveTab] = useState("ingestion");
+
+  // Filters (portfolio explorer)
   const [search, setSearch] = useState("");
   const [cityFilter, setCityFilter] = useState("All");
   const [riskFilter, setRiskFilter] = useState("All");
   const [tenureFilter, setTenureFilter] = useState("All");
-  const [maxPremium, setMaxPremium] = useState(700);
-  const [minEpc, setMinEpc] = useState("Any");
-  const [sortBy, setSortBy] = useState("purePremiumDesc");
+
+  // Upload / ingestion state
   const [uploadedData, setUploadedData] = useState(null);
+  const [uploadedFiles, setUploadedFiles] = useState([]);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadError, setUploadError] = useState(null);
+  const fileInputRef = useRef(null);
 
-  const handleFileUpload = async (event) => {
-    const file = event.target.files[0];
-    if (!file) return;
+  // ---------- Ingestion helpers (shared by CSV + Excel) ----------
+
+  function handleParsedData(rows, columns) {
+    const cleanedColumns = (columns || []).map((c) => c.trim());
+
+    const cleanedData = rows.map((row) => {
+      const newRow = {};
+      cleanedColumns.forEach((col) => {
+        newRow[col] = (row[col] ?? "").toString().trim();
+      });
+      return newRow;
+    });
+
+    setUploadedData({
+      message: "File parsed successfully",
+      columns: cleanedColumns,
+      data: cleanedData,
+      row_count: cleanedData.length,
+    });
+
+    setIsUploading(false);
+  }
+
+  function markFileParsed(file) {
+    setUploadedFiles((prev) =>
+      prev.map((f) => (f.name === file.name ? { ...f, status: "Parsed" } : f))
+    );
+  }
+
+  // ---------- Ingestion: client-side CSV + Excel parsing ----------
+
+  const parseFiles = (fileList) => {
+    const files = Array.from(fileList || []);
+    if (!files.length) return;
 
     setIsUploading(true);
     setUploadError(null);
 
-    const formData = new FormData();
-    formData.append("file", file);
+    const fileSummaries = files.map((f) => {
+      const nameLower = f.name.toLowerCase();
+      const isTabular =
+        nameLower.endsWith(".csv") ||
+        nameLower.endsWith(".xlsx") ||
+        nameLower.endsWith(".xls");
 
-    try {
-      const response = await fetch("http://localhost:8000/upload-csv", {
-        method: "POST",
-        body: formData,
-      });
+      return {
+        name: f.name,
+        size: f.size,
+        type: f.type || "unknown",
+        status: isTabular ? "Parsing" : "Queued (unsupported type)",
+      };
+    });
 
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.detail || "Upload failed");
-      }
+    setUploadedFiles(fileSummaries);
 
-      const result = await response.json();
-      setUploadedData(result);
-    } catch (error) {
-      setUploadError(error.message);
-    } finally {
+    // take the first tabular file (CSV / Excel)
+    const file = files.find((f) => {
+      const nameLower = f.name.toLowerCase();
+      return (
+        nameLower.endsWith(".csv") ||
+        nameLower.endsWith(".xlsx") ||
+        nameLower.endsWith(".xls")
+      );
+    });
+
+    if (!file) {
+      setUploadedData(null);
       setIsUploading(false);
+      return;
+    }
+
+    const nameLower = file.name.toLowerCase();
+
+    // ---- CSV ----
+    if (nameLower.endsWith(".csv")) {
+      Papa.parse(file, {
+        header: true,
+        skipEmptyLines: true,
+        complete: (results) => {
+          const rows = results.data || [];
+          const cols =
+            results.meta?.fields && results.meta.fields.length
+              ? results.meta.fields
+              : Object.keys(rows[0] || {});
+          handleParsedData(rows, cols);
+          markFileParsed(file);
+        },
+        error: (err) => {
+          setUploadError(err.message);
+          setIsUploading(false);
+        },
+      });
+      return;
+    }
+
+    // ---- Excel (.xlsx / .xls) ----
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      try {
+        const data = evt.target.result;
+        const workbook = XLSX.read(data, { type: "binary" });
+
+        // first sheet only for now
+        const sheetName = workbook.SheetNames[0];
+        const sheet = workbook.Sheets[sheetName];
+        const json = XLSX.utils.sheet_to_json(sheet, { defval: "" });
+
+        const columns = Object.keys(json[0] || {});
+        handleParsedData(json, columns);
+        markFileParsed(file);
+      } catch (e) {
+        setUploadError("Failed to parse Excel file.");
+        setIsUploading(false);
+      }
+    };
+    reader.onerror = () => {
+      setUploadError("Failed to read Excel file.");
+      setIsUploading(false);
+    };
+    reader.readAsBinaryString(file);
+  };
+
+  const handleFileInputChange = (e) => {
+    if (!e.target.files?.length) return;
+    parseFiles(e.target.files);
+  };
+
+  const handleDrop = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      parseFiles(e.dataTransfer.files);
+      e.dataTransfer.clearData();
     }
   };
+
+  const handleDragOver = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+  };
+
+  // ---------- Derived portfolio data (demo properties) ----------
 
   const cities = useMemo(() => unique(RAW_PROPERTIES.map((p) => p.city)), []);
   const riskBands = useMemo(
@@ -81,84 +205,27 @@ function App() {
   );
 
   const filtered = useMemo(() => {
-    const epcOrder = ["A", "B", "C", "D", "E", "F", "G"];
-    const minEpcIndex = epcOrder.indexOf(minEpc);
-
     let out = RAW_PROPERTIES.filter((p) => {
       const fullAddress =
         `${p.address1} ${p.address2} ${p.address3}`.toLowerCase();
+      const q = search.toLowerCase();
+
       const matchesSearch =
-        !search ||
-        fullAddress.includes(search.toLowerCase()) ||
-        p.postcode.toLowerCase().includes(search.toLowerCase()) ||
-        (p.propertyReference || "")
-          .toLowerCase()
-          .includes(search.toLowerCase());
+        !q ||
+        fullAddress.includes(q) ||
+        p.postcode.toLowerCase().includes(q) ||
+        (p.propertyReference || "").toLowerCase().includes(q);
+
       const matchesCity = cityFilter === "All" || p.city === cityFilter;
       const matchesRisk = riskFilter === "All" || p.riskBand === riskFilter;
       const matchesTenure =
         tenureFilter === "All" || p.occupancyType === tenureFilter;
-      const matchesPremium = p.purePremium <= maxPremium;
-      const matchesEpc =
-        minEpc === "Any" || epcOrder.indexOf(p.epcRating) <= minEpcIndex;
 
-      return (
-        matchesSearch &&
-        matchesCity &&
-        matchesRisk &&
-        matchesTenure &&
-        matchesPremium &&
-        matchesEpc
-      );
-    });
-
-    out = [...out].sort((a, b) => {
-      switch (sortBy) {
-        case "purePremiumDesc":
-          return b.purePremium - a.purePremium;
-        case "purePremiumAsc":
-          return a.purePremium - b.purePremium;
-        case "claimFrequencyDesc":
-          return b.claimFrequency - a.claimFrequency;
-        case "deprivationDesc":
-          return b.deprivationIndex - a.deprivationIndex;
-        default:
-          return 0;
-      }
+      return matchesSearch && matchesCity && matchesRisk && matchesTenure;
     });
 
     return out;
-  }, [
-    search,
-    cityFilter,
-    riskFilter,
-    tenureFilter,
-    maxPremium,
-    minEpc,
-    sortBy,
-  ]);
-
-  const summary = useMemo(() => {
-    if (!filtered.length) return null;
-    const n = filtered.length;
-    const totalPremium = filtered.reduce((s, p) => s + p.purePremium, 0);
-    const avgPremium = totalPremium / n;
-    const avgFrequency = filtered.reduce((s, p) => s + p.claimFrequency, 0) / n;
-    const highRiskCount = filtered.filter(
-      (p) => p.riskBand === "High" || p.riskBand === "Very High"
-    ).length;
-    const totalSumInsured = filtered.reduce(
-      (s, p) => s + (p.sumInsured || 0),
-      0
-    );
-    return {
-      n,
-      avgPremium,
-      avgFrequency,
-      highRiskCount,
-      totalSumInsured,
-    };
-  }, [filtered]);
+  }, [search, cityFilter, riskFilter, tenureFilter]);
 
   const edinburghProps = useMemo(
     () => RAW_PROPERTIES.filter((p) => p.city === "Edinburgh"),
@@ -178,7 +245,6 @@ function App() {
     []
   );
 
-  // Simple Doc A validation-style aggregates (mimicking the pivot)
   const byOccupancy = useMemo(() => {
     const map = new Map();
     RAW_PROPERTIES.forEach((p) => {
@@ -213,34 +279,142 @@ function App() {
     }));
   }, []);
 
-  // Conditional rendering - AFTER all hooks
+  // Portfolio snapshot – uploaded SOV if present, else demo portfolio
+  const portfolioSnapshot = useMemo(() => {
+    if (uploadedData && uploadedData.data.length) {
+      const rows = uploadedData.data;
+      const colsLower = uploadedData.columns.map((c) => c.toLowerCase());
+
+      const sumColIndex = colsLower.findIndex(
+        (c) => c.includes("sum") && c.includes("insured")
+      );
+      const postcodeIndex = colsLower.findIndex((c) => c.includes("postcode"));
+      const addressIndex = colsLower.findIndex((c) => c.includes("address"));
+
+      let totalValue = 0;
+      let missingCore = 0;
+
+      rows.forEach((row) => {
+        if (sumColIndex !== -1) {
+          const key = uploadedData.columns[sumColIndex];
+          const raw = row[key] ?? "";
+          const numeric = parseFloat(String(raw).replace(/[^0-9.]/g, ""));
+          if (!Number.isNaN(numeric)) totalValue += numeric;
+        }
+
+        const postcodeKey =
+          postcodeIndex !== -1 ? uploadedData.columns[postcodeIndex] : null;
+        const addressKey =
+          addressIndex !== -1 ? uploadedData.columns[addressIndex] : null;
+
+        const missingPostcode = !postcodeKey || !row[postcodeKey];
+        const missingAddress = !addressKey || !row[addressKey];
+
+        if (missingPostcode || missingAddress) {
+          missingCore += 1;
+        }
+      });
+
+      return {
+        source: "Uploaded SOV",
+        propertyCount: rows.length,
+        totalValue: totalValue || null,
+        missingCore,
+      };
+    }
+
+    // fallback to demo RAW_PROPERTIES
+    const rows = RAW_PROPERTIES;
+    const propertyCount = rows.length;
+    const totalValue = rows.reduce((s, p) => s + (p.sumInsured || 0), 0);
+    const missingCore = rows.filter(
+      (p) => !p.postcode || !p.address1 || !p.sumInsured
+    ).length;
+
+    return {
+      source: "Demo portfolio",
+      propertyCount,
+      totalValue,
+      missingCore,
+    };
+  }, [uploadedData]);
+
+  // ---------- Landing vs app ----------
+
+  // Show landing page
   if (showLanding) {
     return (
       <LandingPage
-        onGetStarted={(tab = "portfolio") => {
+        onGetStarted={() => {
           setShowLanding(false);
-          setActiveTab(tab); // <-- opens to Portfolio (with map)
+          setShowLogin(true);
+          setShowRegister(false);
         }}
       />
     );
   }
 
+  // Show register page
+  if (showRegister && !isAuthenticated) {
+    return (
+      <RegisterPage
+        onRegister={() => {
+          setShowRegister(false);
+          setShowLogin(true);
+        }}
+        onSwitchToLogin={() => {
+          setShowRegister(false);
+          setShowLogin(true);
+        }}
+      />
+    );
+  }
+
+  // Show login page if not authenticated
+  if (showLogin && !isAuthenticated) {
+    return (
+      <LoginPage
+        onLogin={(success) => {
+          if (success) {
+            setIsAuthenticated(true);
+            setShowLogin(false);
+            setActiveTab("ingestion");
+          }
+        }}
+        onSwitchToRegister={() => {
+          setShowLogin(false);
+          setShowRegister(true);
+        }}
+      />
+    );
+  }
+
+  // Show main app if authenticated
   return (
     <div className="app-root">
       <div className="app-shell">
         {/* Header */}
         <header className="app-header">
+          <button
+            className="back-home-btn"
+            onClick={() => {
+              setShowLanding(true);
+              setShowLogin(false);
+              setIsAuthenticated(false);
+            }}
+          >
+            ⟵ Back to Home
+          </button>
           <div>
-            <div className="app-badge">Hoplon • Underwriter dashboard</div>
-            <h1 className="app-title">Property &amp; risk workspace</h1>
+            <div className="app-badge">EquiRisk • Underwriter workspace</div>
+            <h1 className="app-title">Exposure &amp; data quality cockpit</h1>
             <p className="app-subtitle">
-              Integrated view of the stock listing (Document A), high-value
-              blocks (Document B) and portfolio risk telemetry. Built for
-              underwriters to interrogate values, perils and completeness.
+              Drag and drop schedules of values, see what's been ingested,
+              what's missing, and how the portfolio looks before touching price.
             </p>
           </div>
           <div className="app-meta">
-            Demo dataset · Mirrors Document A &amp; B structure
+            Ingestion-first MVP · Demo dataset when no SOV uploaded
           </div>
         </header>
 
@@ -257,12 +431,337 @@ function App() {
           ))}
         </nav>
 
-        {/* Layout varies by tab */}
+        {/* 1. Ingestion & overview */}
+        {activeTab === "ingestion" && (
+          <div style={{ padding: "30px 40px", background: "#f5f5f5" }}>
+            <section className="card">
+              <div className="card-header">
+                <h2 className="card-title">Upload schedules of values</h2>
+                <span className="card-badge">
+                  Excel · CSV · PDF · Word (demo parses CSV &amp; Excel
+                  client-side)
+                </span>
+              </div>
+              <div
+                style={{
+                  padding: 24,
+                  display: "flex",
+                  gap: 24,
+                  flexWrap: "wrap",
+                }}
+              >
+                {/* Drag & drop area */}
+                <div
+                  onDragOver={handleDragOver}
+                  onDrop={handleDrop}
+                  onClick={() => fileInputRef.current?.click()}
+                  style={{
+                    flex: 2,
+                    minWidth: 280,
+                    border: "2px dashed #c7d2fe",
+                    borderRadius: 12,
+                    padding: 32,
+                    textAlign: "center",
+                    background: "#eef2ff",
+                    cursor: "pointer",
+                  }}
+                >
+                  <input
+                    type="file"
+                    multiple
+                    accept=".csv,.xlsx,.xls,.pdf,.doc,.docx"
+                    ref={fileInputRef}
+                    style={{ display: "none" }}
+                    onChange={handleFileInputChange}
+                  />
+                  <div
+                    style={{
+                      fontSize: 16,
+                      fontWeight: 600,
+                      marginBottom: 8,
+                    }}
+                  >
+                    Drag &amp; drop SOV files here
+                  </div>
+                  <div
+                    style={{
+                      fontSize: 13,
+                      color: "#4b5563",
+                      marginBottom: 12,
+                    }}
+                  >
+                    Or click to browse. EquiRisk ingests and normalises your
+                    stock listings, loss runs and schedules of values, and
+                    highlights missing or inconsistent information.
+                  </div>
+                  <div style={{ fontSize: 12, color: "#6b7280" }}>
+                    In this MVP, CSV &amp; Excel are parsed client-side and
+                    previewed. Other file types are shown as queued for
+                    extraction.
+                  </div>
+                </div>
+
+                {/* Ingestion status & portfolio snapshot */}
+                <div style={{ flex: 1.4, minWidth: 260 }}>
+                  <div
+                    style={{
+                      marginBottom: 16,
+                      padding: 16,
+                      borderRadius: 12,
+                      border: "1px solid #e5e7eb",
+                      background: "#fff",
+                    }}
+                  >
+                    <div
+                      style={{
+                        fontSize: 13,
+                        fontWeight: 600,
+                        marginBottom: 8,
+                        textTransform: "uppercase",
+                        letterSpacing: "0.06em",
+                        color: "#6b7280",
+                      }}
+                    >
+                      Ingestion status
+                    </div>
+
+                    {isUploading && (
+                      <div style={{ fontSize: 13, marginBottom: 8 }}>
+                        Processing file…
+                      </div>
+                    )}
+
+                    {uploadError && (
+                      <div
+                        style={{
+                          fontSize: 12,
+                          marginTop: 8,
+                          padding: 8,
+                          borderRadius: 6,
+                          background: "#fee2e2",
+                          color: "#b91c1c",
+                        }}
+                      >
+                        Error: {uploadError}
+                      </div>
+                    )}
+
+                    {!uploadedFiles.length && !isUploading && !uploadError && (
+                      <div style={{ fontSize: 13, color: "#9ca3af" }}>
+                        No files uploaded yet. Drop a stock listing or SOV to
+                        begin.
+                      </div>
+                    )}
+
+                    {uploadedFiles.length > 0 && (
+                      <ul
+                        style={{
+                          listStyle: "none",
+                          padding: 0,
+                          margin: 0,
+                          fontSize: 13,
+                        }}
+                      >
+                        {uploadedFiles.map((f) => (
+                          <li
+                            key={f.name}
+                            style={{
+                              display: "flex",
+                              justifyContent: "space-between",
+                              alignItems: "center",
+                              padding: "4px 0",
+                            }}
+                          >
+                            <span>
+                              {f.name}{" "}
+                              <span style={{ color: "#9ca3af" }}>
+                                ({Math.round(f.size / 1024)} KB)
+                              </span>
+                            </span>
+                            <span
+                              style={{
+                                fontSize: 12,
+                                color:
+                                  f.status === "Parsed"
+                                    ? "#16a34a"
+                                    : f.status.startsWith("Queued")
+                                    ? "#6b7280"
+                                    : "#4f46e5",
+                              }}
+                            >
+                              {f.status}
+                            </span>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+
+                  <div
+                    style={{
+                      padding: 16,
+                      borderRadius: 12,
+                      border: "1px solid #e5e7eb",
+                      background: "#fff",
+                    }}
+                  >
+                    <div
+                      style={{
+                        fontSize: 13,
+                        fontWeight: 600,
+                        marginBottom: 8,
+                        textTransform: "uppercase",
+                        letterSpacing: "0.06em",
+                        color: "#6b7280",
+                      }}
+                    >
+                      Portfolio snapshot
+                    </div>
+                    <div
+                      style={{
+                        fontSize: 12,
+                        color: "#9ca3af",
+                        marginBottom: 12,
+                      }}
+                    >
+                      Source: {portfolioSnapshot.source}
+                    </div>
+                    <div
+                      style={{
+                        display: "grid",
+                        gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
+                        gap: 12,
+                      }}
+                    >
+                      <div>
+                        <div
+                          style={{
+                            fontSize: 11,
+                            textTransform: "uppercase",
+                            letterSpacing: "0.06em",
+                            color: "#9ca3af",
+                            marginBottom: 4,
+                          }}
+                        >
+                          Properties
+                        </div>
+                        <div
+                          style={{
+                            fontSize: 22,
+                            fontWeight: 700,
+                            color: "#111827",
+                          }}
+                        >
+                          {portfolioSnapshot.propertyCount}
+                        </div>
+                      </div>
+                      <div>
+                        <div
+                          style={{
+                            fontSize: 11,
+                            textTransform: "uppercase",
+                            letterSpacing: "0.06em",
+                            color: "#9ca3af",
+                            marginBottom: 4,
+                          }}
+                        >
+                          Total value
+                        </div>
+                        <div
+                          style={{
+                            fontSize: 18,
+                            fontWeight: 600,
+                            color: "#111827",
+                          }}
+                        >
+                          {portfolioSnapshot.totalValue
+                            ? `£${(
+                                portfolioSnapshot.totalValue / 1_000_000
+                              ).toFixed(1)}m`
+                            : "Not available"}
+                        </div>
+                      </div>
+                      <div>
+                        <div
+                          style={{
+                            fontSize: 11,
+                            textTransform: "uppercase",
+                            letterSpacing: "0.06em",
+                            color: "#9ca3af",
+                            marginBottom: 4,
+                          }}
+                        >
+                          Records with missing info
+                        </div>
+                        <div
+                          style={{
+                            fontSize: 22,
+                            fontWeight: 700,
+                            color:
+                              portfolioSnapshot.missingCore > 0
+                                ? "#b91c1c"
+                                : "#16a34a",
+                          }}
+                        >
+                          {portfolioSnapshot.missingCore}
+                        </div>
+                      </div>
+                    </div>
+                    <div
+                      style={{
+                        marginTop: 10,
+                        fontSize: 11,
+                        color: "#6b7280",
+                      }}
+                    >
+                      Underwriters start here: do we trust the schedule of
+                      values? Are addresses, postcodes and sums insured
+                      complete? Detailed rows and modelling come next.
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </section>
+
+            {/* Standardised SOV preview if a tabular file parsed */}
+            {uploadedData && (
+              <section className="card" style={{ marginTop: 20 }}>
+                <div className="card-header">
+                  <h2 className="card-title">Standardised SOV preview</h2>
+                  <span className="card-badge">
+                    Showing first 50 of {uploadedData.row_count} rows
+                  </span>
+                </div>
+                <div className="table-wrapper">
+                  <table className="risk-table">
+                    <thead>
+                      <tr>
+                        {uploadedData.columns.map((col) => (
+                          <th key={col}>{col}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {uploadedData.data.slice(0, 50).map((row, idx) => (
+                        <tr key={idx}>
+                          {uploadedData.columns.map((col) => (
+                            <td key={col}>{row[col] ?? "—"}</td>
+                          ))}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </section>
+            )}
+          </div>
+        )}
+
+        {/* 2. Portfolio explorer */}
         {activeTab === "portfolio" && (
           <div className="app-layout">
-            {/* Filters */}
             <aside className="sidebar-card">
-              <h2 className="card-title">Filters</h2>
+              <h2 className="card-title">Portfolio explorer</h2>
 
               <div className="field">
                 <label className="field-label">
@@ -328,100 +827,58 @@ function App() {
               </div>
 
               <div className="field">
-                <label className="field-label">Max pure premium (£)</label>
-                <input
-                  type="range"
-                  min={50}
-                  max={700}
-                  step={10}
-                  value={maxPremium}
-                  onChange={(e) => setMaxPremium(Number(e.target.value))}
-                  className="range"
-                />
-                <div className="range-value">≤ £{maxPremium}</div>
-              </div>
-
-              <div className="field">
-                <label className="field-label">Minimum EPC rating</label>
-                <select
-                  value={minEpc}
-                  onChange={(e) => setMinEpc(e.target.value)}
-                  className="input"
-                >
-                  <option value="Any">Any</option>
-                  <option value="A">A</option>
-                  <option value="B">B or better</option>
-                  <option value="C">C or better</option>
-                  <option value="D">D or better</option>
-                </select>
-              </div>
-
-              <div className="field">
-                <label className="field-label">Sort by</label>
-                <select
-                  value={sortBy}
-                  onChange={(e) => setSortBy(e.target.value)}
-                  className="input"
-                >
-                  <option value="purePremiumDesc">
-                    Pure premium (high → low)
-                  </option>
-                  <option value="purePremiumAsc">
-                    Pure premium (low → high)
-                  </option>
-                  <option value="claimFrequencyDesc">
-                    Claim frequency (high → low)
-                  </option>
-                  <option value="deprivationDesc">
-                    Deprivation index (high → low)
-                  </option>
-                </select>
-              </div>
-
-              <div className="field">
-                <label className="field-label">Data quality notes</label>
+                <label className="field-label">Note</label>
                 <div className="field-note">
-                  All information to be included where available. Best
-                  endeavours should be used to populate missing fields, in line
-                  with Document A notes.
+                  This explorer is secondary. The primary workflow is ingestion
+                  and high-level portfolio overview. Detailed rows support
+                  underwriter deep dives when needed.
                 </div>
               </div>
             </aside>
 
-            {/* Main column: summary + map + detailed table */}
             <main className="main-column">
-              {/* Summary cards */}
-              {summary && (
-                <section className="summary-grid">
-                  <div className="summary-card">
-                    <div className="summary-label">Properties in view</div>
-                    <div className="summary-value">{summary.n}</div>
-                    <div className="summary-footnote">
-                      out of {RAW_PROPERTIES.length} in this demo portfolio
-                    </div>
+              <section className="summary-grid">
+                <div className="summary-card">
+                  <div className="summary-label">Properties (demo)</div>
+                  <div className="summary-value">{RAW_PROPERTIES.length}</div>
+                  <div className="summary-footnote">
+                    As per current sample portfolio
                   </div>
-                  <div className="summary-card">
-                    <div className="summary-label">Avg pure premium</div>
-                    <div className="summary-value">
-                      £{summary.avgPremium.toFixed(0)}
-                    </div>
-                    <div className="summary-footnote">
-                      modelled annual technical rate
-                    </div>
+                </div>
+                <div className="summary-card">
+                  <div className="summary-label">Sum insured</div>
+                  <div className="summary-value">
+                    £
+                    {(
+                      RAW_PROPERTIES.reduce(
+                        (s, p) => s + (p.sumInsured || 0),
+                        0
+                      ) / 1_000_000
+                    ).toFixed(1)}
+                    m
                   </div>
-                  <div className="summary-card">
-                    <div className="summary-label">Sum insured in view</div>
-                    <div className="summary-value">
-                      £{(summary.totalSumInsured / 1_000_000).toFixed(1)}m
-                    </div>
-                    <div className="summary-footnote">
-                      aggregate declared values for filtered properties
-                    </div>
+                  <div className="summary-footnote">
+                    Aggregate declared values
                   </div>
-                </section>
-              )}
+                </div>
+                <div className="summary-card">
+                  <div className="summary-label">
+                    High / Very High risk props
+                  </div>
+                  <div className="summary-value">
+                    {
+                      RAW_PROPERTIES.filter(
+                        (p) =>
+                          p.riskBand === "High" || p.riskBand === "Very High"
+                      ).length
+                    }
+                  </div>
+                  <div className="summary-footnote">
+                    Based on deprivation, claims &amp; maintenance
+                  </div>
+                </div>
+              </section>
 
-              {/* Edinburgh Map */}
               <section className="card map-card">
                 <div className="card-header">
                   <h2 className="card-title">Edinburgh property view</h2>
@@ -453,8 +910,6 @@ function App() {
                             {p.propertyType} • {p.occupancyType}
                             <br />
                             Risk band: <strong>{p.riskBand}</strong>
-                            <br />
-                            Pure premium: £{p.purePremium.toFixed(0)}
                           </div>
                         </Popup>
                       </Marker>
@@ -463,7 +918,6 @@ function App() {
                 </div>
               </section>
 
-              {/* Detailed table – merged technical view */}
               <section className="card">
                 <div className="card-header">
                   <h2 className="card-title">
@@ -478,11 +932,10 @@ function App() {
                   <table className="risk-table">
                     <thead>
                       <tr>
-                        <th>Property (Doc A)</th>
+                        <th>Property</th>
                         <th>Geo / Deprivation</th>
                         <th>Construction &amp; features</th>
                         <th>Perils &amp; claims</th>
-                        <th>Risk metrics</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -502,11 +955,6 @@ function App() {
                               Ref {p.propertyReference} · Block{" "}
                               {p.blockReference} · Units {p.numberOfUnits}
                             </div>
-                            <div className="prop-meta">
-                              Sum insured: £
-                              {p.sumInsured.toLocaleString("en-GB")} (
-                              {p.sumInsuredType})
-                            </div>
                           </td>
 
                           <td>
@@ -519,14 +967,6 @@ function App() {
                             </div>
                             <div className="cell-meta">
                               lat {p.lat.toFixed(3)}, lon {p.lon.toFixed(3)}
-                            </div>
-                            <div className="pill pill-risk">
-                              <span
-                                className={`pill-dot pill-dot-${p.riskBand
-                                  .toLowerCase()
-                                  .replace(" ", "")}`}
-                              />
-                              {p.riskBand} risk
                             </div>
                           </td>
 
@@ -568,50 +1008,13 @@ function App() {
                               Claim frequency: {p.claimFrequency.toFixed(2)} /
                               year
                             </div>
-                            <div className="cell-meta">
-                              Last claim: {p.lastClaimDate || "None"}
-                            </div>
-                          </td>
-
-                          <td>
-                            <div className="cell-strong">
-                              Pure premium: £{p.purePremium.toFixed(0)}
-                            </div>
-                            <div className="cell-muted">
-                              Expected severity: £
-                              {p.expectedSeverity.toLocaleString("en-GB")}
-                            </div>
-                            <div className="cell-muted">
-                              Maintenance score: {p.maintenanceScore.toFixed(1)}
-                            </div>
-                            <div className="cell-muted flags-label">
-                              Underwriter flags:
-                            </div>
-                            <ul className="flags-list">
-                              {p.deprivationIndex > 8 && (
-                                <li>High deprivation area</li>
-                              )}
-                              {p.floodScore > 0.5 && (
-                                <li>Elevated flood risk</li>
-                              )}
-                              {p.claimFrequency > 0.2 && (
-                                <li>Frequent claims history</li>
-                              )}
-                              {p.maintenanceScore < 6 && (
-                                <li>Maintenance concerns</li>
-                              )}
-                              {p.deprivationIndex <= 8 &&
-                                p.floodScore <= 0.5 &&
-                                p.claimFrequency <= 0.2 &&
-                                p.maintenanceScore >= 6 && <li>None</li>}
-                            </ul>
                           </td>
                         </tr>
                       ))}
 
                       {filtered.length === 0 && (
                         <tr>
-                          <td colSpan={5} className="empty-row">
+                          <td colSpan={4} className="empty-row">
                             No properties match the current filters.
                           </td>
                         </tr>
@@ -624,7 +1027,7 @@ function App() {
           </div>
         )}
 
-        {/* Stock listing tab – closer to Document A layout */}
+        {/* 3. Stock listing – Doc A-style */}
         {activeTab === "stock" && (
           <div className="card" style={{ marginTop: 20 }}>
             <div className="card-header">
@@ -708,7 +1111,6 @@ function App() {
               </table>
             </div>
 
-            {/* Very light validation summary, echoing the pivot */}
             <div className="card-header">
               <h3 className="card-title">Validation snapshots</h3>
             </div>
@@ -753,7 +1155,7 @@ function App() {
           </div>
         )}
 
-        {/* High value tab – Document B-flavoured */}
+        {/* 4. High value – Doc B-style */}
         {activeTab === "highvalue" && (
           <div className="card" style={{ marginTop: 20 }}>
             <div className="card-header">
@@ -825,9 +1227,6 @@ function App() {
                           Risk band: <span>{p.riskBand}</span>
                         </div>
                         <div className="cell-muted">
-                          Pure premium: £{p.purePremium.toFixed(0)}
-                        </div>
-                        <div className="cell-muted">
                           Claim frequency: {p.claimFrequency.toFixed(2)} / year
                         </div>
                         <div className="cell-meta">
@@ -846,132 +1245,8 @@ function App() {
             <div style={{ padding: "10px 18px 16px", fontSize: 12 }}>
               This view mirrors the intent of Document B: to capture
               high-resolution information for complex or high-value blocks,
-              including construction features, fire safety measures and
-              remediation status (for example EWS, ACM/HPL panels). It is
-              designed to sit alongside the stock listing, not replace it.
-            </div>
-          </div>
-        )}
-
-        {activeTab === "upload" && (
-          <div className="card" style={{ marginTop: 20 }}>
-            <div className="card-header">
-              <h2 className="card-title">Upload CSV File</h2>
-              <span className="card-badge">
-                Upload and standardize property data
-              </span>
-            </div>
-
-            <div style={{ padding: "20px" }}>
-              {/* File upload input */}
-              <div className="field">
-                <label className="field-label">Select CSV File</label>
-                <input
-                  type="file"
-                  accept=".csv"
-                  onChange={handleFileUpload}
-                  disabled={isUploading}
-                  className="input"
-                  style={{ padding: "8px" }}
-                />
-              </div>
-
-              {/* Loading indicator */}
-              {isUploading && (
-                <div style={{ marginTop: 20, textAlign: "center" }}>
-                  <p>Processing file...</p>
-                </div>
-              )}
-
-              {/* Error message */}
-              {uploadError && (
-                <div
-                  style={{
-                    marginTop: 20,
-                    padding: 15,
-                    backgroundColor: "#fee",
-                    borderRadius: 4,
-                    color: "#c00",
-                  }}
-                >
-                  <strong>Error:</strong> {uploadError}
-                </div>
-              )}
-
-              {/* Success message and data display */}
-              {uploadedData && !isUploading && (
-                <div style={{ marginTop: 20 }}>
-                  <div
-                    style={{
-                      padding: 15,
-                      backgroundColor: "#efe",
-                      borderRadius: 4,
-                      marginBottom: 20,
-                    }}
-                  >
-                    <strong>✓ Success!</strong> {uploadedData.message}
-                    <br />
-                    <small>File: {uploadedData.original_filename}</small>
-                  </div>
-
-                  {/* Column mapping info */}
-                  {Object.keys(uploadedData.column_mapping).length > 0 && (
-                    <div style={{ marginBottom: 20 }}>
-                      <h3 className="card-title">Standardized Columns</h3>
-                      <table className="risk-table">
-                        <thead>
-                          <tr>
-                            <th>Original Column</th>
-                            <th>Standardized Column</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {Object.entries(uploadedData.column_mapping).map(
-                            ([original, standardized]) => (
-                              <tr key={original}>
-                                <td>{original}</td>
-                                <td>
-                                  <strong>{standardized}</strong>
-                                </td>
-                              </tr>
-                            )
-                          )}
-                        </tbody>
-                      </table>
-                    </div>
-                  )}
-
-                  {/* Display standardized data */}
-                  <div>
-                    <h3 className="card-title">Standardized Data Preview</h3>
-                    <div className="table-wrapper">
-                      <table className="risk-table">
-                        <thead>
-                          <tr>
-                            {uploadedData.columns.map((col) => (
-                              <th key={col}>{col}</th>
-                            ))}
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {uploadedData.data.slice(0, 50).map((row, idx) => (
-                            <tr key={idx}>
-                              {uploadedData.columns.map((col) => (
-                                <td key={col}>{row[col] ?? "—"}</td>
-                              ))}
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                    {uploadedData.row_count > 50 && (
-                      <p style={{ marginTop: 10, fontSize: 12, color: "#666" }}>
-                        Showing first 50 of {uploadedData.row_count} rows
-                      </p>
-                    )}
-                  </div>
-                </div>
-              )}
+              including construction features, fire safety measures and façade /
+              EWS status. It sits alongside, not instead of, the stock listing.
             </div>
           </div>
         )}
@@ -981,3 +1256,4 @@ function App() {
 }
 
 export default App;
+
