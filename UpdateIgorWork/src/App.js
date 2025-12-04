@@ -77,14 +77,18 @@ function App() {
     "Complete",
   ];
 
-  const runIngestionPipeline = async () => {
-    setPipelineStep("Queued");
-    for (let i = 1; i < PIPELINE_STEPS.length; i++) {
-      // simulate async stages
-      // eslint-disable-next-line no-await-in-loop
-      await new Promise((res) => setTimeout(res, 450));
-      setPipelineStep(PIPELINE_STEPS[i]);
-    }
+  // Simulated Archepelago-style stepper: advances through steps on a timer
+  const runIngestionPipeline = () => {
+    if (!PIPELINE_STEPS.length) return;
+
+    // Start at step 0 ("Queued")
+    setPipelineStep(PIPELINE_STEPS[0]);
+
+    PIPELINE_STEPS.slice(1).forEach((step, idx) => {
+      setTimeout(() => {
+        setPipelineStep(step);
+      }, 500 * (idx + 1));
+    });
   };
 
   const parseCSV = (file) => {
@@ -116,7 +120,7 @@ function App() {
     });
   };
 
-  const handleFiles = async (fileList) => {
+  const handleFiles = (fileList) => {
     const files = Array.from(fileList || []);
     if (!files.length) return;
 
@@ -138,15 +142,22 @@ function App() {
       return;
     }
 
-    await runIngestionPipeline(csvFile);
+    // Kick off pipeline animation
+    runIngestionPipeline();
+
+    // Parse CSV immediately
     parseCSV(csvFile);
 
-    setIsUploading(false);
-    setUploadedFiles((prev) =>
-      prev.map((f) =>
-        f.name === csvFile.name ? { ...f, status: "Complete" } : f
-      )
-    );
+    // Mark upload as complete after the pipeline has "finished"
+    const totalMs = 500 * PIPELINE_STEPS.length;
+    setTimeout(() => {
+      setIsUploading(false);
+      setUploadedFiles((prev) =>
+        prev.map((f) =>
+          f.name === csvFile.name ? { ...f, status: "Complete" } : f
+        )
+      );
+    }, totalMs);
   };
 
   const handleFileInputChange = (e) => {
@@ -339,7 +350,7 @@ function App() {
     }));
   }, []);
 
-  // Portfolio snapshot
+  // Portfolio snapshot for ingestion card
   const portfolioSnapshot = useMemo(() => {
     if (uploadedData && uploadedData.data.length) {
       const rows = uploadedData.data;
@@ -393,6 +404,42 @@ function App() {
       propertyCount,
       totalValue,
       missingCore,
+    };
+  }, [uploadedData]);
+
+  // Archepelago-style ingestion breakdown for uploaded CSV
+  const ingestionSummary = useMemo(() => {
+    if (!uploadedData || !uploadedData.data.length) return null;
+
+    const colsLower = uploadedData.columns.map((c) => c.toLowerCase());
+    const postcodeIndex = colsLower.findIndex((c) => c.includes("postcode"));
+    const addressIndex = colsLower.findIndex((c) => c.includes("address"));
+    const sumIndex = colsLower.findIndex(
+      (c) => c.includes("sum") && c.includes("insured")
+    );
+
+    let missingAddress = 0;
+    let missingPostcode = 0;
+
+    uploadedData.data.forEach((row) => {
+      if (addressIndex !== -1) {
+        const key = uploadedData.columns[addressIndex];
+        if (!row[key]) missingAddress += 1;
+      }
+      if (postcodeIndex !== -1) {
+        const key = uploadedData.columns[postcodeIndex];
+        if (!row[key]) missingPostcode += 1;
+      }
+    });
+
+    return {
+      rowCount: uploadedData.row_count,
+      columnCount: uploadedData.columns.length,
+      hasAddress: addressIndex !== -1,
+      hasPostcode: postcodeIndex !== -1,
+      hasSumInsured: sumIndex !== -1,
+      missingAddress,
+      missingPostcode,
     };
   }, [uploadedData]);
 
@@ -522,8 +569,9 @@ function App() {
                   </div>
                 </div>
 
-                {/* INGESTION STATUS */}
+                {/* INGESTION STATUS + SNAPSHOT */}
                 <div style={{ flex: 1.4, minWidth: 260 }}>
+                  {/* STATUS CARD */}
                   <div
                     style={{
                       marginBottom: 16,
@@ -546,6 +594,7 @@ function App() {
                       Ingestion status
                     </div>
 
+                    {/* Animated pipeline */}
                     {isUploading && pipelineStep && (
                       <div
                         style={{
@@ -641,6 +690,56 @@ function App() {
                           </li>
                         ))}
                       </ul>
+                    )}
+
+                    {/* Archepelago-style ingestion breakdown */}
+                    {ingestionSummary && !isUploading && (
+                      <div
+                        style={{
+                          marginTop: 12,
+                          paddingTop: 12,
+                          borderTop: "1px dashed #e5e7eb",
+                          fontSize: 12,
+                          color: "#4b5563",
+                        }}
+                      >
+                        <div style={{ fontWeight: 600, marginBottom: 6 }}>
+                          Ingestion breakdown
+                        </div>
+                        <ul
+                          style={{
+                            paddingLeft: 18,
+                            margin: 0,
+                            lineHeight: 1.5,
+                          }}
+                        >
+                          <li>
+                            {ingestionSummary.rowCount} rows parsed across{" "}
+                            {ingestionSummary.columnCount} columns
+                          </li>
+                          <li>
+                            Address column:{" "}
+                            {ingestionSummary.hasAddress
+                              ? "detected"
+                              : "not detected"}
+                            ; postcode column:{" "}
+                            {ingestionSummary.hasPostcode
+                              ? "detected"
+                              : "not detected"}
+                          </li>
+                          <li>
+                            Sum insured field:{" "}
+                            {ingestionSummary.hasSumInsured
+                              ? "detected"
+                              : "not detected"}
+                          </li>
+                          <li>
+                            Rows with missing address:{" "}
+                            {ingestionSummary.missingAddress}; rows with missing
+                            postcode: {ingestionSummary.missingPostcode}
+                          </li>
+                        </ul>
+                      </div>
                     )}
                   </div>
 
@@ -845,7 +944,7 @@ function App() {
               </div>
             </section>
 
-            {/* MIDROW: CRV/ERV + MAP */}
+            {/* MIDROW: CRV/ERV + PERILS/FEATURES/MAINTENANCE + MAP */}
             <section
               style={{
                 display: "grid",
@@ -854,59 +953,219 @@ function App() {
                 marginTop: 20,
               }}
             >
-              {/* CRV vs ERV */}
-              <div className="card">
-                <div className="card-header">
-                  <h2 className="card-title">
-                    Reinstatement value comparison (demo)
-                  </h2>
-                  <span className="card-badge">CRV vs ERV</span>
-                </div>
+              {/* LEFT COLUMN: CRV/ERV + THREE SUBCARDS */}
+              <div
+                style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: 20,
+                }}
+              >
+                {/* CRV vs ERV */}
+                <div className="card">
+                  <div className="card-header">
+                    <h2 className="card-title">
+                      Reinstatement value comparison (demo)
+                    </h2>
+                    <span className="card-badge">CRV vs ERV</span>
+                  </div>
 
-                <div style={{ padding: 20 }}>
-                  {[
-                    { label: "Current (CRV)", pct: 68, colour: "#c7d2fe" },
-                    { label: "Estimated (ERV)", pct: 75, colour: "#4f46e5" },
-                  ].map((bar) => (
-                    <div key={bar.label} style={{ marginBottom: 16 }}>
-                      <div style={{ marginBottom: 4 }}>{bar.label}</div>
+                  <div style={{ padding: 20 }}>
+                    {[
+                      { label: "Current (CRV)", pct: 68, colour: "#c7d2fe" },
+                      { label: "Estimated (ERV)", pct: 75, colour: "#4f46e5" },
+                    ].map((bar) => (
+                      <div key={bar.label} style={{ marginBottom: 16 }}>
+                        <div style={{ marginBottom: 4 }}>{bar.label}</div>
 
-                      <div
-                        style={{
-                          height: 10,
-                          borderRadius: 999,
-                          background: "#e5e7eb",
-                        }}
-                      >
                         <div
                           style={{
-                            height: "100%",
-                            width: `${bar.pct}%`,
+                            height: 10,
                             borderRadius: 999,
-                            background: bar.colour,
+                            background: "#e5e7eb",
                           }}
-                        />
+                        >
+                          <div
+                            style={{
+                              height: "100%",
+                              width: `${bar.pct}%`,
+                              borderRadius: 999,
+                              background: bar.colour,
+                            }}
+                          />
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    ))}
 
-                  <div
-                    style={{
-                      marginTop: 6,
-                      fontSize: 12,
-                      display: "flex",
-                      justifyContent: "space-between",
-                      color: "#6b7280",
-                    }}
-                  >
-                    <span>Indicative uplift (demo)</span>
-                    <span>+7–8%</span>
+                    <div
+                      style={{
+                        marginTop: 6,
+                        fontSize: 12,
+                        display: "flex",
+                        justifyContent: "space-between",
+                        color: "#6b7280",
+                      }}
+                    >
+                      <span>Indicative uplift (demo)</span>
+                      <span>+7–8%</span>
+                    </div>
                   </div>
                 </div>
+
+                {/* PERIL + FEATURES + MAINTENANCE UNDER CRV CARD */}
+                <section
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "2fr 1fr 1fr",
+                    gap: 20,
+                  }}
+                >
+                  {/* PERIL */}
+                  <div className="card">
+                    <div className="card-header">
+                      <h2 className="card-title">Peril risk distribution</h2>
+                    </div>
+
+                    <div style={{ padding: 20 }}>
+                      {[
+                        {
+                          label: "Combustibility",
+                          value: dashboardMetrics.combustibilityHotspots,
+                        },
+                        {
+                          label: "Fire exposure",
+                          value: dashboardMetrics.fireHotspots,
+                        },
+                        {
+                          label: "Flood exposure",
+                          value: dashboardMetrics.floodHotspots,
+                        },
+                        {
+                          label: "Flat roofs",
+                          value: dashboardMetrics.flatRoofPct,
+                        },
+                      ].map((i) => (
+                        <div key={i.label} style={{ marginBottom: 12 }}>
+                          <div
+                            style={{
+                              display: "flex",
+                              justifyContent: "space-between",
+                            }}
+                          >
+                            <span>{i.label}</span>
+                            <span>{i.value}%</span>
+                          </div>
+
+                          <div
+                            style={{
+                              height: 8,
+                              borderRadius: 999,
+                              background: "#e5e7eb",
+                              marginTop: 4,
+                            }}
+                          >
+                            <div
+                              style={{
+                                height: "100%",
+                                width: `${i.value}%`,
+                                background: "#4f46e5",
+                                borderRadius: 999,
+                              }}
+                            />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* FEATURES */}
+                  <div className="card">
+                    <div className="card-header">
+                      <h2 className="card-title">Property features</h2>
+                    </div>
+
+                    <div style={{ padding: 20, fontSize: 13 }}>
+                      <div style={{ marginBottom: 12 }}>
+                        <div className="cell-strong">
+                          Properties with balconies (proxy)
+                        </div>
+                        <div className="summary-value" style={{ fontSize: 24 }}>
+                          {dashboardMetrics.balconyPct}%
+                        </div>
+                        <div className="summary-footnote">
+                          Flats / high-rise used as proxy
+                        </div>
+                      </div>
+
+                      <div>
+                        <div className="cell-strong">Basements present</div>
+                        <div className="summary-value" style={{ fontSize: 24 }}>
+                          {dashboardMetrics.basementPct}%
+                        </div>
+                        <div className="summary-footnote">
+                          Flood / escape-of-water sensitivity
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* MAINTENANCE */}
+                  <div className="card">
+                    <div className="card-header">
+                      <h2 className="card-title">Maintenance hotspots</h2>
+                    </div>
+
+                    <div style={{ padding: 20 }}>
+                      {[
+                        {
+                          label: "Low maintenance score",
+                          value: dashboardMetrics.maintenanceIssues,
+                        },
+                      ].map((i) => (
+                        <div key={i.label} style={{ marginBottom: 12 }}>
+                          <div
+                            style={{
+                              display: "flex",
+                              justifyContent: "space-between",
+                            }}
+                          >
+                            <span>{i.label}</span>
+                            <span>{i.value}%</span>
+                          </div>
+
+                          <div
+                            style={{
+                              height: 8,
+                              borderRadius: 999,
+                              background: "#e5e7eb",
+                              marginTop: 4,
+                            }}
+                          >
+                            <div
+                              style={{
+                                height: "100%",
+                                width: `${i.value}%`,
+                                background: "#10b981",
+                                borderRadius: 999,
+                              }}
+                            />
+                          </div>
+                        </div>
+                      ))}
+
+                      <div className="summary-footnote">
+                        Helps target survey / capex interventions.
+                      </div>
+                    </div>
+                  </div>
+                </section>
               </div>
 
-              {/* MAP */}
-              <section className="card map-card">
+              {/* RIGHT COLUMN: MAP (FULL HEIGHT) */}
+              <section
+                className="card map-card"
+                style={{ display: "flex", flexDirection: "column" }}
+              >
                 <div className="card-header">
                   <h2 className="card-title">Regional risk &amp; exposure</h2>
                   <span className="card-badge">
@@ -914,7 +1173,10 @@ function App() {
                   </span>
                 </div>
 
-                <div className="map-wrapper" style={{ height: 260 }}>
+                <div
+                  className="map-wrapper"
+                  style={{ flex: 1, minHeight: 260 }}
+                >
                   <MapContainer
                     center={[54.5, -3]}
                     zoom={5}
@@ -941,155 +1203,6 @@ function App() {
                   </MapContainer>
                 </div>
               </section>
-            </section>
-
-            {/* PERIL + FEATURES + MAINTENANCE */}
-            <section
-              style={{
-                display: "grid",
-                gridTemplateColumns: "2fr 1fr 1fr",
-                gap: 20,
-                marginTop: 20,
-              }}
-            >
-              {/* PERIL */}
-              <div className="card">
-                <div className="card-header">
-                  <h2 className="card-title">Peril risk distribution</h2>
-                </div>
-
-                <div style={{ padding: 20 }}>
-                  {[
-                    {
-                      label: "Combustibility",
-                      value: dashboardMetrics.combustibilityHotspots,
-                    },
-                    {
-                      label: "Fire exposure",
-                      value: dashboardMetrics.fireHotspots,
-                    },
-                    {
-                      label: "Flood exposure",
-                      value: dashboardMetrics.floodHotspots,
-                    },
-                    {
-                      label: "Flat roofs",
-                      value: dashboardMetrics.flatRoofPct,
-                    },
-                  ].map((i) => (
-                    <div key={i.label} style={{ marginBottom: 12 }}>
-                      <div
-                        style={{
-                          display: "flex",
-                          justifyContent: "space-between",
-                        }}
-                      >
-                        <span>{i.label}</span>
-                        <span>{i.value}%</span>
-                      </div>
-
-                      <div
-                        style={{
-                          height: 8,
-                          borderRadius: 999,
-                          background: "#e5e7eb",
-                          marginTop: 4,
-                        }}
-                      >
-                        <div
-                          style={{
-                            height: "100%",
-                            width: `${i.value}%`,
-                            background: "#4f46e5",
-                            borderRadius: 999,
-                          }}
-                        />
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* FEATURES */}
-              <div className="card">
-                <div className="card-header">
-                  <h2 className="card-title">Property features</h2>
-                </div>
-
-                <div style={{ padding: 20, fontSize: 13 }}>
-                  <div style={{ marginBottom: 12 }}>
-                    <div className="cell-strong">
-                      Properties with balconies (proxy)
-                    </div>
-                    <div className="summary-value" style={{ fontSize: 24 }}>
-                      {dashboardMetrics.balconyPct}%
-                    </div>
-                    <div className="summary-footnote">
-                      Flats / high-rise used as proxy
-                    </div>
-                  </div>
-
-                  <div>
-                    <div className="cell-strong">Basements present</div>
-                    <div className="summary-value" style={{ fontSize: 24 }}>
-                      {dashboardMetrics.basementPct}%
-                    </div>
-                    <div className="summary-footnote">
-                      Flood / escape-of-water sensitivity
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* MAINTENANCE */}
-              <div className="card">
-                <div className="card-header">
-                  <h2 className="card-title">Maintenance hotspots</h2>
-                </div>
-
-                <div style={{ padding: 20 }}>
-                  {[
-                    {
-                      label: "Low maintenance score",
-                      value: dashboardMetrics.maintenanceIssues,
-                    },
-                  ].map((i) => (
-                    <div key={i.label} style={{ marginBottom: 12 }}>
-                      <div
-                        style={{
-                          display: "flex",
-                          justifyContent: "space-between",
-                        }}
-                      >
-                        <span>{i.label}</span>
-                        <span>{i.value}%</span>
-                      </div>
-
-                      <div
-                        style={{
-                          height: 8,
-                          borderRadius: 999,
-                          background: "#e5e7eb",
-                          marginTop: 4,
-                        }}
-                      >
-                        <div
-                          style={{
-                            height: "100%",
-                            width: `${i.value}%`,
-                            background: "#10b981",
-                            borderRadius: 999,
-                          }}
-                        />
-                      </div>
-                    </div>
-                  ))}
-
-                  <div className="summary-footnote">
-                    Helps target survey / capex interventions.
-                  </div>
-                </div>
-              </div>
             </section>
 
             {/* DETAIL TABLE */}
@@ -1439,10 +1552,7 @@ function App() {
                       <td>
                         <div className="cell-strong">Risk: {p.riskBand}</div>
                         <div className="cell-muted">
-                          Claims: {p.claimFrequency.toFixed(2)} /yr
-                        </div>
-                        <div className="cell-meta">
-                          Last claim: {p.lastClaimDate || "None"}
+                          Claims: {p.claimFrequency.toFixed(2)} / yr
                         </div>
                       </td>
                     </tr>
@@ -1450,22 +1560,9 @@ function App() {
                 </tbody>
               </table>
             </div>
-
-            <div className="card-header">
-              <h3 className="card-title">Document B intent</h3>
-            </div>
-
-            <div style={{ padding: 20, fontSize: 12 }}>
-              Document B captures high-resolution information for complex
-              blocks: construction, cladding, fire measures, EWS status, and
-              evacuation strategies. This enables underwriters to evaluate
-              multi-variable risk in minutes rather than days.
-            </div>
           </div>
         )}
-        {/* END highvalue tab */}
       </div>
-      {/* END app-shell */}
     </div>
   );
 }
