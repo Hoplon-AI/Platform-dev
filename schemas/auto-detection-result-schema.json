@@ -1,0 +1,149 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "$id": "https://platform-dev/schemas/auto-detection-result-schema.json",
+    "version": "1.0.0",
+    "title": "Auto-Detection Result Schema",
+    "description": "Schema for auto-detection results from the auto_detect module",
+    "type": "object",
+    "patternProperties": {
+        "^.*$": {
+            "type": "object",
+            "description": "Detection result for a column (key is column name)",
+            "required": [
+                "detected_type",
+                "confidence",
+                "all_scores"
+            ],
+            "properties": {
+                "detected_type": {
+                    "type": "string",
+                    "description": "The best matching detected type",
+                    "enum": [
+                        "postcode",
+                        "uprn",
+                        "date",
+                        "address",
+                        "numeric_id",
+                        "categorical",
+                        "boolean",
+                        "year",
+                        "latitude",
+                        "longitude",
+                        "city",
+                        "region",
+                        "house_type",
+                        "epc_rating",
+                        "unknown"
+                    ]
+                },
+                "confidence": {
+                    "type": "number",
+                    "description": "Confidence score for the detected type (0.0-1.0)",
+                    "minimum": 0.0,
+                    "maximum": 1.0
+                },
+                "all_scores": {
+                    "type": "object",
+                    "description": "All detection scores for this column",
+                    "properties": {
+                        "postcode": {
+                            "type": "number",
+                            "minimum": 0.0,
+                            "maximum": 1.0
+                        },
+                        "uprn": {
+                            "type": "number",
+                            "minimum": 0.0,
+                            "maximum": 1.0
+                        },
+                        "date": {
+                            "type": "number",
+                            "minimum": 0.0,
+                            "maximum": 1.0
+                        },
+                        "address": {
+                            "type": "number",
+                            "minimum": 0.0,
+                            "maximum": 1.0
+                        },
+                        "numeric_id": {
+                            "type": "number",
+                            "minimum": 0.0,
+                            "maximum": 1.0
+                        },
+                        "categorical": {
+                            "type": "number",
+                            "minimum": 0.0,
+                            "maximum": 1.0
+                        },
+                        "boolean": {
+                            "type": "number",
+                            "minimum": 0.0,
+                            "maximum": 1.0
+                        },
+                        "year": {
+                            "type": "number",
+                            "minimum": 0.0,
+                            "maximum": 1.0
+                        },
+                        "latitude": {
+                            "type": "number",
+                            "minimum": 0.0,
+                            "maximum": 1.0
+                        },
+                        "longitude": {
+                            "type": "number",
+                            "minimum": 0.0,
+                            "maximum": 1.0
+                        },
+                        "city": {
+                            "type": "number",
+                            "minimum": 0.0,
+                            "maximum": 1.0
+                        },
+                        "region": {
+                            "type": "number",
+                            "minimum": 0.0,
+                            "maximum": 1.0
+                        },
+                        "house_type": {
+                            "type": "number",
+                            "minimum": 0.0,
+                            "maximum": 1.0
+                        },
+                        "epc_rating": {
+                            "type": "number",
+                            "minimum": 0.0,
+                            "maximum": 1.0
+                        }
+                    },
+                    "additionalProperties": false
+                },
+                "format": {
+                    "type": "string",
+                    "description": "Detected format (for date columns)",
+                    "enum": [
+                        "%Y-%m-%d",
+                        "%d/%m/%Y",
+                        "%m/%d/%Y",
+                        "%d-%m-%Y",
+                        "%Y/%m/%d",
+                        "%d.%m.%Y",
+                        "%Y%m%d"
+                    ]
+                },
+                "is_sequential": {
+                    "type": "boolean",
+                    "description": "Whether numeric ID is sequential (for numeric_id columns)"
+                },
+                "unique_count": {
+                    "type": "integer",
+                    "description": "Number of unique values (for categorical columns)",
+                    "minimum": 0
+                }
+            },
+            "additionalProperties": false
+        }
+    },
+    "additionalProperties": false
+}
