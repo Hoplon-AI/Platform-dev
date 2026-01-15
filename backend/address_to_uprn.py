@@ -24,6 +24,8 @@ def get_uprn_from_address(address, api_key):
             return {
                 'uprn': result.get('UPRN'),
                 'matched_address': result.get('ADDRESS'),
+                'x_coordinate': result.get('X_COORDINATE'),
+                'y_coordinate': result.get('Y_COORDINATE')
                 #'latitude': result.get('LAT'),
                 #'longitude': result.get('LNG')
             }
@@ -44,6 +46,8 @@ if isinstance(result, dict):
     print(f"Address Provided: {search_address}")
     print(f"Matched Address:  {result['matched_address']}")
     print(f"UPRN:             {result['uprn']}")
+    print(f"X Coordinate:     {result['x_coordinate']}")
+    print(f"Y Coordinate:     {result['y_coordinate']}")
     #print(f"Latitude:         {result['latitude']}")
     #print(f"Longitude:        {result['longitude']}")
 else:
