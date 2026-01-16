@@ -21,7 +21,7 @@ JIRA_EMAIL = os.getenv('JIRA_EMAIL')
 JIRA_API_TOKEN = os.getenv('JIRA_API_TOKEN')
 JIRA_PROJECT_KEY = os.getenv('JIRA_PROJECT_KEY', 'KAN')
 
-CSV_FILE = Path(__file__).parent.parent / 'docs' / 'jira-tickets-import.csv'
+CSV_FILE = Path(__file__).parent.parent / 'docs' / 'jira-tickets-simplified.csv'
 
 def create_epic(jira, epic_data):
     """Create an Epic."""
@@ -77,7 +77,7 @@ def create_story(jira, story_data, epic_key=None):
         return None, None
 
 def create_task(jira, task_data, parent_key=None):
-    """Create a Task."""
+    """Create a Task (without parent link - Jira hierarchy may not support Story->Task)."""
     try:
         issue_dict = {
             'project': {'key': JIRA_PROJECT_KEY},
@@ -91,8 +91,8 @@ def create_task(jira, task_data, parent_key=None):
             priority_name = priority_map.get(task_data['Priority'], 'Medium')
             issue_dict['priority'] = {'name': priority_name}
         
-        if parent_key:
-            issue_dict['parent'] = {'key': parent_key}
+        # Don't set parent - Tasks are standalone in this Jira instance
+        # They can be linked to Epics manually if needed
         
         new_task = jira.create_issue(fields=issue_dict)
         
@@ -198,15 +198,32 @@ def main():
     for ticket in tickets:
         if ticket['Issue Type'] == 'Task':
             parent_key = None
-            # Simple parent matching
-            for story_summary, story_key in stories.items():
-                if story_summary[:30] in ticket.get('Summary', ''):
-                    parent_key = story_key
-                    break
+            # Try to match by Epic Link first
+            if ticket.get('Epic Link'):
+                epic_name = ticket['Epic Link']
+                if epic_name.startswith('KAN-EPIC-'):
+                    epic_map = {
+                        'KAN-EPIC-1': 'Frontend Infrastructure & UPRN Mapping Service',
+                        'KAN-EPIC-2': 'Portfolio Overview Dashboard',
+                        'KAN-EPIC-3': 'Block View Implementation',
+                        'KAN-EPIC-4': 'HA Profile Page with Interactive Map',
+                        'KAN-EPIC-5': 'Analytics & Reporting Dashboard',
+                        'KAN-EPIC-6': 'Excel Table Views Integration (Doc A & Doc B)',
+                    }
+                    mapped_name = epic_map.get(epic_name)
+                    if mapped_name:
+                        epic_key = epics.get(mapped_name)
+                        # Find a story in that epic to use as parent
+                        for story_summary, story_key in stories.items():
+                            # Match story to epic by checking if story summary relates to epic
+                            if epic_key and mapped_name[:20] in story_summary:
+                                parent_key = story_key
+                                break
             
-            if create_task(jira, ticket, parent_key):
+            task_key = create_task(jira, ticket, parent_key)
+            if task_key:
                 task_count += 1
-                if task_count % 20 == 0:
+                if task_count % 5 == 0:
                     print(f"  Progress: {task_count}/{total_tasks} tasks...")
             time.sleep(0.2)
     
