@@ -63,7 +63,7 @@ psql -U postgres -d platform_dev -f database/migrations/001_bronze_layer.sql
 
 ## Next Steps
 
-1. Connect database layer (SQLAlchemy models)
+1. Connect database layer
 2. Implement actual database operations in placeholder methods
 3. Set up S3 bucket and configure credentials
 4. Implement JWT authentication

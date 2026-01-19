@@ -35,7 +35,7 @@ This roadmap outlines the 3-month implementation plan for the EquiRisk Platform 
 - Configure build tooling and development environment
 - Establish API client and authentication flow
 - Create base component library and design system
-- **Implement UPRN mapping service using Ordnance Survey DataHub API**
+- **Implement UPRN mapping service using Ordnance Survey DataHub data**
 
 **Deliverables:**
 - [ ] React application scaffold (Vite/Create React App)
@@ -47,7 +47,10 @@ This roadmap outlines the 3-month implementation plan for the EquiRisk Platform 
 - [ ] State management (Context API or Zustand)
 - [ ] Design system tokens (colors, typography, spacing)
 - [ ] **UPRN Mapping Service (Backend)**
-  - [ ] OS DataHub API client integration
+  - [ ] OS DataHub dataset download
+  - [ ] Create necessary SQL tables
+  - [ ] Narrow columns import
+  - [ ] Add indexing 
   - [ ] Address-to-UPRN mapping function
   - [ ] Batch processing for multiple addresses
   - [ ] Error handling and fallback strategies
@@ -65,10 +68,6 @@ This roadmap outlines the 3-month implementation plan for the EquiRisk Platform 
 - Tailwind CSS or Material-UI for styling
 - Axios for API calls
 - React Query for data fetching/caching
-- **Backend:**
-  - `httpx` or `aiohttp` for async HTTP requests to OS DataHub API
-  - `redis` or in-memory cache for UPRN lookups
-  - Ordnance Survey DataHub API (AddressBase or UPRN Lookup service)
 
 **Dependencies:**
 - Backend API endpoints (already available)
@@ -83,7 +82,7 @@ This roadmap outlines the 3-month implementation plan for the EquiRisk Platform 
 **Service Architecture:**
 - **Location:** `backend/core/mapping/uprn_service.py`
 - **Purpose:** Map property addresses to UPRN (Unique Property Reference Number) during ingestion
-- **API:** Ordnance Survey DataHub API (AddressBase Premium or UPRN Lookup API)
+- **API:** Ordnance Survey DataHub bulk download
 
 **Features:**
 - [ ] **Address Normalization:**
@@ -97,12 +96,9 @@ This roadmap outlines the 3-month implementation plan for the EquiRisk Platform 
   - Fallback to fuzzy matching if exact match fails
 - [ ] **Caching Strategy:**
   - Cache successful UPRN lookups (address → UPRN)
-  - Cache TTL: 30 days (UPRNs don't change frequently)
+  - LRU in mem with a finite number of addresses
   - Invalidate cache on address updates
 - [ ] **Error Handling:**
-  - Handle API rate limits (implement retry with exponential backoff)
-  - Handle invalid/missing addresses
-  - Handle API unavailability (graceful degradation)
   - Log mapping failures for manual review
 - [ ] **Integration Points:**
   - Hook into CSV/Excel upload processing
@@ -135,33 +131,9 @@ class UPRNMapping:
 ```
 
 **OS DataHub API Integration:**
-- **Service:** Ordnance Survey AddressBase Premium or UPRN Lookup API
-- **Authentication:** API key or OAuth2 (depending on subscription)
-- **Rate Limits:** Typically 100-1000 requests/minute (check subscription)
-- **Request Format:**
-  ```json
-  {
-    "address": "123 Test Street",
-    "postcode": "SW1A 1AA"
-  }
-  ```
-- **Response Format:**
-  ```json
-  {
-    "uprn": "123456789012",
-    "address": "123 Test Street, London",
-    "postcode": "SW1A 1AA",
-    "confidence": 1.0,
-    "coordinates": {
-      "latitude": 51.5074,
-      "longitude": -0.1278
-    }
-  }
-  ```
 
 **Implementation Steps:**
-1. Set up OS DataHub API credentials and test connection
-2. Create `OSDataHubClient` with authentication and error handling
+1. Download OS DataHub API bulk GB-wide open dataset
 3. Implement address normalization function
 4. Create `UPRNMappingService` with lookup methods
 5. Add caching layer (Redis or in-memory)
@@ -702,7 +674,7 @@ CREATE INDEX idx_uprn_mappings_ha_id ON uprn_mappings(ha_id);
    - Fallback to Google Geocoding API if OS DataHub unavailable
 
 2. **UPRN Mapping:**
-   - **Address-to-UPRN mapping via OS DataHub API** (Week 1-2)
+   - **Address-to-UPRN mapping via OS DataHub dataset** (Week 1-2)
    - UPRN is critical for data lineage and property identification
    - Store UPRN mappings in database for future lookups
    - Handle cases where UPRN cannot be found (manual review queue)
@@ -790,7 +762,7 @@ CREATE INDEX idx_uprn_mappings_ha_id ON uprn_mappings(ha_id);
 ### Month 1
 - [ ] React application setup
 - [ ] Base component library
-- [ ] **UPRN Mapping Service (OS DataHub integration)**
+- [ ] **UPRN Mapping Service (OS DataHub dataset import and integration)**
 - [ ] **Address-to-UPRN mapping during ingestion**
 - [ ] Portfolio Overview Dashboard
 - [ ] API integration layer
@@ -888,29 +860,6 @@ App
   }
 }
 ```
-
-**Backend (Python):**
-```txt
-# Add to requirements.txt
-httpx==0.25.2  # For async HTTP requests to OS DataHub API
-redis==5.0.1   # For UPRN lookup caching (optional, can use in-memory cache)
-python-dotenv==1.0.0  # For environment variable management
-```
-
-**OS DataHub API Setup:**
-- Requires Ordnance Survey DataHub subscription
-- API credentials (API key or OAuth2 client credentials)
-- Access to AddressBase Premium or UPRN Lookup service
-- **Setup Steps:**
-  1. Register for OS DataHub account at https://osdatahub.os.uk/
-  2. Subscribe to AddressBase Premium or UPRN Lookup service
-  3. Generate API key or OAuth2 credentials
-  4. Configure credentials in environment variables:
-     - `OS_DATAHUB_API_KEY` or
-     - `OS_DATAHUB_CLIENT_ID` and `OS_DATAHUB_CLIENT_SECRET`
-  5. Test API connection and rate limits
-  6. Set up monitoring for API usage and costs
-
 ---
 
 **Document Owner:** Development Team  

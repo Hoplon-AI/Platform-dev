@@ -294,7 +294,111 @@ Rules:
 
 ⸻
 
-6. AI Assistant Instructions (Cursor)
+6. AWS Architecture & Infrastructure as Code (AWS CDK in Python)
+
+6.1 Reference Standard
+	•	Align infrastructure decisions with the AWS Well-Architected Framework pillars:
+	•	Operational Excellence, Security, Reliability, Performance Efficiency, Cost Optimization
+	•	Prefer managed services over self-managed infrastructure where possible
+
+⸻
+
+6.2 Environments & Accounts
+	•	Use separate AWS accounts (recommended) for: dev / staging / prod
+	•	Never deploy dev resources into prod accounts (and vice versa)
+	•	Environment parity: same architecture across envs, only configuration differs
+	•	All resources must be tagged (at minimum):
+	•	app, env, owner, cost_center, data_classification
+
+⸻
+
+6.3 Networking (VPC) & Edge
+	•	Prefer a single VPC per environment with clear subnet separation:
+	•	Public subnets: edge/ingress only (ALB/NLB, NAT if required)
+	•	Private subnets: application compute (ECS/Lambda if VPC-attached), internal services
+	•	Isolate databases into private subnets; no public database access
+	•	Prefer VPC endpoints (S3, ECR, CloudWatch, Secrets Manager, etc.) to reduce NAT reliance
+	•	Inbound traffic should be protected by AWS WAF (when Internet-exposed)
+	•	Use Security Groups as the primary east-west firewall; keep rules minimal and explicit
+
+⸻
+
+6.4 Identity, Secrets, and Encryption
+	•	Least privilege IAM everywhere (no wildcard actions/resources unless unavoidable)
+	•	No long-lived AWS access keys for CI/CD:
+	•	Use OIDC to assume roles from GitHub Actions (or equivalent) into AWS
+	•	All secrets in AWS Secrets Manager (preferred) or SSM Parameter Store:
+	•	Never store secrets in Git, in `.env` committed files, or in CDK context
+	•	Encrypt data at rest using AWS KMS (S3, RDS, logs where supported)
+	•	Encrypt in transit (TLS) for all service-to-service and client-to-service communication
+
+⸻
+
+6.5 Compute & Integration Patterns
+	•	Default hosting options for the API:
+	•	ECS Fargate behind an ALB (recommended for FastAPI services)
+	•	Lambda + API Gateway (only if the workload fits Lambda constraints)
+	•	Use queues and events for decoupling:
+	•	SQS for asynchronous processing and backpressure
+	•	EventBridge for event routing and fan-out
+	•	Avoid tight coupling via synchronous service-to-service calls
+	•	Auto-scaling must be enabled for production compute (CPU/memory/queue depth-based)
+
+⸻
+
+6.6 Data Stores, Backups, and Durability
+	•	PostgreSQL on Amazon RDS (Multi-AZ in staging/prod)
+	•	Backups are mandatory:
+	•	Automated backups enabled, with retention appropriate to the environment
+	•	Enable PITR where applicable/required
+	•	S3 buckets:
+	•	Block public access enabled
+	•	Default encryption enabled
+	•	Lifecycle policies for cost management (archival/expiration as appropriate)
+	•	Treat schema migrations as part of the release process (CI/CD), not a manual step
+
+⸻
+
+6.7 Observability & Operations
+	•	All services must emit structured logs and metrics:
+	•	CloudWatch Logs for logs, CloudWatch metrics/alarms for key signals
+	•	Standardize on request IDs / correlation IDs across services
+	•	Define SLO-relevant alarms (availability, latency, error rate) for production
+	•	Prefer OpenTelemetry-compatible instrumentation for tracing (when used)
+
+⸻
+
+6.8 Infrastructure as Code Rules (AWS CDK — Python)
+	•	All AWS resources must be created and changed via CDK (no console-driven drift)
+	•	CDK code quality:
+	•	Use typed constructs and explicit names where it improves operability
+	•	Prefer composable Constructs over monolithic Stacks
+	•	One stack per deployable boundary (e.g., networking, data, compute, observability)
+	•	Configuration:
+	•	Use per-environment config (accounts/regions, toggles, sizes) outside code
+	•	Do not hardcode account IDs, ARNs, or secrets into CDK source
+	•	Safety:
+	•	Run `cdk diff` in CI for every change; require approval for prod deployments
+	•	Enable termination protection for critical prod stacks (as appropriate)
+	•	Guardrails:
+	•	Use `cdk-nag` (or equivalent) to enforce security best practices and catch unsafe defaults
+	•	Prefer explicit IAM policies over broad managed policies
+	•	Testing:
+	•	Use CDK assertions tests for key resources (e.g., encryption, public access, logging)
+
+⸻
+
+6.9 CI/CD Expectations for Infra
+	•	CI must include (at minimum):
+	•	CDK synth
+	•	Static checks (lint/type-check)
+	•	Unit tests (including CDK assertions tests)
+	•	CDK diff (recorded as build output)
+	•	CDK deploy to dev/staging can be automated; production requires a manual approval gate
+
+⸻
+
+7. AI Assistant Instructions (Cursor)
 	•	This file is the source of truth
 	•	Match existing architectural patterns
 	•	Do not introduce new frameworks or paradigms
