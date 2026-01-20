@@ -153,41 +153,82 @@ class UPRNMapping:
 
 ---
 
-### Week 3-4: Dashboard 1 - Portfolio Overview Dashboard
+### Week 3: Dashboard 1 - Portfolio Overview (UI skeleton + API contracts)
 
 **Objectives:**
-- Create the main portfolio overview dashboard
-- Display high-level metrics and KPIs
-- Show portfolio-level statistics
+- Establish the Portfolio Overview dashboard page layout and navigation
+- Define API contracts and typed client for portfolio summary/readiness/risk/activity
+- Deliver a usable dashboard with loading/error/empty states
+- Add an Ingestion landing page to list submissions and upload new files (batch upload)
 
-**Features:**
-- [ ] Portfolio summary cards (total blocks, units, properties)
-- [ ] Risk distribution chart (E/D/C/B ratings)
-- [ ] Legislation & Market Readiness progress bars:
-  - Statutory readiness percentage
-  - Insurance readiness percentage
-  - Data completeness percentage
-- [ ] Recent activity feed
-- [ ] Quick action buttons (Upload, Export)
-- [ ] Filter by jurisdiction (England/Scotland)
-- [ ] Time period selector (2024, 2025, etc.)
+**Deliverables (Week 3):**
+- [x] Frontend scaffold finalized (**Vite + React + TypeScript**) in `frontend/`
+- [x] Routes:
+  - [x] `/` → **Ingestion** landing page (submissions + batch upload)
+  - [x] `/portfolio` → **PortfolioOverview** dashboard
+- [x] Ingestion landing page (Week 3 enabling work):
+  - [x] List recent submissions from Postgres `upload_audit`
+  - [x] Upload multiple files using `POST /api/v1/upload/batch` (auto-detect type)
+  - [x] Display upload results (success/fail) and refresh submission list
+- [x] PortfolioOverview dashboard wired to real backend data:
+  - [x] Summary cards (blocks / units / properties)
+  - [x] Readiness (data completeness percentages)
+  - [x] Risk distribution
+  - [x] Recent activity feed
+- [x] Basic responsive layout + error states
+- [x] Local dev environment (Option B: real DB + LocalStack):
+  - [x] `docker-compose.yml` includes Postgres 16.9 + LocalStack (S3)
+  - [x] Migrations: Bronze + Silver + Gold (`database/migrations/*`)
+  - [x] Seed data for Week 3 (`database/seeds/week3_seed.sql`)
 
-**API Endpoints Required:**
-- `GET /api/v1/portfolios/{portfolio_id}/summary`
-- `GET /api/v1/portfolios/{portfolio_id}/readiness`
-- `GET /api/v1/portfolios/{portfolio_id}/risk-distribution`
-- `GET /api/v1/portfolios/{portfolio_id}/recent-activity`
+**Submissions & parsing (current behavior):**
+- **Bronze (S3)**:
+  - Uploads are written to an S3 “lake-style” partitioned key:
+    - `ha_id=<ha_id>/bronze/dataset=<file_type>/ingest_date=YYYY-MM-DD/submission_id=<upload_id>/file=<filename>`
+  - Each submission also writes:
+    - `metadata.json` (upload metadata) and `manifest.json` (list of objects)
+- **Audit (Postgres)**:
+  - `upload_audit.metadata` stores `manifest_s3_key` and `metadata_s3_key` for jump-to-file lineage
+  - Status is initially `pending` (future processing step should update to `completed`)
+- **Silver/Gold (Postgres)**:
+  - Silver tables created (`portfolios`, `blocks`, `properties`, `epc_data`, `uprn_mappings`)
+  - Gold views created to power Week 3 widgets (portfolio summary/readiness/risk/activity)
 
-**Components:**
-- `PortfolioOverviewDashboard.tsx`
-- `SummaryCards.tsx`
-- `RiskDistributionChart.tsx` (using Chart.js or Recharts)
-- `ReadinessProgressBars.tsx`
-- `ActivityFeed.tsx`
+**API Endpoints (implemented for Week 3):**
+- Portfolios (Gold-backed):
+  - `GET /api/v1/portfolios` (list)
+  - `GET /api/v1/portfolios/{portfolio_id}/summary`
+  - `GET /api/v1/portfolios/{portfolio_id}/readiness`
+  - `GET /api/v1/portfolios/{portfolio_id}/risk-distribution`
+  - `GET /api/v1/portfolios/{portfolio_id}/recent-activity`
+- Uploads / submissions:
+  - `POST /api/v1/upload/batch` (multi-file upload + type detection)
+  - `GET /api/v1/upload/submissions` (list recent uploads)
+  - `GET /api/v1/upload/{upload_id}/status` (single upload)
 
-**Acceptance Criteria:**
+**Acceptance Criteria (Week 3):**
+- Ingestion page lists recent submissions and supports multi-file upload (batch)
+- PortfolioOverview dashboard loads end-to-end from real backend endpoints
+- All components have loading/empty/error states
+- Clean, consistent layout and responsive behavior
+
+---
+
+### Week 4: Dashboard 1 - Portfolio Overview (backend integration + polish)
+
+**Objectives:**
+- Validate filtering behavior against API query params
+- Polish UI/UX and harden error handling
+
+**Deliverables (Week 4):**
+- [ ] Add jurisdiction/time filters to PortfolioOverview and reflect in API query params
+- [ ] Ensure filters trigger refetch and update visualizations
+- [ ] Add export action wiring (CSV/PDF stub or endpoint integration)
+- [ ] Performance pass (avoid unnecessary re-renders; cache server state)
+
+**Acceptance Criteria (Week 4):**
 - Dashboard loads with real data from backend
-- All metrics display correctly
+- All metrics display correctly and match API responses
 - Filters update data dynamically
 - Responsive design (mobile/tablet/desktop)
 

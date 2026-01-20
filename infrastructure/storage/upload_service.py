@@ -3,8 +3,9 @@ File upload handler with checksum validation for Bronze layer.
 """
 import hashlib
 import uuid
-from typing import BinaryIO, Tuple, Optional
+from typing import BinaryIO, Tuple, Optional, Any, Dict, List
 from datetime import datetime
+import json
 import boto3
 from botocore.exceptions import ClientError
 
@@ -68,13 +69,14 @@ class UploadService:
         checksum = self.calculate_checksum(file_content)
         
         # Generate S3 key
-        s3_key = self.s3_config.generate_s3_key(ha_id, upload_id, filename)
+        s3_key = self.s3_config.generate_s3_key(ha_id, upload_id, filename, file_type=file_type)
         
         # Ensure bucket exists
         self.s3_config.ensure_bucket_exists()
         
         # Upload to S3
         try:
+            uploaded_at = datetime.utcnow().isoformat()
             self.s3_client.put_object(
                 Bucket=self.bucket_name,
                 Key=s3_key,
@@ -86,14 +88,120 @@ class UploadService:
                     'file_type': file_type,
                     'user_id': user_id,
                     'checksum': checksum,
-                    'uploaded_at': datetime.utcnow().isoformat(),
+                    'uploaded_at': uploaded_at,
                 },
                 ContentType=self._get_content_type(filename),
+            )
+
+            # Write submission metadata + manifest alongside the file.
+            # These make lineage tracing and debugging trivial without scanning S3 listings.
+            submission_prefix = self.s3_config.generate_submission_prefix(
+                ha_id=ha_id,
+                dataset=file_type,
+                submission_id=upload_id,
+            )
+
+            metadata_payload = {
+                "upload_id": upload_id,
+                "ha_id": ha_id,
+                "user_id": user_id,
+                "file_type": file_type,
+                "filename": filename,
+                "s3_key": s3_key,
+                "checksum": checksum,
+                "file_size": len(file_content),
+                "uploaded_at": uploaded_at,
+            }
+
+            manifest_payload = {
+                "submission_id": upload_id,
+                "ha_id": ha_id,
+                "dataset": file_type,
+                "ingested_at": uploaded_at,
+                "objects": [
+                    {
+                        "role": "source",
+                        "filename": filename,
+                        "s3_key": s3_key,
+                        "checksum": checksum,
+                        "file_size": len(file_content),
+                        "content_type": self._get_content_type(filename),
+                    }
+                ],
+            }
+
+            self.s3_client.put_object(
+                Bucket=self.bucket_name,
+                Key=f"{submission_prefix}metadata.json",
+                Body=json.dumps(metadata_payload, indent=2).encode("utf-8"),
+                ContentType="application/json",
+            )
+
+            self.s3_client.put_object(
+                Bucket=self.bucket_name,
+                Key=f"{submission_prefix}manifest.json",
+                Body=json.dumps(manifest_payload, indent=2).encode("utf-8"),
+                ContentType="application/json",
             )
         except ClientError as e:
             raise Exception(f"Failed to upload file to S3: {str(e)}")
         
         return upload_id, s3_key, checksum
+
+    def put_json(self, key: str, payload: Dict[str, Any]) -> None:
+        """
+        Store a JSON payload in S3 at the given key.
+        """
+        try:
+            self.s3_client.put_object(
+                Bucket=self.bucket_name,
+                Key=key,
+                Body=json.dumps(payload, indent=2).encode("utf-8"),
+                ContentType="application/json",
+            )
+        except ClientError as e:
+            raise Exception(f"Failed to write JSON to S3: {str(e)}")
+
+    def get_json(self, key: str) -> Dict[str, Any]:
+        """
+        Read a JSON payload from S3.
+        """
+        raw = self.get_file(key)
+        try:
+            return json.loads(raw.decode("utf-8"))
+        except Exception as e:
+            raise Exception(f"Failed to parse JSON from S3 ({key}): {str(e)}")
+
+    def append_manifest_objects(self, manifest_key: str, new_objects: List[Dict[str, Any]]) -> None:
+        """
+        Append objects to an existing submission manifest.json (best-effort).
+        """
+        try:
+            manifest = self.get_json(manifest_key)
+        except Exception:
+            # If manifest can't be read, don't block the upload flow.
+            return
+
+        objects = manifest.get("objects")
+        if not isinstance(objects, list):
+            objects = []
+
+        # De-dupe by s3_key if present
+        existing_keys = {
+            o.get("s3_key") for o in objects if isinstance(o, dict) and o.get("s3_key")
+        }
+        for obj in new_objects:
+            if not isinstance(obj, dict):
+                continue
+            s3_key = obj.get("s3_key")
+            if s3_key and s3_key in existing_keys:
+                continue
+            objects.append(obj)
+            if s3_key:
+                existing_keys.add(s3_key)
+
+        manifest["objects"] = objects
+        self.put_json(manifest_key, manifest)
     
     def get_file(self, s3_key: str) -> bytes:
         """

@@ -20,6 +20,11 @@ class UploadResponse(BaseModel):
     filename: str
     file_type: str
     s3_key: str
+    manifest_s3_key: Optional[str] = None
+    metadata_s3_key: Optional[str] = None
+    extraction_s3_key: Optional[str] = None
+    features_s3_key: Optional[str] = None
+    interpretation_s3_key: Optional[str] = None
     checksum: str
     file_size: int
     uploaded_at: datetime
@@ -38,6 +43,11 @@ class UploadStatusResponse(BaseModel):
     file_size: int
     checksum: str
     metadata: Optional[Dict[str, Any]] = None
+
+
+class UploadListResponse(BaseModel):
+    """List of uploads/submissions for an HA."""
+    items: list[UploadStatusResponse]
 
 
 class BatchUploadResponse(BaseModel):

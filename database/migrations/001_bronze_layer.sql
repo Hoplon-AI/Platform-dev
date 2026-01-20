@@ -1,6 +1,9 @@
 -- Bronze layer audit tables and GDPR compliance
 -- Migration: 001_bronze_layer.sql
 
+-- Required for gen_random_uuid()
+CREATE EXTENSION IF NOT EXISTS pgcrypto;
+
 -- Housing Associations table
 CREATE TABLE IF NOT EXISTS housing_associations (
     ha_id VARCHAR(50) PRIMARY KEY,

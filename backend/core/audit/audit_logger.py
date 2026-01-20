@@ -51,6 +51,8 @@ class AuditLogger:
         file_size: int,
         user_id: str,
         metadata: Optional[Dict[str, Any]] = None,
+        status: str = "pending",
+        stepfn_execution_arn: Optional[str] = None,
     ):
         """
         Log file upload event.
@@ -77,6 +79,8 @@ class AuditLogger:
                 file_size=file_size,
                 user_id=user_id,
                 metadata=metadata,
+                status=status,
+                stepfn_execution_arn=stepfn_execution_arn,
             )
         except (RuntimeError, AttributeError):
             # Database pool not initialized or adapter not available - skip logging
@@ -222,15 +226,17 @@ class AuditLogger:
         file_size: int,
         user_id: str,
         metadata: Optional[Dict[str, Any]] = None,
+        status: str = "pending",
+        stepfn_execution_arn: Optional[str] = None,
     ):
         """Store upload audit record in database."""
         await self.db_adapter.execute(
             """
             INSERT INTO upload_audit (
                 upload_id, ha_id, file_type, filename, s3_key,
-                checksum, file_size, user_id, status, metadata
+                checksum, file_size, user_id, status, metadata, stepfn_execution_arn
             )
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
             """,
             uuid.UUID(upload_id),
             ha_id,
@@ -240,8 +246,9 @@ class AuditLogger:
             checksum,
             file_size,
             user_id,
-            'pending',
+            status,
             json.dumps(metadata) if metadata else None,
+            stepfn_execution_arn,
         )
     
     async def _store_processing_audit(

@@ -1,24 +1,49 @@
 """
 Main FastAPI application entry point.
 """
+from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 from typing import Dict, Any
 from backend.api.ingestion.upload_router import router as upload_router
 from backend.api.v1.lineage_router import router as lineage_router
+from backend.api.v1.portfolios_router import router as portfolios_router
 from backend.core.database.db_pool import DatabasePool
 from infrastructure.storage.s3_config import get_s3_config
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """
+    Application lifespan handler.
+
+    Ensures global resources (database pool) are initialized for the app lifetime.
+    """
+    await DatabasePool.initialize()
+    try:
+        yield
+    finally:
+        await DatabasePool.close()
+
 
 app = FastAPI(
     title="Platform-dev API",
     description="Bronze-layer ingestion, audit, and lineage APIs",
     version="1.0.0",
+    lifespan=lifespan,
 )
 
 # CORS configuration
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://localhost:3002"],
+    # Local dev: support both localhost and 127.0.0.1 for Vite/React dev servers.
+    allow_origins=[
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+        "http://localhost:3002",
+        "http://127.0.0.1:3002",
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -27,6 +52,7 @@ app.add_middleware(
 # Include routers
 app.include_router(upload_router)
 app.include_router(lineage_router)
+app.include_router(portfolios_router)
 
 
 @app.get("/")
