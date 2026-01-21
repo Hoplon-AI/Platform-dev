@@ -1,162 +1,117 @@
 # Platform-dev
 
-A full-stack property portfolio management and analytics dashboard application built with React and FastAPI.
+Full-stack property portfolio management and ingestion platform built with **React (Vite) + FastAPI + Postgres**.
 
 ## Overview
 
-This project is a web-based platform for property portfolio management, data ingestion, and analytics. It provides functionality for uploading CSV/Excel files, visualizing property data on interactive maps, exploring portfolios with advanced filtering, and generating analytics reports.
+This project is a web-based platform for property portfolio management, ingestion, and analytics.
+Current focus is **Week 1–3** groundwork:
+- Bronze ingestion to S3 (LocalStack for local dev)
+- Postgres-backed Silver/Gold schemas and Gold views for dashboards
+- A small Week 3 UI: **Ingestion** page + **PortfolioOverview** dashboard
 
 ## Project Structure
 
-The project is organized across multiple development branches, each containing different components and features:
-
-### Branch Structure
-
-- **`main`**: Main branch (currently minimal, ready for integration)
-- **`Igor`**: Full-stack implementation with complete backend and frontend
-- **`Kanishka`**: Frontend-focused work with React components and styling
-
-### Directory Structure (Igor Branch)
-
 ```
 Platform-dev/
-├── frontend/              # React frontend application
-│   ├── src/
-│   │   ├── App.js        # Main application component
-│   │   ├── LandingPage.js
-│   │   ├── LoginPage.js
-│   │   ├── RegisterPage.js
-│   │   ├── data/
-│   │   │   └── properties.js
-│   │   └── styles.css
-│   ├── public/
-│   │   └── index.html
-│   └── package.json
-├── backend/              # FastAPI backend
-│   ├── api.py           # Main API endpoints
-│   ├── preprocessing.py # Data preprocessing utilities
-│   ├── auto_detect.py   # Auto-detection functionality
-│   ├── detect_functions.py
-│   └── geo/
-│       └── postcoderequests.py
-└── datacleaning/        # Data cleaning notebooks
-    ├── datacleaning.ipynb
-    ├── test.csv
-    └── output.csv
+├── backend/                    # FastAPI API (ingestion + portfolios + lineage)
+├── frontend/                   # Vite + React + TypeScript UI
+├── database/
+│   ├── migrations/             # Bronze/Silver/Gold SQL
+│   └── seeds/                  # Local seed data
+├── infrastructure/storage/      # S3 keying + upload service
+├── docs/                        # Roadmap + local dev guide
+└── docker-compose.yml           # Postgres 16.9 + LocalStack (S3)
 ```
 
 ## Technology Stack
 
 ### Frontend
-- **React** 18.2.0 - UI framework
-- **React Router DOM** 7.9.6 - Routing
-- **Leaflet** 1.9.4 & **React-Leaflet** 4.2.1 - Interactive maps
-- **Recharts** 3.5.1 - Data visualization and charts
-- **PapaParse** 5.5.3 - CSV parsing
-- **XLSX** 0.18.5 - Excel file handling
+- **React** + **TypeScript**
+- **Vite** (dev/build tooling)
+- **React Router**
 
 ### Backend
-- **FastAPI** - Python web framework
-- **Pandas** - Data processing and manipulation
-- **Python 3.12** - Runtime environment
+- **FastAPI**
+- **asyncpg** (Postgres)
+- **boto3** (S3)
 
 ## Features
 
 ### Current Features
-- 🏠 **Landing Page** - Welcome page with project introduction
-- 🔐 **Authentication** - Login and registration functionality
-- 📊 **Data Ingestion** - Upload and process CSV/Excel files
-- 🗺️ **Interactive Maps** - Visualize property locations using Leaflet
-- 📈 **Analytics Dashboard** - Charts and data visualization with Recharts
-- 🔍 **Portfolio Explorer** - Filter and search properties by:
-  - City
-  - Risk level
-  - Tenure type
-  - Custom search queries
-- 📋 **Document Management** - Stock listing (Doc A) and High value (Doc B) views
+- **Ingestion landing page** (`/`): list submissions + batch upload (auto-detect file type)
+- **PortfolioOverview dashboard** (`/portfolio`): summary, readiness, risk distribution, recent activity
 
-### Application Tabs
-1. **Ingestion & Overview** - Upload and view uploaded data
-2. **Portfolio Explorer** - Browse and filter property portfolio
-3. **Analytics** - Data visualization and insights
-4. **Stock Listing (Doc A)** - Document A view
-5. **High Value (Doc B)** - Document B view
+## Local development (recommended)
 
-## Getting Started
+Use the step-by-step guide in:
+- `docs/LOCAL_DEV.md`
 
-### Prerequisites
-- Node.js (v14 or higher)
-- Python 3.12+
-- npm or yarn
+Quickstart (Option B: real DB + LocalStack):
 
-### Frontend Setup
+```bash
+docker compose up -d
+docker exec -i platform-dev-postgres psql -U postgres -d platform_dev < database/migrations/001_bronze_layer.sql
+docker exec -i platform-dev-postgres psql -U postgres -d platform_dev < database/migrations/002_async_processing_retries.sql
+docker exec -i platform-dev-postgres psql -U postgres -d platform_dev < database/migrations/001_silver_layer.sql
+docker exec -i platform-dev-postgres psql -U postgres -d platform_dev < database/migrations/001_gold_layer.sql
+docker exec -i platform-dev-postgres psql -U postgres -d platform_dev < database/seeds/week3_seed.sql
+docker exec -i platform-dev-localstack awslocal s3 mb s3://platform-bronze
+```
 
-1. Navigate to the frontend directory:
+### Backend
+
+This repo supports a local runtime venv for Python 3.13:
+
+```bash
+python3 -m venv venv_local
+./venv_local/bin/pip install -r requirements.local.txt
+
+DB_HOST=localhost DB_PORT=5432 DB_USER=postgres DB_PASSWORD=postgres DB_NAME=platform_dev \
+AWS_ACCESS_KEY_ID=test AWS_SECRET_ACCESS_KEY=test AWS_DEFAULT_REGION=us-east-1 \
+S3_ENDPOINT_URL=http://localhost:4566 S3_BUCKET_NAME=platform-bronze \
+DEV_MODE=true DEV_HA_ID=ha_demo \
+./venv_local/bin/uvicorn backend.main:app --reload --port 8000
+```
+
+API docs: `http://127.0.0.1:8000/docs`
+
+### Frontend
+
 ```bash
 cd frontend
-```
-
-2. Install dependencies:
-```bash
 npm install
+npm run dev -- --host 127.0.0.1 --port 3000
 ```
 
-3. Start the development server:
-```bash
-npm start
+UI:
+- Ingestion: `http://127.0.0.1:3000/`
+- PortfolioOverview: `http://127.0.0.1:3000/portfolio`
+
+## S3 partitioning (Bronze)
+
+Uploads are stored using lake-style partitioning and submission sidecars:
+
 ```
-
-The frontend will run on `http://localhost:3000` (or the next available port).
-
-### Backend Setup
-
-1. Navigate to the backend directory:
-```bash
-cd backend
+ha_id=<ha_id>/bronze/dataset=<file_type>/ingest_date=YYYY-MM-DD/submission_id=<upload_id>/file=<filename>
+ha_id=<ha_id>/bronze/dataset=<file_type>/ingest_date=YYYY-MM-DD/submission_id=<upload_id>/manifest.json
+ha_id=<ha_id>/bronze/dataset=<file_type>/ingest_date=YYYY-MM-DD/submission_id=<upload_id>/metadata.json
 ```
-
-2. Install Python dependencies (create a virtual environment first):
-```bash
-python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
-pip install fastapi uvicorn pandas python-multipart
-```
-
-3. Start the FastAPI server:
-```bash
-uvicorn api:app --reload --port 8000
-```
-
-The backend API will run on `http://localhost:8000`.
-
-**Note**: The backend is configured to accept CORS requests from `http://localhost:3002`. Update the CORS configuration in `backend/api.py` if using a different port.
-
-## Development Workflow
-
-### Branch Strategy
-
-- **Main Branch**: Production-ready code
-- **Feature Branches**: Individual developer branches (Igor, Kanishka) for parallel development
-- **Integration**: Merge feature branches into main after review
-
-### Recent Development Activity
-
-Recent commits include:
-- CSV upload and display functionality
-- Chart integration and data visualization
-- Login functionality with authentication
-- Landing page creation and styling
-- Property data management
 
 ## API Endpoints
 
 ### Backend API (FastAPI)
 
-- `POST /upload-csv` - Upload and process CSV files
-  - Accepts CSV file uploads
-  - Standardizes column names
-  - Returns processed data in JSON format
-  - Response schema: [CSV Upload Response Schema](schemas/csv-upload-response-schema.json)
+- Ingestion:
+  - `POST /api/v1/upload/batch` (multi-file upload + type detection)
+  - `GET /api/v1/upload/submissions` (recent submissions)
+  - `GET /api/v1/upload/{upload_id}/status` (single submission)
+- Portfolios (Gold-backed):
+  - `GET /api/v1/portfolios`
+  - `GET /api/v1/portfolios/{portfolio_id}/summary`
+  - `GET /api/v1/portfolios/{portfolio_id}/readiness`
+  - `GET /api/v1/portfolios/{portfolio_id}/risk-distribution`
+  - `GET /api/v1/portfolios/{portfolio_id}/recent-activity`
 
 ## Data Schemas
 
@@ -180,3 +135,9 @@ The backend includes utilities for:
 - **Data Preprocessing** - Clean and prepare data for analysis
 - **Auto-Detection** - Automatically detect data patterns and types (see [Auto-Detection Documentation](docs/auto-detection.md))
 - **Geographic Processing** - Handle postcode and location data
+
+## Roadmap
+
+See:
+- `docs/mvp-3month-roadmap.md`
+- `docs/AWS_ASYNC_INGESTION.md` (AWS-first async ingestion: S3 → Step Functions)

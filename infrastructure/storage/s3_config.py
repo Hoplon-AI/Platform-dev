@@ -6,6 +6,7 @@ import boto3
 from botocore.config import Config
 from typing import Optional
 from functools import lru_cache
+from datetime import datetime, timezone
 
 
 class S3Config:
@@ -88,21 +89,49 @@ class S3Config:
         """Get the configured bucket name."""
         return self.bucket_name
     
-    def generate_s3_key(self, ha_id: str, upload_id: str, filename: str) -> str:
+    def generate_submission_prefix(
+        self,
+        ha_id: str,
+        dataset: str,
+        submission_id: str,
+        ingest_date: Optional[str] = None,
+    ) -> str:
         """
-        Generate S3 key for upload following structure: {ha_id}/bronze/{upload_id}/{filename}
+        Generate an S3 prefix for a submission using lake-style partitioning.
+
+        Structure:
+          ha_id=<ha_id>/bronze/dataset=<dataset>/ingest_date=<YYYY-MM-DD>/submission_id=<uuid>/
+        """
+        date_str = ingest_date or datetime.now(timezone.utc).date().isoformat()
+        return (
+            f"ha_id={ha_id}/bronze/"
+            f"dataset={dataset}/ingest_date={date_str}/submission_id={submission_id}/"
+        )
+
+    def generate_s3_key(self, ha_id: str, upload_id: str, filename: str, file_type: str) -> str:
+        """
+        Generate S3 key for Bronze upload using lake-style partitioning.
+
+        Structure:
+          ha_id=<ha_id>/bronze/dataset=<file_type>/ingest_date=<YYYY-MM-DD>/submission_id=<upload_id>/file=<filename>
         
         Args:
             ha_id: Housing Association ID
             upload_id: Upload UUID
             filename: Original filename
+            file_type: Dataset/file type (e.g. property_schedule, epc_data, fra_document)
             
         Returns:
             S3 key path
         """
         # Sanitize filename to prevent path traversal
         safe_filename = os.path.basename(filename).replace('..', '').replace('/', '_')
-        return f"{ha_id}/bronze/{upload_id}/{safe_filename}"
+        prefix = self.generate_submission_prefix(
+            ha_id=ha_id,
+            dataset=file_type,
+            submission_id=upload_id,
+        )
+        return f"{prefix}file={safe_filename}"
 
 
 # Global S3 config instance

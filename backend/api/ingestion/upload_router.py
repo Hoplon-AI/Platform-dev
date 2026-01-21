@@ -7,21 +7,169 @@ from typing import Optional, List, Tuple
 import os
 import io
 from datetime import datetime
+from backend.core.database.db_pool import DatabasePool
+import json
 
 from backend.api.ingestion.upload_models import (
-    UploadRequest, UploadResponse, UploadStatusResponse, BatchUploadResponse
+    UploadRequest, UploadResponse, UploadStatusResponse, UploadListResponse, BatchUploadResponse
 )
 from backend.api.ingestion.upload_validator import UploadValidator
 from backend.api.ingestion.file_type_detector import FileTypeDetector, FileType
 from infrastructure.storage.upload_service import get_upload_service
 from backend.core.audit.audit_logger import get_audit_logger
 from backend.core.tenancy.tenant_middleware import TenantMiddleware
+from backend.core.pdf_extraction.pdf_pipeline import (
+    build_pdf_artifacts,
+    is_pdf_type,
+    agent_assisted_interpretation_placeholder,
+)
 
 router = APIRouter(prefix="/api/v1/upload", tags=["upload"])
 security = HTTPBearer(auto_error=False)  # Don't auto-raise on missing token
 validator = UploadValidator()
 detector = FileTypeDetector()
 middleware = TenantMiddleware()
+
+def _derive_sidecar_keys(s3_key: str) -> tuple[Optional[str], Optional[str]]:
+    """
+    Derive manifest.json and metadata.json keys from a stored source file key.
+
+    Supports both:
+    - New scheme: .../submission_id=<uuid>/file=<name>
+    - Legacy scheme: .../<upload_id>/<filename>
+    """
+    if "/file=" in s3_key:
+        prefix = s3_key.split("/file=", 1)[0] + "/"
+        return (prefix + "manifest.json", prefix + "metadata.json")
+
+    # Fallback: treat parent directory as the submission prefix
+    if "/" in s3_key:
+        prefix = s3_key.rsplit("/", 1)[0] + "/"
+        return (prefix + "manifest.json", prefix + "metadata.json")
+
+    return (None, None)
+
+def _derive_submission_prefix(s3_key: str) -> Optional[str]:
+    """
+    Best-effort: derive the submission prefix from a stored source file key.
+
+    New scheme: .../submission_id=<uuid>/file=<name>  -> prefix ends with /
+    Legacy scheme: .../<upload_id>/<filename>         -> prefix ends with /
+    """
+    if "/file=" in s3_key:
+        return s3_key.split("/file=", 1)[0] + "/"
+    if "/" in s3_key:
+        return s3_key.rsplit("/", 1)[0] + "/"
+    return None
+
+
+def _safe_write_pdf_artifacts(
+    *,
+    upload_service,
+    manifest_s3_key: Optional[str],
+    submission_prefix: Optional[str],
+    file_content: bytes,
+    file_type: str,
+    filename: str,
+) -> dict:
+    """
+    Write extraction/features/interpretation JSON sidecars for PDFs.
+    Returns metadata updates: {extraction_s3_key, features_s3_key, interpretation_s3_key, pdf_scanned, pdf_validation}
+    """
+    if not submission_prefix:
+        return {}
+
+    artifacts = build_pdf_artifacts(
+        file_content,
+        file_type=file_type,
+        filename=filename,
+    )
+
+    extraction_s3_key = f"{submission_prefix}extraction.json"
+    features_s3_key = f"{submission_prefix}features.json"
+    interpretation_s3_key = f"{submission_prefix}interpretation.json"
+
+    # Fill interpretation inputs now that we know the S3 keys
+    artifacts.interpretation["inputs"] = {
+        "file_type": file_type,
+        "extraction_s3_key": extraction_s3_key,
+        "features_s3_key": features_s3_key,
+    }
+
+    upload_service.put_json(extraction_s3_key, artifacts.extraction)
+    upload_service.put_json(features_s3_key, artifacts.features)
+    upload_service.put_json(
+        interpretation_s3_key,
+        agent_assisted_interpretation_placeholder(
+            file_type=file_type,
+            extraction_s3_key=extraction_s3_key,
+            features_s3_key=features_s3_key,
+        ),
+    )
+
+    # Update manifest to include canonical artifacts (best-effort)
+    if manifest_s3_key:
+        upload_service.append_manifest_objects(
+            manifest_s3_key,
+            new_objects=[
+                {
+                    "role": "extraction",
+                    "filename": "extraction.json",
+                    "s3_key": extraction_s3_key,
+                    "content_type": "application/json",
+                },
+                {
+                    "role": "features",
+                    "filename": "features.json",
+                    "s3_key": features_s3_key,
+                    "content_type": "application/json",
+                },
+                {
+                    "role": "interpretation",
+                    "filename": "interpretation.json",
+                    "s3_key": interpretation_s3_key,
+                    "content_type": "application/json",
+                },
+            ],
+        )
+
+    return {
+        "extraction_s3_key": extraction_s3_key,
+        "features_s3_key": features_s3_key,
+        "interpretation_s3_key": interpretation_s3_key,
+        "pdf_scanned": bool(artifacts.extraction.get("scanned")),
+        "pdf_validation": artifacts.extraction.get("validation"),
+    }
+
+def _derive_pdf_artifact_keys(submission_prefix: Optional[str]) -> dict:
+    if not submission_prefix:
+        return {}
+    return {
+        "extraction_s3_key": f"{submission_prefix}extraction.json",
+        "features_s3_key": f"{submission_prefix}features.json",
+        "interpretation_s3_key": f"{submission_prefix}interpretation.json",
+    }
+
+
+def _parse_metadata(value) -> Optional[dict]:
+    """
+    upload_audit.metadata is JSONB, but asyncpg may return it as a string.
+    Normalize to dict for API responses.
+    """
+    if value is None:
+        return None
+    if isinstance(value, dict):
+        return value
+    if isinstance(value, str):
+        try:
+            return json.loads(value)
+        except Exception:
+            return {"raw": value}
+    # Fallback for unexpected types (e.g. asyncpg.Record/Mapping)
+    try:
+        return dict(value)
+    except Exception:
+        return {"raw": str(value)}
 
 
 async def get_tenant_info(
@@ -41,17 +189,19 @@ async def get_tenant_info(
     """
     # Check if development mode is enabled (skip auth)
     dev_mode = os.getenv("DEV_MODE", "false").lower() == "true"
+    dev_ha_id = os.getenv("DEV_HA_ID", "ha_demo")
+    dev_user_id = os.getenv("DEV_USER_ID", "dev_user")
     
     if dev_mode:
         # Development mode: return default values if no token provided
         if not credentials:
-            return ("default_ha", "default_user")
+            return (dev_ha_id, dev_user_id)
         # If token is provided, still validate it
         try:
             return middleware.extract_tenant_from_token(credentials.credentials)
         except HTTPException:
             # If token is invalid in dev mode, fall back to defaults
-            return ("default_ha", "default_user")
+            return (dev_ha_id, dev_user_id)
     
     # Production mode: authentication required
     if not credentials:
@@ -98,6 +248,33 @@ async def _process_single_file(
         file_type=file_type,
         user_id=user_id,
     )
+
+    manifest_s3_key, metadata_s3_key = _derive_sidecar_keys(s3_key)
+    submission_prefix = _derive_submission_prefix(s3_key)
+
+    # Core pattern: do not do heavy extraction in-request by default.
+    inline_pdf_extraction = os.getenv("INLINE_PDF_EXTRACTION", "false").lower() == "true"
+
+    pdf_metadata_updates: dict = {}
+    if is_pdf_type(file_type=file_type, filename=file.filename or ""):
+        # Always return/record deterministic artifact keys (Step Functions worker will write them)
+        pdf_metadata_updates.update(_derive_pdf_artifact_keys(submission_prefix))
+
+        if inline_pdf_extraction:
+            # Optional: local/dev inline extraction (best-effort)
+            try:
+                pdf_metadata_updates.update(
+                    _safe_write_pdf_artifacts(
+                        upload_service=upload_service,
+                        manifest_s3_key=manifest_s3_key,
+                        submission_prefix=submission_prefix,
+                        file_content=file_content,
+                        file_type=file_type,
+                        filename=file.filename or "document.pdf",
+                    )
+                )
+            except Exception as e:
+                pdf_metadata_updates["pdf_extraction_error"] = str(e)
     
     # Log upload in audit
     audit_logger = get_audit_logger()
@@ -107,9 +284,15 @@ async def _process_single_file(
         file_type=file_type,
         filename=file.filename or f"{file_type}.csv",
         s3_key=s3_key,
+        metadata={
+            "manifest_s3_key": manifest_s3_key,
+            "metadata_s3_key": metadata_s3_key,
+            **pdf_metadata_updates,
+        },
         checksum=checksum,
         file_size=len(file_content),
         user_id=user_id,
+        status="queued",
     )
     
     return UploadResponse(
@@ -119,10 +302,15 @@ async def _process_single_file(
         filename=file.filename or f"{file_type}.csv",
         file_type=file_type,
         s3_key=s3_key,
+        manifest_s3_key=manifest_s3_key,
+        metadata_s3_key=metadata_s3_key,
+        extraction_s3_key=pdf_metadata_updates.get("extraction_s3_key"),
+        features_s3_key=pdf_metadata_updates.get("features_s3_key"),
+        interpretation_s3_key=pdf_metadata_updates.get("interpretation_s3_key"),
         checksum=checksum,
         file_size=len(file_content),
         uploaded_at=datetime.utcnow(),
-        status='pending',
+        status='queued',
         message=f"Successfully uploaded {file.filename}",
     )
 
@@ -189,6 +377,29 @@ async def upload_files_batch(
                 file_type=file_type_str,
                 user_id=user_id,
             )
+
+            manifest_s3_key, metadata_s3_key = _derive_sidecar_keys(s3_key)
+            submission_prefix = _derive_submission_prefix(s3_key)
+
+            inline_pdf_extraction = os.getenv("INLINE_PDF_EXTRACTION", "false").lower() == "true"
+
+            pdf_metadata_updates: dict = {}
+            if is_pdf_type(file_type=file_type_str, filename=file.filename or ""):
+                pdf_metadata_updates.update(_derive_pdf_artifact_keys(submission_prefix))
+                if inline_pdf_extraction:
+                    try:
+                        pdf_metadata_updates.update(
+                            _safe_write_pdf_artifacts(
+                                upload_service=upload_service,
+                                manifest_s3_key=manifest_s3_key,
+                                submission_prefix=submission_prefix,
+                                file_content=file_content,
+                                file_type=file_type_str,
+                                filename=file.filename or "document.pdf",
+                            )
+                        )
+                    except Exception as e:
+                        pdf_metadata_updates["pdf_extraction_error"] = str(e)
             
             # Log upload in audit
             audit_logger = get_audit_logger()
@@ -198,9 +409,15 @@ async def upload_files_batch(
                 file_type=file_type_str,
                 filename=file.filename or f"{file_type_str}.csv",
                 s3_key=s3_key,
+                metadata={
+                    "manifest_s3_key": manifest_s3_key,
+                    "metadata_s3_key": metadata_s3_key,
+                    **pdf_metadata_updates,
+                },
                 checksum=checksum,
                 file_size=len(file_content),
                 user_id=user_id,
+                status="queued",
             )
             
             results.append(UploadResponse(
@@ -210,10 +427,15 @@ async def upload_files_batch(
                 filename=file.filename or f"{file_type_str}.csv",
                 file_type=file_type_str,
                 s3_key=s3_key,
+                manifest_s3_key=manifest_s3_key,
+                metadata_s3_key=metadata_s3_key,
+                extraction_s3_key=pdf_metadata_updates.get("extraction_s3_key"),
+                features_s3_key=pdf_metadata_updates.get("features_s3_key"),
+                interpretation_s3_key=pdf_metadata_updates.get("interpretation_s3_key"),
                 checksum=checksum,
                 file_size=len(file_content),
                 uploaded_at=datetime.utcnow(),
-                status='pending',
+                status='queued',
                 message=f"Successfully uploaded {file.filename} (detected as {file_type_str})",
             ))
             
@@ -376,12 +598,54 @@ async def upload_scr_document(
         file_type='scr_document',
     )
 
-# TODO: Query upload_audit table
-# This is a placeholder
+@router.get("/submissions", response_model=UploadListResponse)
+async def list_submissions(
+    tenant: Tuple[str, str] = Depends(get_tenant_info),
+    limit: int = 50,
+):
+    """
+    List recent upload submissions for the current tenant.
+    """
+    ha_id, _user_id = tenant
+    limit = max(1, min(limit, 200))
+
+    pool = DatabasePool.get_pool()
+    async with pool.acquire() as conn:
+        rows = await conn.fetch(
+            """
+            SELECT upload_id, ha_id, filename, file_type, status, uploaded_at, file_size, checksum, metadata
+            FROM upload_audit
+            WHERE ha_id = $1
+            ORDER BY uploaded_at DESC
+            LIMIT $2
+            """,
+            ha_id,
+            limit,
+        )
+
+    items = []
+    for r in rows:
+        items.append(
+            UploadStatusResponse(
+                upload_id=str(r["upload_id"]),
+                ha_id=r["ha_id"],
+                filename=r["filename"],
+                file_type=r["file_type"],
+                status=r["status"],
+                uploaded_at=r["uploaded_at"],
+                file_size=r["file_size"],
+                checksum=r["checksum"],
+                metadata=_parse_metadata(r["metadata"]),
+            )
+        )
+
+    return UploadListResponse(items=items)
+
+
 @router.get("/{upload_id}/status", response_model=UploadStatusResponse)
 async def get_upload_status(
     upload_id: str,
-    ha_id: Optional[str] = None,
+    tenant: Tuple[str, str] = Depends(get_tenant_info),
 ):
     """
     Get upload status and metadata.
@@ -393,7 +657,31 @@ async def get_upload_status(
     Returns:
         UploadStatusResponse with upload details
     """
-    raise HTTPException(
-        status_code=status.HTTP_501_NOT_IMPLEMENTED,
-        detail="Upload status endpoint not yet implemented"
+    ha_id, _user_id = tenant
+
+    pool = DatabasePool.get_pool()
+    async with pool.acquire() as conn:
+        row = await conn.fetchrow(
+            """
+            SELECT upload_id, ha_id, filename, file_type, status, uploaded_at, file_size, checksum, metadata
+            FROM upload_audit
+            WHERE upload_id = $1 AND ha_id = $2
+            """,
+            upload_id,
+            ha_id,
+        )
+
+    if not row:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Upload not found")
+
+    return UploadStatusResponse(
+        upload_id=str(row["upload_id"]),
+        ha_id=row["ha_id"],
+        filename=row["filename"],
+        file_type=row["file_type"],
+        status=row["status"],
+        uploaded_at=row["uploaded_at"],
+        file_size=row["file_size"],
+        checksum=row["checksum"],
+        metadata=_parse_metadata(row["metadata"]),
     )
