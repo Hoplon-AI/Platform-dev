@@ -29,3 +29,9 @@ pydantic-settings>=2.1.0
 # PDF text extraction (used by file_type_detector)
 pdfplumber>=0.11.0
 
+# CDK
+# Add to requirements.txt or requirements.local.txt
+pip install aws-cdk-lib==2.100.0
+pip install constructs>=10.0.0,<11.0.0
+pip install cdk-nag  # For security guardrails
+
