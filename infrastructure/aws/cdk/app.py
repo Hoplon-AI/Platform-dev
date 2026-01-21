@@ -2,27 +2,129 @@
 import os
 
 import aws_cdk as cdk
+from cdk_nag import AwsSolutionsChecks, NagSuppressions
 
-from cdk.cdk_stack import CdkStack
-
+from cdk.networking_stack import NetworkingStack
+from cdk.security_stack import SecurityStack
+from cdk.data_stack import DataStack
+from cdk.compute_stack import ComputeStack
+from cdk.observability_stack import ObservabilityStack
 
 app = cdk.App()
-CdkStack(app, "CdkStack",
-    # If you don't specify 'env', this stack will be environment-agnostic.
-    # Account/Region-dependent features and context lookups will not work,
-    # but a single synthesized template can be deployed anywhere.
 
-    # Uncomment the next line to specialize this stack for the AWS Account
-    # and Region that are implied by the current CLI configuration.
+# Enable cdk-nag security checks
+cdk.Aspects.of(app).add(AwsSolutionsChecks())
 
-    #env=cdk.Environment(account=os.getenv('CDK_DEFAULT_ACCOUNT'), region=os.getenv('CDK_DEFAULT_REGION')),
+# Dev environment configuration
+dev_account = os.getenv('CDK_DEFAULT_ACCOUNT', '025215344919')
+dev_region = os.getenv('CDK_DEFAULT_REGION', 'eu-west-1')
 
-    # Uncomment the next line if you know exactly what Account and Region you
-    # want to deploy the stack to. */
+env = cdk.Environment(account=dev_account, region=dev_region)
 
-    #env=cdk.Environment(account='123456789012', region='us-east-1'),
+# Stack 1: Networking (VPC, subnets, VPC endpoints)
+networking_stack = NetworkingStack(
+    app,
+    "PlatformNetworkingDev",
+    env=env,
+    description="Networking infrastructure: VPC, subnets, VPC endpoints",
+)
 
-    # For more information, see https://docs.aws.amazon.com/cdk/latest/guide/environments.html
-    )
+# Stack 2: Security (KMS, IAM, Secrets Manager)
+security_stack = SecurityStack(
+    app,
+    "PlatformSecurityDev",
+    env=env,
+    description="Security infrastructure: KMS keys, IAM roles, Secrets Manager",
+)
+
+# Stack 3: Data (S3, RDS with PostGIS)
+data_stack = DataStack(
+    app,
+    "PlatformDataDev",
+    vpc=networking_stack.vpc,
+    database_subnets=networking_stack.database_subnets,
+    private_subnets=networking_stack.private_subnets,  # For Lambda VPC access
+    s3_key=security_stack.s3_key,
+    rds_key=security_stack.rds_key,
+    env=env,
+    description="Data infrastructure: S3 buckets and RDS PostgreSQL with PostGIS",
+)
+
+# Stack 4: Compute (ECS Fargate + ALB)
+compute_stack = ComputeStack(
+    app,
+    "PlatformComputeDev",
+    vpc=networking_stack.vpc,
+    private_subnets=networking_stack.private_subnets,
+    public_subnets=networking_stack.public_subnets,
+    bronze_bucket=data_stack.bronze_bucket,
+    db_secret=data_stack.db_secret,
+    secrets_key=data_stack.secrets_key,
+    database_security_group=data_stack.database_security_group,
+    env=env,
+    description="Compute infrastructure: ECS Fargate cluster and ALB",
+)
+
+# Stack 5: Observability (CloudWatch alarms and dashboards)
+observability_stack = ObservabilityStack(
+    app,
+    "PlatformObservabilityDev",
+    cluster_name=compute_stack.cluster.cluster_name,
+    service_name=compute_stack.service.service_name,
+    alb_arn=compute_stack.alb.load_balancer_arn,
+    database_endpoint=data_stack.database.instance_endpoint.hostname,
+    log_group_name="/ecs/platform-dev",
+    lambda_function_name=data_stack.ingestion_lambda.function_name if hasattr(data_stack, 'ingestion_lambda') else None,
+    env=env,
+    description="Observability infrastructure: CloudWatch alarms, dashboards, and logging",
+)
+
+# ---- cdk-nag suppressions (DEV ONLY) ----
+# These suppressions are intentionally scoped to the current dev-only environment.
+# Tighten/remove these as we harden for staging/prod.
+NagSuppressions.add_stack_suppressions(
+    networking_stack,
+    [
+        {"id": "AwsSolutions-VPC7", "reason": "Dev: VPC Flow Logs not enabled yet; will enable for staging/prod."},
+        {"id": "CdkNagValidationFailure", "reason": "Dev: Interface endpoint SG rule validation hits intrinsics; review in staging/prod."},
+        {"id": "AwsSolutions-EC23", "reason": "Dev: Endpoint security groups managed by CDK; intrinsics prevent static analysis."},
+    ],
+)
+
+NagSuppressions.add_stack_suppressions(
+    data_stack,
+    [
+        {"id": "AwsSolutions-SMG4", "reason": "Dev: Secret rotation deferred; enable rotation when workloads stabilize."},
+        {"id": "AwsSolutions-S1", "reason": "Dev: Access logs bucket not configured yet; enable for staging/prod."},
+        {"id": "AwsSolutions-S10", "reason": "Dev: SSL enforced via bucket policy; cdk-nag may not detect it."},
+        {"id": "AwsSolutions-RDS3", "reason": "Dev: Single-AZ RDS for cost; enable Multi-AZ in staging/prod."},
+        {"id": "AwsSolutions-RDS10", "reason": "Dev: Deletion protection disabled for iteration; enable in prod."},
+        {"id": "AwsSolutions-RDS11", "reason": "Dev: Using default Postgres port; will review for prod hardening."},
+        {"id": "AwsSolutions-IAM4", "reason": "Dev: CDK-generated Lambda roles may use AWS managed policies; tighten later."},
+        {"id": "AwsSolutions-IAM5", "reason": "Dev: Lambda needs S3/KMS wildcard permissions for ingestion pipeline; tighten later."},
+        {"id": "AwsSolutions-L1", "reason": "Dev: Using Python 3.11 for compatibility; upgrade to latest when available."},
+    ],
+)
+
+NagSuppressions.add_stack_suppressions(
+    compute_stack,
+    [
+        {"id": "AwsSolutions-ELB2", "reason": "Dev: ALB access logs not enabled yet; enable for staging/prod."},
+        {"id": "AwsSolutions-EC23", "reason": "Dev: ALB must be publicly reachable in dev; restrict via WAF in prod."},
+        {"id": "AwsSolutions-ECS2", "reason": "Dev: Env vars used for bootstrap; move sensitive values to Secrets Manager."},
+        {"id": "AwsSolutions-IAM4", "reason": "Dev: Using AWS managed policy for ECS execution role; replace with least-privilege later."},
+        {"id": "AwsSolutions-IAM5", "reason": "Dev: CDK grants wildcard actions for S3/KMS convenience; tighten later."},
+    ],
+)
+
+NagSuppressions.add_stack_suppressions(
+    observability_stack,
+    [
+        {"id": "AwsSolutions-SNS3", "reason": "Dev: SNS topic policy hardening deferred; enable TLS-only publishers for prod."},
+    ],
+)
+
+# Stack dependencies are inferred from cross-stack references (preferred).
+# Avoid manual dependencies here to prevent accidental cyclic references.
 
 app.synth()
