@@ -6,6 +6,7 @@ Document Upload (into S3 correspondent location)
 → IF scanned: Textract (Tables + Forms) (placeholder)
 → Structured JSON (cells, boxes, confidence)
 → Deterministic validation
+→ Document-specific feature extraction (FRAEW, FRA, etc.)
 → (Optional, placeholder) Agent-assisted interpretation → Human approval
 → Canonical storage of extracted features
 """
@@ -15,7 +16,7 @@ from __future__ import annotations
 import io
 import json
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -28,6 +29,43 @@ PDF_TYPES = {
     "fraew_document",
     "scr_document",
 }
+
+
+class PDFExtractionError(Exception):
+    """Base exception for PDF extraction errors."""
+    pass
+
+
+class PasswordProtectedPDFError(PDFExtractionError):
+    """Raised when a PDF is password protected."""
+    pass
+
+
+class CorruptedPDFError(PDFExtractionError):
+    """Raised when a PDF file is corrupted or unreadable."""
+    pass
+
+
+class EmptyPDFError(PDFExtractionError):
+    """Raised when a PDF has no pages."""
+    pass
+
+
+@dataclass
+class FRAEWFeatures:
+    """FRAEW-specific extracted features (PAS 9980:2022 documents)."""
+    pas_9980_compliant: bool = False
+    pas_9980_version: Optional[str] = None
+    building_name: Optional[str] = None
+    address: Optional[str] = None
+    building_risk_rating: Optional[str] = None  # HIGH, MEDIUM, LOW
+    assessment_date: Optional[str] = None
+    job_reference: Optional[str] = None
+    client_name: Optional[str] = None
+    assessor_company: Optional[str] = None
+    wall_types: List[Dict[str, Any]] = field(default_factory=list)
+    has_interim_measures: bool = False
+    has_remedial_actions: bool = False
 
 
 @dataclass(frozen=True)
@@ -47,15 +85,27 @@ def _utc_now_iso() -> str:
 
 def _extract_text_sample(file_bytes: bytes, max_pages: int = 3) -> str:
     """
-    Best-effort: extract a small text sample for scanned detection + feature mining.
+    Best-effort: extract text from PDF pages for scanned detection + feature mining.
+
+    Args:
+        file_bytes: Raw PDF bytes
+        max_pages: Maximum number of pages to extract text from
+
+    Returns:
+        Concatenated text from pages, or empty string on error
     """
     try:
         with pdfplumber.open(io.BytesIO(file_bytes)) as pdf:
             text_parts: list[str] = []
-            for i in range(min(len(pdf.pages), max_pages)):
-                t = pdf.pages[i].extract_text() or ""
-                if t.strip():
-                    text_parts.append(t)
+            pages_to_extract = min(len(pdf.pages), max_pages)
+            for i in range(pages_to_extract):
+                try:
+                    t = pdf.pages[i].extract_text() or ""
+                    if t.strip():
+                        text_parts.append(t)
+                except Exception:
+                    # Skip pages that fail to extract
+                    continue
             return "\n".join(text_parts)
     except Exception:
         return ""
@@ -184,6 +234,182 @@ def extract_features_from_text(text: str) -> Dict[str, Any]:
     }
 
 
+def extract_fraew_features(text: str) -> Dict[str, Any]:
+    """
+    Extract FRAEW-specific features from PDF text content.
+
+    FRAEW documents (Fire Risk Appraisal of External Walls) follow PAS 9980:2022
+    and contain specific structured information about building fire risk assessments.
+    """
+    text_lower = text.lower()
+
+    # PAS 9980 compliance detection
+    pas_9980_compliant = "pas 9980" in text_lower or "pas9980" in text_lower
+    pas_9980_version = None
+    pas_match = re.search(r"pas\s*9980[:\s]*(\d{4})", text_lower)
+    if pas_match:
+        pas_9980_version = pas_match.group(1)
+    elif pas_9980_compliant:
+        # Default to 2022 if PAS 9980 mentioned but year not specified
+        pas_9980_version = "2022"
+
+    # Building risk rating extraction (HIGH, MEDIUM, LOW)
+    # Look for patterns like "risk rating is HIGH" or "Building Risk Rating: HIGH"
+    building_risk_rating = None
+    risk_patterns = [
+        r"risk\s+rating[^.]*?(?:is\s+)?(?:therefore\s+)?(?:considered\s+)?(?:as\s+)?(high|medium|low)",
+        r"(?:building\s+)?risk\s+rating[:\s]+(high|medium|low)",
+        r"rated\s+as[:\s]*(high|medium|low)\s+risk",
+        r"[\"'](high|medium|low)[\"']\s+risk\s+(?:rating|outcome|band)",
+    ]
+    for pattern in risk_patterns:
+        match = re.search(pattern, text_lower)
+        if match:
+            building_risk_rating = match.group(1).upper()
+            break
+
+    # Extract wall types and their risk ratings - deduplicate by wall number
+    wall_types_dict: Dict[int, Dict[str, Any]] = {}
+    # Pattern: "Wall Type N - Name" or similar
+    wall_pattern = r"wall\s+type\s+(\d+)[:\s\-]+([A-Za-z\s]+?)(?:\s*[-–]\s*summary|\n)"
+    wall_matches = re.finditer(wall_pattern, text_lower)
+    for match in wall_matches:
+        wall_num = int(match.group(1))
+        wall_name = match.group(2).strip().title()
+        if wall_num not in wall_types_dict:
+            # Try to find risk rating for this wall type
+            wall_risk = None
+            # Look for risk outcomes like "high" risk outcome or "low" risk
+            wall_risk_patterns = [
+                rf"wall\s+type\s+{wall_num}[^.]*?[\"'](high|medium|low)[\"']\s+risk",
+                rf"wall\s+type\s+{wall_num}[^.]*?based\s+on\s+the\s+[\"']?(high|medium|low)[\"']?\s+risk",
+            ]
+            for wrp in wall_risk_patterns:
+                wall_risk_match = re.search(wrp, text_lower)
+                if wall_risk_match:
+                    wall_risk = wall_risk_match.group(1).upper()
+                    break
+            wall_types_dict[wall_num] = {
+                "type_number": wall_num,
+                "name": wall_name,
+                "risk_rating": wall_risk,
+            }
+
+    wall_types = list(wall_types_dict.values())
+
+    # Building name extraction - look for "Property" line
+    building_name = None
+    # Try to find after "Property" label - handle concatenated text
+    property_patterns = [
+        r"property\n([A-Za-z0-9\s,]+?)(?:\n|client)",
+        r"property[:\s]+([A-Za-z]+(?:Court|House|Tower|Building|Place|Square))",
+    ]
+    for pattern in property_patterns:
+        property_match = re.search(pattern, text, re.I)
+        if property_match:
+            building_name = property_match.group(1).strip()
+            # Clean up: take first part before comma if it's a name
+            if "," in building_name:
+                building_name = building_name.split(",")[0].strip()
+            # Handle concatenated text (AuraCourt -> Aura Court)
+            building_name = re.sub(r"([a-z])([A-Z])", r"\1 \2", building_name)
+            break
+
+    # Job/Reference number extraction
+    job_reference = None
+    job_match = re.search(r"(?:job\s*(?:nr|no|number|ref)|reference)[:\s\n]+(\d+[-A-Za-z0-9]*)", text, re.I)
+    if job_match:
+        job_reference = job_match.group(1).strip()
+
+    # Client name extraction - more restrictive to avoid catching extra content
+    client_name = None
+    client_patterns = [
+        r"client\n([A-Za-z0-9\s]+(?:Limited|Ltd|LLP|PLC))",
+        r"client[:\s]+([A-Za-z0-9\s]+(?:Limited|Ltd|LLP|PLC))",
+    ]
+    for pattern in client_patterns:
+        client_match = re.search(pattern, text, re.I)
+        if client_match:
+            client_name = client_match.group(1).strip()
+            # Clean up concatenated text
+            client_name = re.sub(r"([a-z])([A-Z])", r"\1 \2", client_name)
+            break
+
+    # Assessor company extraction
+    assessor_company = None
+    company_patterns = [
+        r"([A-Za-z0-9\s]+(?:Partnership|Consultants)[^.]*?(?:LLP|Ltd))",
+        r"(?:undertaken|prepared|produced)\s+by[:\s]+([A-Za-z0-9\s]+(?:Limited|Ltd|LLP|PLC|Consultants))",
+    ]
+    for pattern in company_patterns:
+        match = re.search(pattern, text, re.I)
+        if match:
+            assessor_company = match.group(1).strip()
+            break
+
+    # Assessment date - look for Issue Date or specific date references
+    assessment_date = None
+    date_patterns = [
+        r"(?:issue\s*date|assessment\s*date|dated)\n(\d{2}[/-]\d{2}[/-]\d{4})",
+        r"(?:issue\s*date|assessment\s*date|dated)[:\s]+(\d{2}[/-]\d{2}[/-]\d{4})",
+    ]
+    for pattern in date_patterns:
+        date_match = re.search(pattern, text, re.I)
+        if date_match:
+            date_str = date_match.group(1)
+            # Convert to ISO format if DD/MM/YYYY
+            if "/" in date_str or "-" in date_str:
+                parts = re.split(r"[/-]", date_str)
+                if len(parts) == 3 and len(parts[2]) == 4:
+                    assessment_date = f"{parts[2]}-{parts[1]}-{parts[0]}"
+            break
+
+    # Check for interim measures and remedial actions sections
+    has_interim_measures = "interim measures" in text_lower
+    has_remedial_actions = "remedial actions" in text_lower or "remedial works" in text_lower
+
+    return {
+        "pas_9980_compliant": pas_9980_compliant,
+        "pas_9980_version": pas_9980_version,
+        "building_name": building_name,
+        "building_risk_rating": building_risk_rating,
+        "assessment_date": assessment_date,
+        "job_reference": job_reference,
+        "client_name": client_name,
+        "assessor_company": assessor_company,
+        "wall_types": wall_types,
+        "has_interim_measures": has_interim_measures,
+        "has_remedial_actions": has_remedial_actions,
+    }
+
+
+def _check_pdf_accessible(file_bytes: bytes) -> None:
+    """
+    Check if PDF is accessible (not password-protected, not corrupted).
+
+    Raises:
+        PasswordProtectedPDFError: If PDF is password protected
+        CorruptedPDFError: If PDF is corrupted or unreadable
+        EmptyPDFError: If PDF has no pages
+    """
+    try:
+        with pdfplumber.open(io.BytesIO(file_bytes)) as pdf:
+            if len(pdf.pages) == 0:
+                raise EmptyPDFError("PDF has no pages")
+            # Try to access first page to verify it's readable
+            _ = pdf.pages[0].extract_text()
+    except EmptyPDFError:
+        raise
+    except Exception as e:
+        error_str = str(e).lower()
+        if "password" in error_str or "encrypted" in error_str:
+            raise PasswordProtectedPDFError(f"PDF is password protected: {e}")
+        elif "syntax" in error_str or "invalid" in error_str or "corrupt" in error_str:
+            raise CorruptedPDFError(f"PDF is corrupted or invalid: {e}")
+        else:
+            raise CorruptedPDFError(f"Unable to read PDF: {e}")
+
+
 def validate_extraction(extraction: Dict[str, Any]) -> Dict[str, Any]:
     """
     Deterministic validation of the structured JSON output.
@@ -264,9 +490,32 @@ def build_pdf_artifacts(
     file_type: str,
     filename: str,
     max_pages_layout: int = 10,
+    max_pages_features: int = 15,
 ) -> PdfArtifacts:
-    scanned = detect_scanned_pdf(file_bytes)
+    """
+    Build extraction, features, and interpretation artifacts from a PDF.
+
+    Args:
+        file_bytes: Raw PDF file bytes
+        file_type: Document type (fra_document, fraew_document, etc.)
+        filename: Original filename
+        max_pages_layout: Max pages to extract layout from
+        max_pages_features: Max pages to extract features from (FRAEW needs more pages)
+
+    Returns:
+        PdfArtifacts with extraction, features, and interpretation dicts
+
+    Raises:
+        PasswordProtectedPDFError: If PDF is password protected
+        CorruptedPDFError: If PDF is corrupted
+        EmptyPDFError: If PDF has no pages
+    """
     now = _utc_now_iso()
+
+    # Pre-check for accessibility issues
+    _check_pdf_accessible(file_bytes)
+
+    scanned = detect_scanned_pdf(file_bytes)
 
     if scanned:
         extraction = {
@@ -305,8 +554,14 @@ def build_pdf_artifacts(
     validation = validate_extraction(layout)
 
     # Build a text sample for canonical features
-    text_sample = _extract_text_sample(file_bytes, max_pages=min(5, max_pages_layout))
+    # Use more pages for feature extraction since key info may be spread out
+    text_sample = _extract_text_sample(file_bytes, max_pages=max_pages_features)
     features_core = extract_features_from_text(text_sample)
+
+    # Add document-specific features based on file_type
+    if file_type == "fraew_document":
+        fraew_specific = extract_fraew_features(text_sample)
+        features_core["fraew_specific"] = fraew_specific
 
     extraction = {
         "schema_version": "pdf-extraction/v1",

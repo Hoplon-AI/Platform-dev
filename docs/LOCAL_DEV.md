@@ -21,6 +21,7 @@ Run migrations inside the Postgres container:
 docker exec -i platform-dev-postgres psql -U postgres -d platform_dev < database/migrations/001_bronze_layer.sql
 docker exec -i platform-dev-postgres psql -U postgres -d platform_dev < database/migrations/002_async_processing_retries.sql
 docker exec -i platform-dev-postgres psql -U postgres -d platform_dev < database/migrations/001_silver_layer.sql
+docker exec -i platform-dev-postgres psql -U postgres -d platform_dev < database/migrations/003_silver_document_features.sql
 docker exec -i platform-dev-postgres psql -U postgres -d platform_dev < database/migrations/001_gold_layer.sql
 ```
 

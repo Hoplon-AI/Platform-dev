@@ -7,6 +7,7 @@ from cdk_nag import AwsSolutionsChecks, NagSuppressions
 from cdk.networking_stack import NetworkingStack
 from cdk.security_stack import SecurityStack
 from cdk.data_stack import DataStack
+from cdk.ingestion_stack import IngestionStack
 from cdk.compute_stack import ComputeStack
 from cdk.observability_stack import ObservabilityStack
 
@@ -50,6 +51,23 @@ data_stack = DataStack(
     description="Data infrastructure: S3 buckets and RDS PostgreSQL with PostGIS",
 )
 
+# Stack 3b: Ingestion (EventBridge -> Step Functions -> worker Lambda)
+ingestion_stack = IngestionStack(
+    app,
+    "PlatformIngestionDev",
+    bronze_bucket=data_stack.bronze_bucket,
+    vpc=networking_stack.vpc,
+    private_subnets=networking_stack.private_subnets,
+    database_security_group=data_stack.database_security_group,
+    db_secret=data_stack.db_secret,
+    database_host=data_stack.database.instance_endpoint.hostname,
+    database_port=data_stack.database.instance_endpoint.port,
+    s3_key=security_stack.s3_key,
+    secrets_key=data_stack.secrets_key,
+    env=env,
+    description="Ingestion infrastructure: EventBridge rule, Step Functions, worker Lambda",
+)
+
 # Stack 4: Compute (ECS Fargate + ALB)
 compute_stack = ComputeStack(
     app,
@@ -74,7 +92,7 @@ observability_stack = ObservabilityStack(
     alb_arn=compute_stack.alb.load_balancer_arn,
     database_endpoint=data_stack.database.instance_endpoint.hostname,
     log_group_name="/ecs/platform-dev",
-    lambda_function_name=data_stack.ingestion_lambda.function_name if hasattr(data_stack, 'ingestion_lambda') else None,
+    lambda_function_name=ingestion_stack.ingestion_lambda.function_name,
     env=env,
     description="Observability infrastructure: CloudWatch alarms, dashboards, and logging",
 )
@@ -103,6 +121,16 @@ NagSuppressions.add_stack_suppressions(
         {"id": "AwsSolutions-IAM4", "reason": "Dev: CDK-generated Lambda roles may use AWS managed policies; tighten later."},
         {"id": "AwsSolutions-IAM5", "reason": "Dev: Lambda needs S3/KMS wildcard permissions for ingestion pipeline; tighten later."},
         {"id": "AwsSolutions-L1", "reason": "Dev: Using Python 3.11 for compatibility; upgrade to latest when available."},
+    ],
+)
+
+NagSuppressions.add_stack_suppressions(
+    ingestion_stack,
+    [
+        {"id": "AwsSolutions-IAM4", "reason": "Dev: Lambda/StepFn roles use AWS managed policies; tighten for staging/prod."},
+        {"id": "AwsSolutions-IAM5", "reason": "Dev: Ingestion worker needs broad S3 object access within bronze bucket prefix; tighten later."},
+        {"id": "AwsSolutions-L1", "reason": "Dev: Using Python 3.12; revisit runtime pinning policy as AWS evolves."},
+        {"id": "AwsSolutions-SF2", "reason": "Enabled tracing on state machine; remaining warnings may be false positives."},
     ],
 )
 

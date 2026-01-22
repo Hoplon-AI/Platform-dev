@@ -10,20 +10,11 @@ from aws_cdk import (
     aws_secretsmanager as secretsmanager,
     aws_kms as kms,
     aws_iam as iam,
-    aws_lambda as lambda_,
-    aws_s3_notifications as s3n,
-    aws_logs as logs,
     RemovalPolicy,
     Tags,
     Duration,
 )
-try:
-    import aws_cdk.aws_lambda_python_alpha as lambda_python
-except ImportError:
-    # Fallback: use standard Lambda with Code.from_asset if alpha package not available
-    lambda_python = None
 from constructs import Construct
-import os
 
 
 class DataStack(Stack):
@@ -218,59 +209,6 @@ class DataStack(Stack):
         Tags.of(database).add("env", "dev")
         Tags.of(database).add("data_classification", "database")
 
-        # Lambda function for ingestion pipeline
-        # This Lambda processes files uploaded to S3 and extracts data
-        # Calculate absolute path to workers directory
-        # From infrastructure/aws/cdk/cdk/data_stack.py to backend/workers/
-        # Go up 4 levels: cdk -> aws -> infrastructure -> Platform-dev (project root)
-        current_file = os.path.abspath(__file__)  # infrastructure/aws/cdk/cdk/data_stack.py
-        project_root = os.path.join(os.path.dirname(current_file), "../../../..")  # Go to project root (4 levels up)
-        workers_dir = os.path.join(project_root, "backend", "workers")
-        workers_dir = os.path.normpath(workers_dir)  # Normalize path
-        
-        # Use standard Lambda Function (avoids Docker build issues with PythonFunction)
-        # Dependencies should be packaged separately or use Lambda layers
-        ingestion_lambda = lambda_.Function(
-            self,
-            "IngestionLambda",
-            function_name="platform-dev-ingestion-processor",
-            code=lambda_.Code.from_asset(workers_dir),
-            handler="stepfn_ingestion_worker.handler",
-            runtime=lambda_.Runtime.PYTHON_3_11,  # Use 3.11 for better compatibility
-            timeout=Duration.minutes(15),  # PDF processing can take time
-            memory_size=1024,  # 1 GB for PDF processing
-            environment={
-                "DATABASE_SECRET_ARN": db_secret.secret_arn,
-                "S3_BUCKET_NAME": bronze_bucket.bucket_name,
-            },
-            vpc=vpc if private_subnets else None,
-            vpc_subnets=ec2.SubnetSelection(subnets=private_subnets) if private_subnets else None,
-            security_groups=[db_security_group] if private_subnets else None,
-            log_retention=logs.RetentionDays.ONE_WEEK,
-        )
-
-        # Grant Lambda permissions
-        # S3 read/write access
-        bronze_bucket.grant_read(ingestion_lambda)
-        bronze_bucket.grant_write(ingestion_lambda)
-        
-        # Secrets Manager access
-        db_secret.grant_read(ingestion_lambda)
-        
-        # KMS decrypt for S3 and Secrets Manager
-        s3_key.grant_decrypt(ingestion_lambda)
-        secrets_key.grant_decrypt(ingestion_lambda)
-
-        # Configure S3 bucket notification to trigger Lambda
-        # Note: S3 notifications can't filter for keys containing "/file=" in the middle,
-        # so we trigger on all object creations. The Lambda handler already filters out
-        # sidecar files (manifest.json, metadata.json, extraction.json, etc.) and
-        # non-source files (keys without "/file=").
-        bronze_bucket.add_event_notification(
-            s3.EventType.OBJECT_CREATED,
-            s3n.LambdaDestination(ingestion_lambda),
-        )
-
         # Store references
         self.bronze_bucket = bronze_bucket
         self.processed_bucket = processed_bucket
@@ -278,7 +216,6 @@ class DataStack(Stack):
         self.database_security_group = db_security_group
         self.db_secret = db_secret
         self.secrets_key = secrets_key
-        self.ingestion_lambda = ingestion_lambda
 
         # Outputs
         CfnOutput(
@@ -329,18 +266,4 @@ class DataStack(Stack):
             export_name=f"{self.stack_name}-DatabaseSecurityGroupId",
         )
 
-        CfnOutput(
-            self,
-            "IngestionLambdaArn",
-            value=ingestion_lambda.function_arn,
-            description="ARN of ingestion pipeline Lambda function",
-            export_name=f"{self.stack_name}-IngestionLambdaArn",
-        )
-
-        CfnOutput(
-            self,
-            "IngestionLambdaName",
-            value=ingestion_lambda.function_name,
-            description="Name of ingestion pipeline Lambda function",
-            export_name=f"{self.stack_name}-IngestionLambdaName",
-        )
+        # Ingestion pipeline resources (EventBridge rule + Step Functions + worker) are owned by IngestionStack.
