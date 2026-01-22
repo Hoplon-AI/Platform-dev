@@ -63,6 +63,29 @@ Adds retry/attempt fields to:
    - `bucket`
    - `key`
 
+Example EventBridge event pattern (filters **only** source objects by substring match):
+
+```json
+{
+  "source": ["aws.s3"],
+  "detail-type": ["Object Created"],
+  "detail": {
+    "bucket": {
+      "name": ["platform-bronze"]
+    },
+    "object": {
+      "key": [
+        { "wildcard": "*\/file=*" }
+      ]
+    }
+  }
+}
+```
+
+Notes:
+- EventBridge supports `wildcard` matching, so `*\/file=*` correctly matches “contains `/file=`”.
+- This avoids triggering on `manifest.json` / `metadata.json` / artifacts because those keys do not include `/file=`.
+
 ### Option B: S3 → Lambda → Step Functions
 
 Use a small Lambda to start the Step Functions execution, if you prefer S3 notification configuration.

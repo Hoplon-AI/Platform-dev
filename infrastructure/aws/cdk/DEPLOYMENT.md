@@ -4,7 +4,7 @@ This guide covers deploying the Platform infrastructure stacks to AWS.
 
 ## Stack Overview
 
-The infrastructure is organized into 5 separate stacks:
+The infrastructure is organized into 6 separate stacks:
 
 1. **NetworkingStack** (`PlatformNetworkingDev`)
    - VPC with public/private/isolated subnets
@@ -21,12 +21,17 @@ The infrastructure is organized into 5 separate stacks:
    - RDS PostgreSQL 16.9 instance
    - Database subnet group and security group
 
-4. **ComputeStack** (`PlatformComputeDev`)
+4. **IngestionStack** (`PlatformIngestionDev`)
+   - EventBridge rule (filters S3 Object Created for keys containing `/file=`)
+   - Step Functions state machine
+   - Worker Lambda (PDF extraction/validation/features)
+
+5. **ComputeStack** (`PlatformComputeDev`)
    - ECS Fargate cluster
    - Application Load Balancer
    - ECS service with auto-scaling
 
-5. **ObservabilityStack** (`PlatformObservabilityDev`)
+6. **ObservabilityStack** (`PlatformObservabilityDev`)
    - CloudWatch alarms (ECS, ALB, RDS)
    - CloudWatch dashboard
    - SNS topic for notifications
@@ -75,6 +80,13 @@ cdk synth
 
 This generates CloudFormation templates without deploying.
 
+Note: the ingestion worker Lambda uses a dependency layer that can be Docker-bundled.
+To enable bundling (recommended for deploy), set:
+
+```bash
+export CDK_USE_DOCKER_BUNDLING=true
+```
+
 ### 4. Review Changes
 
 ```bash
@@ -95,6 +107,7 @@ cdk deploy --all
 cdk deploy PlatformNetworkingDev
 cdk deploy PlatformSecurityDev
 cdk deploy PlatformDataDev
+cdk deploy PlatformIngestionDev
 cdk deploy PlatformComputeDev
 cdk deploy PlatformObservabilityDev
 ```

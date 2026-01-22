@@ -25,16 +25,22 @@ import os
 import re
 import hashlib
 import uuid
+from urllib.parse import unquote_plus
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, Optional, Tuple
 
 import asyncpg
+import boto3
 
 from backend.core.pdf_extraction.pdf_pipeline import (
     build_pdf_artifacts,
     is_pdf_type,
     agent_assisted_interpretation_placeholder,
+    PDFExtractionError,
+    PasswordProtectedPDFError,
+    CorruptedPDFError,
+    EmptyPDFError,
 )
 from infrastructure.storage.s3_config import S3Config
 from infrastructure.storage.upload_service import UploadService
@@ -55,7 +61,7 @@ def _parse_s3_event(event: Dict[str, Any]) -> Tuple[str, str, Optional[str]]:
     - S3 event (EventBridge/Lambda): {"Records":[{"s3":{"bucket":{"name":...},"object":{"key":...}}}]}.
     """
     if "bucket" in event and "key" in event:
-        return event["bucket"], event["key"], event.get("execution_arn")
+        return event["bucket"], unquote_plus(event["key"]), event.get("execution_arn")
 
     records = event.get("Records") or []
     if not records:
@@ -63,7 +69,7 @@ def _parse_s3_event(event: Dict[str, Any]) -> Tuple[str, str, Optional[str]]:
     r0 = records[0]
     bucket = r0["s3"]["bucket"]["name"]
     key = r0["s3"]["object"]["key"]
-    return bucket, key, None
+    return bucket, unquote_plus(key), None
 
 
 @dataclass(frozen=True)
@@ -105,12 +111,34 @@ def _backoff_next_attempt(attempts: int) -> datetime:
 
 
 async def _db_connect() -> asyncpg.Connection:
+    host = os.getenv("DB_HOST", "localhost")
+    port = int(os.getenv("DB_PORT", "5432"))
+    database = os.getenv("DB_NAME", "platform_dev")
+
+    user = os.getenv("DB_USER", "postgres")
+    password = os.getenv("DB_PASSWORD", "postgres")
+
+    secret_arn = os.getenv("DATABASE_SECRET_ARN")
+    if secret_arn:
+        sm = boto3.client("secretsmanager")
+        resp = sm.get_secret_value(SecretId=secret_arn)
+        secret_str = resp.get("SecretString") or "{}"
+        # Secret string template in CDK DataStack: {"username":"postgres","password":"..."}
+        try:
+            import json
+            secret = json.loads(secret_str)
+            user = secret.get("username", user)
+            password = secret.get("password", password)
+        except Exception:
+            # fall back to env vars if secret can't be parsed
+            pass
+
     return await asyncpg.connect(
-        host=os.getenv("DB_HOST", "localhost"),
-        port=int(os.getenv("DB_PORT", "5432")),
-        user=os.getenv("DB_USER", "postgres"),
-        password=os.getenv("DB_PASSWORD", "postgres"),
-        database=os.getenv("DB_NAME", "platform_dev"),
+        host=host,
+        port=port,
+        user=user,
+        password=password,
+        database=database,
     )
 
 
@@ -198,6 +226,36 @@ async def _mark_upload_retryable_failure(
         ha_id,
         error[:4000],
         next_attempt,
+    )
+
+
+async def _mark_upload_permanent_failure(
+    conn: asyncpg.Connection,
+    upload_id: uuid.UUID,
+    ha_id: str,
+    error: str,
+    error_type: str,
+) -> None:
+    """
+    Mark upload as permanently failed (non-retryable error like password-protected PDF).
+    """
+    now = _utc_now().replace(tzinfo=None)
+    await conn.execute(
+        """
+        UPDATE upload_audit
+        SET
+            status = 'failed',
+            processing_last_error = $3,
+            processing_completed_at = $4,
+            processing_next_attempt_at = NULL,
+            metadata = COALESCE(metadata, '{}'::jsonb) || $5::jsonb
+        WHERE upload_id = $1 AND ha_id = $2
+        """,
+        upload_id,
+        ha_id,
+        error[:4000],
+        now,
+        {"error_type": error_type, "retryable": False},
     )
 
 
@@ -379,6 +437,49 @@ async def process_s3_put(event: Dict[str, Any]) -> Dict[str, Any]:
             "upload_id": parsed.submission_id,
             "ha_id": parsed.ha_id,
             "attempts": attempts,
+            "metadata": {
+                "extraction_s3_key": extraction_key,
+                "features_s3_key": features_key,
+                "interpretation_s3_key": interpretation_key,
+            },
+        }
+
+    except PDFExtractionError as e:
+        # PDF-specific errors (password protected, corrupted, empty) are non-retryable
+        err = f"{type(e).__name__}: {e}"
+        error_type = type(e).__name__
+        try:
+            row = await conn.fetchrow(
+                "SELECT processing_attempts FROM upload_audit WHERE upload_id=$1 AND ha_id=$2",
+                upload_id_uuid,
+                parsed.ha_id,
+            )
+            attempts = int(row["processing_attempts"]) if row else 0
+            await _mark_upload_permanent_failure(conn, upload_id_uuid, parsed.ha_id, err, error_type)
+            await _insert_processing_audit(
+                conn,
+                ha_id=parsed.ha_id,
+                upload_id=upload_id_uuid,
+                transformation_type="pdf_extract_v1",
+                status="failed",
+                attempt=attempts,
+                max_attempts=int(os.getenv("PDF_PROCESSING_MAX_ATTEMPTS", "5")),
+                execution_arn=execution_arn,
+                metadata={"bucket": bucket, "key": key, "error_type": error_type, "retryable": False},
+                last_error=err,
+            )
+        except Exception:
+            pass
+        # Return failure status instead of raising (non-retryable)
+        return {
+            "status": "failed",
+            "bucket": bucket,
+            "key": key,
+            "upload_id": parsed.submission_id,
+            "ha_id": parsed.ha_id,
+            "error": err,
+            "error_type": error_type,
+            "retryable": False,
         }
 
     except Exception as e:
