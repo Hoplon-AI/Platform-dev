@@ -1,0 +1,75 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "$id": "https://platform-dev/schemas/standardized-property-schema.json",
+    "version": "1.0.0",
+    "title": "Standardized Property Data Schema",
+    "description": "Schema for property data after column standardization (based on preprocessing.py COLUMN_MAPPING)",
+    "type": "object",
+    "properties": {
+        "id": {
+            "type": [
+                "integer",
+                "string"
+            ],
+            "description": "Property identifier (standardized from: id, property_id, prop_id, reference, ref_number)"
+        },
+        "uprn": {
+            "type": [
+                "string",
+                "integer"
+            ],
+            "description": "Unique Property Reference Number (standardized from: uprn, unique_property_reference, property_reference)"
+        },
+        "address": {
+            "type": "string",
+            "description": "Property address (standardized from: address, full_address, property_address, street_address)"
+        },
+        "city": {
+            "type": "string",
+            "description": "City or town (standardized from: city, town, locality)"
+        },
+        "postcode": {
+            "type": "string",
+            "description": "UK postcode (standardized from: postcode, post_code, zip_code, postal_code)"
+        },
+        "buildYear": {
+            "type": [
+                "integer",
+                "string"
+            ],
+            "description": "Year built (standardized from: buildyear, build_year, year_built, construction_year, built)"
+        },
+        "type": {
+            "type": "string",
+            "description": "Property type (standardized from: type, property_type, dwelling_type, house_type)"
+        },
+        "tenure": {
+            "type": "string",
+            "description": "Tenure type (standardized from: tenure, ownership, tenancy_type)"
+        },
+        "landlord": {
+            "type": "string",
+            "description": "Landlord name (standardized from: landlord, owner, landlord_name, housing_provider)"
+        },
+        "epcRating": {
+            "type": "string",
+            "description": "EPC rating (standardized from: epcrating, epc_rating, epc, energy_rating, energy_performance)"
+        },
+        "lastClaimDate": {
+            "type": "string",
+            "description": "Last claim date (standardized from: lastclaimdate, last_claim_date, lastclaim, previous_claim, last_claim, claim_date, most_recent_claim)"
+        },
+        "claimFrequency": {
+            "type": [
+                "number",
+                "string"
+            ],
+            "description": "Claim frequency (standardized from: claimfrequency, claim_frequency, number_of_claims, claims_count)"
+        },
+        "riskBand": {
+            "type": "string",
+            "description": "Risk band (standardized from: riskband, risk_band, risk_level, risk_category, risk_rating)"
+        }
+    },
+    "additionalProperties": true
+}
