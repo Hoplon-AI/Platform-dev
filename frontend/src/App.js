@@ -25,7 +25,7 @@ L.Icon.Default.mergeOptions({
 // Tabs focused around ingestion & overview first
 const TABS = [
   { id: "ingestion", label: "Ingestion & overview" },
-  { id: "portfolio", label: "Portfolio explorer" },
+  { id: "portfolio", label: "Underwriter dashboard" },
   { id: "analytics", label: "Analytics" },
   { id: "stock", label: "Stock listing (Doc A)" },
   { id: "highvalue", label: "High value (Doc B)" },
