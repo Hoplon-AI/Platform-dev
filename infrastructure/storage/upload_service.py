@@ -53,7 +53,7 @@ class UploadService:
             ha_id: Housing Association ID
             file_content: File content as bytes
             filename: Original filename
-            file_type: File type (e.g., 'property_schedule', 'epc_data', 'frsa_document')
+            file_type: File type (e.g., 'property_schedule', 'epc_data', 'fra_document')
             user_id: User ID who uploaded the file
             
         Returns:

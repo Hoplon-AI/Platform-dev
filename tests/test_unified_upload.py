@@ -201,20 +201,20 @@ async def test_batch_upload_detects_fra_documents(client):
 
 
 @pytest.mark.asyncio
-async def test_batch_upload_detects_frsa_documents(client):
-    """Test that batch upload detects FRSA (Fire Risk Safety Assessment) documents."""
+async def test_batch_upload_detects_frsa_as_fra_documents(client):
+    """Test that batch upload detects FRSA files as FRA documents (consolidated)."""
     file_obj = create_pdf_file("frsa_report_block_b.pdf")
-    
+
     response = client.post(
         "/api/v1/upload/batch",
         files={"files": ("frsa_report_block_b.pdf", file_obj, "application/pdf")},
         data={"ha_id": "test_ha", "user_id": "test_user"},
     )
-    
+
     assert response.status_code == 200
     data = response.json()
     assert data["successful"] == 1
-    assert data["results"][0]["file_type"] == "frsa_document"
+    assert data["results"][0]["file_type"] == "fra_document"
 
 
 @pytest.mark.asyncio

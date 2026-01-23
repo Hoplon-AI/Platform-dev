@@ -183,7 +183,15 @@ async def _write_document_features(
         job_reference = fraew.get("job_reference")
         client_name = fraew.get("client_name")
         assessor_company = fraew.get("assessor_company")
-    
+    elif document_type == "fra_document" and "fra_specific" in features:
+        fra = features["fra_specific"]
+        building_name = fra.get("building_name")
+        address = fra.get("address")
+        assessment_date = _normalize_date(fra.get("assessment_date")) or assessment_date
+        job_reference = None  # Not in FRA features
+        client_name = fra.get("client_name")
+        assessor_company = fra.get("assessor_company")
+
     extracted_at_str = features_json.get("extracted_at")
     extracted_at = None
     if extracted_at_str:
@@ -340,35 +348,6 @@ async def _write_scr_features(
     )
 
 
-async def _write_frsa_features(
-    conn: asyncpg.Connection,
-    *,
-    feature_id: uuid.UUID,
-    ha_id: str,
-    upload_id: uuid.UUID,
-    features_json: Dict[str, Any],
-) -> None:
-    """Write FRSA-specific features to frsa_features table."""
-    features = features_json.get("features", {})
-    
-    await conn.execute(
-        """
-        INSERT INTO frsa_features (
-            frsa_id, feature_id, ha_id, upload_id,
-            frsa_features_json, created_at, updated_at
-        )
-        VALUES ($1, $2, $3, $4, $5::jsonb, $6, $7)
-        """,
-        uuid.uuid4(),
-        feature_id,
-        ha_id,
-        upload_id,
-        json.dumps(features),
-        _utc_now().replace(tzinfo=None),
-        _utc_now().replace(tzinfo=None),
-    )
-
-
 async def _update_processing_audit(
     conn: asyncpg.Connection,
     *,
@@ -450,7 +429,7 @@ async def process_features_to_silver(
     document_type = metadata["file_type"]
     
     # Only process PDF document types
-    pdf_types = {"fra_document", "frsa_document", "fraew_document", "scr_document"}
+    pdf_types = {"fra_document", "fraew_document", "scr_document"}
     if document_type not in pdf_types:
         return {"status": "ignored", "reason": "not_pdf_document", "document_type": document_type}
     
@@ -521,15 +500,6 @@ async def process_features_to_silver(
                 upload_id=upload_id_uuid,
                 features_json=features_json,
             )
-        elif document_type == "frsa_document":
-            await _write_frsa_features(
-                conn,
-                feature_id=feature_id,
-                ha_id=ha_id,
-                upload_id=upload_id_uuid,
-                features_json=features_json,
-            )
-        
         # Update processing_audit
         await _update_processing_audit(
             conn,
