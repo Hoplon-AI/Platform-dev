@@ -13,12 +13,11 @@ class UploadValidator:
     ALLOWED_TYPES = {
         'property_schedule': ['.csv', '.xlsx', '.xls'],
         'epc_data': ['.csv', '.xlsx', '.xls'],
-        'fra_document': ['.pdf'],
-        'frsa_document': ['.pdf'],
+        'fra_document': ['.pdf'],  # Fire Risk Assessment (includes FRSA)
         'fraew_document': ['.pdf'],  # PAS 9980 - Fire Risk Appraisal of External Walls
         'scr_document': ['.pdf'],  # Safety Case Report
     }
-    
+
     # Maximum file sizes (in bytes)
     # PDF documents can be large due to scanned pages, images, and detailed reports.
     # Processing is asynchronous via Step Functions, so larger files don't block the API.
@@ -26,7 +25,6 @@ class UploadValidator:
         'property_schedule': 50 * 1024 * 1024,  # 50 MB
         'epc_data': 50 * 1024 * 1024,  # 50 MB
         'fra_document': 50 * 1024 * 1024,  # 50 MB (increased from 10 MB for scanned/image-heavy PDFs)
-        'frsa_document': 50 * 1024 * 1024,  # 50 MB (increased from 10 MB for scanned/image-heavy PDFs)
         'fraew_document': 50 * 1024 * 1024,  # 50 MB (increased from 10 MB for scanned/image-heavy PDFs)
         'scr_document': 50 * 1024 * 1024,  # 50 MB (increased from 10 MB for scanned/image-heavy PDFs)
     }

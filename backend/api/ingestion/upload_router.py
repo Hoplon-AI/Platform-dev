@@ -527,30 +527,6 @@ async def upload_fra_document(
     )
 
 
-@router.post("/frsa-document", response_model=UploadResponse)
-async def upload_frsa_document(
-    file: UploadFile = File(...),
-    tenant: Tuple[str, str] = Depends(get_tenant_info),
-):
-    """
-    Upload FRSA document (PDF - Fire Risk Safety Assessment).
-    
-    Args:
-        file: Uploaded file
-        tenant: Tuple of (ha_id, user_id) extracted from JWT token
-        
-    Returns:
-        UploadResponse with upload details
-    """
-    ha_id, user_id = tenant
-    return await _process_single_file(
-        file=file,
-        ha_id=ha_id,
-        user_id=user_id,
-        file_type='frsa_document',
-    )
-
-
 @router.post("/fraew-document", response_model=UploadResponse)
 async def upload_fraew_document(
     file: UploadFile = File(...),

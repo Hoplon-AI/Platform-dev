@@ -25,7 +25,6 @@ import pdfplumber
 
 PDF_TYPES = {
     "fra_document",
-    "frsa_document",
     "fraew_document",
     "scr_document",
 }
@@ -383,6 +382,258 @@ def extract_fraew_features(text: str) -> Dict[str, Any]:
     }
 
 
+def extract_fra_features(text: str) -> Dict[str, Any]:
+    """
+    Extract FRA-specific features from PDF text content.
+
+    FRA documents (Fire Risk Assessment) contain structured information about fire safety
+    assessments for buildings, following the Regulatory Reform (Fire Safety) Order 2005.
+    They use a 5-level risk rating: Trivial, Tolerable, Moderate, Substantial, Intolerable.
+    """
+    text_lower = text.lower()
+
+    # Risk rating extraction - FRA uses 5-level scale
+    # Trivial < Tolerable < Moderate < Substantial < Intolerable
+    overall_risk_rating = None
+    risk_patterns = [
+        r"overall[:\s]+(trivial|tolerable|moderate|substantial|intolerable)",
+        r"(?:overall\s+)?risk[:\s]+(?:is\s+)?(trivial|tolerable|moderate|substantial|intolerable)",
+        r"risk\s+(?:rating|level|assessment)[:\s]*(trivial|tolerable|moderate|substantial|intolerable)",
+        # Handle "risk rating is considered to be X" patterns
+        r"risk\s+rating\s+(?:is\s+)?(?:considered\s+(?:to\s+be\s+)?|deemed\s+)?(trivial|tolerable|moderate|substantial|intolerable)",
+        # Handle "Risk Assessment Level: X" patterns
+        r"risk\s+assessment\s+level[:\s]*(trivial|tolerable|moderate|substantial|intolerable)",
+    ]
+    for pattern in risk_patterns:
+        match = re.search(pattern, text_lower)
+        if match:
+            overall_risk_rating = match.group(1).upper()
+            break
+
+    # Also check for simplified HIGH/MEDIUM/LOW ratings (some FRAs use this)
+    if not overall_risk_rating:
+        simple_risk_patterns = [
+            r"(?:overall\s+)?risk\s+(?:rating|level)[:\s]*(high|medium|low)",
+            r"fire\s+risk[:\s]+(high|medium|low)",
+        ]
+        for pattern in simple_risk_patterns:
+            match = re.search(pattern, text_lower)
+            if match:
+                overall_risk_rating = match.group(1).upper()
+                break
+
+    # Extract individual risk area ratings
+    risk_areas: Dict[str, Optional[str]] = {}
+    risk_area_names = [
+        "identifying people at risk",
+        "people at risk",
+        "fire hazards",
+        "fire protection measures",
+        "fire protection",
+        "management of fire safety",
+        "management",
+    ]
+    for area in risk_area_names:
+        # Look for patterns like "Fire Hazards: Moderate" or "Fire Hazards √ Moderate"
+        area_pattern = rf"{area}[:\s√✓]*\s*(trivial|tolerable|moderate|substantial|intolerable)"
+        match = re.search(area_pattern, text_lower)
+        if match:
+            # Normalize area name
+            normalized_area = area.replace(" ", "_")
+            if normalized_area not in risk_areas:
+                risk_areas[normalized_area] = match.group(1).upper()
+
+    # Building/premises name extraction
+    building_name = None
+    building_patterns = [
+        r"(?:premises|site|property)[:\s]+([A-Za-z0-9\s,\-]+?)(?:\n|assessed|client|telephone)",
+        r"fire\s+risk\s+assessment[^:]*?:\s*([A-Za-z0-9\s,\-]+?)(?:\n|contents|page)",
+        r"for\n([A-Za-z0-9\s,\-]+?)(?:\n|colchester|assessed|client)",
+    ]
+    for pattern in building_patterns:
+        match = re.search(pattern, text, re.I)
+        if match:
+            building_name = match.group(1).strip()
+            # Clean up: take meaningful part
+            if len(building_name) > 100:
+                building_name = building_name[:100]
+            # Handle concatenated text
+            building_name = re.sub(r"([a-z])([A-Z])", r"\1 \2", building_name)
+            break
+
+    # Address extraction
+    address = None
+    address_patterns = [
+        r"(?:site|premises|address)[:\s]+([A-Za-z0-9\s,\-]+?(?:Road|Street|Lane|Avenue|Close|Drive|Way)[^.]*?)(?:\n|telephone|client)",
+        r"for\n([A-Za-z0-9\s,\-]+?)(?:\n\n|postcode|assessed)",
+    ]
+    for pattern in address_patterns:
+        match = re.search(pattern, text, re.I)
+        if match:
+            address = match.group(1).strip()
+            break
+
+    # Assessment type extraction (Type 1, 2, 3, 4)
+    assessment_type = None
+    type_match = re.search(r"(?:risk\s+assessment\s+)?type[:\s]+(\d+)[^.]*?(?:common|flats|intrusive|full)", text, re.I)
+    if type_match:
+        type_num = type_match.group(1)
+        type_desc_match = re.search(rf"type\s+{type_num}\s*[-–:]\s*([^.]+)", text, re.I)
+        if type_desc_match:
+            assessment_type = f"Type {type_num} - {type_desc_match.group(1).strip()}"
+        else:
+            assessment_type = f"Type {type_num}"
+
+    # Assessor extraction
+    assessor_name = None
+    assessor_patterns = [
+        r"(?:assessed|assessor|consultant)[:\s]+(?:by\s+)?([A-Z][a-z]+\s+[A-Z][a-z]+)",
+        r"risk\s+assessment\s+consultant[:\s]+([A-Z][a-z]+\s+[A-Z][a-z]+)",
+    ]
+    for pattern in assessor_patterns:
+        match = re.search(pattern, text, re.I)
+        if match:
+            assessor_name = match.group(1).strip()
+            break
+
+    # Assessor company extraction
+    assessor_company = None
+    company_patterns = [
+        r"(?:eurosafe|tersus|fire\s+safety)[^.]*?(?:ltd|limited|uk|consultancy)",
+        r"(?:undertaken|prepared|produced|carried\s+out)\s+by[:\s]+([A-Za-z0-9\s]+(?:Limited|Ltd|LLP|PLC|UK))",
+    ]
+    for pattern in company_patterns:
+        match = re.search(pattern, text, re.I)
+        if match:
+            assessor_company = match.group(0).strip() if match.lastindex is None else match.group(1).strip()
+            break
+
+    # Client name extraction
+    client_name = None
+    client_patterns = [
+        r"(?:on\s+behalf\s+of|client)[:\s]+([A-Za-z0-9\s]+(?:Homes|Council|Housing|Limited|Ltd|Association))",
+        r"client[:\s]+([A-Za-z0-9\s]+?)(?:\n|client\s+contact|telephone)",
+    ]
+    for pattern in client_patterns:
+        match = re.search(pattern, text, re.I)
+        if match:
+            client_name = match.group(1).strip()
+            # Clean up concatenated text
+            client_name = re.sub(r"([a-z])([A-Z])", r"\1 \2", client_name)
+            break
+
+    # Assessment date extraction
+    assessment_date = None
+    date_patterns = [
+        r"date\s+assessed[:\s]+(\d{1,2}(?:st|nd|rd|th)?\s+\w+\s+\d{4})",
+        r"date\s+assessed[:\s]+(\d{2}[/-]\d{2}[/-]\d{4})",
+        r"assessment\s+date[:\s]+(\d{1,2}(?:st|nd|rd|th)?\s+\w+\s+\d{4})",
+        r"assessed\s+on[:\s]+(\d{1,2}(?:st|nd|rd|th)?\s+\w+\s+\d{4})",
+    ]
+    for pattern in date_patterns:
+        match = re.search(pattern, text, re.I)
+        if match:
+            date_str = match.group(1)
+            # Convert text date to ISO format
+            assessment_date = _convert_text_date_to_iso(date_str)
+            if not assessment_date:
+                assessment_date = date_str  # Keep original if conversion fails
+            break
+
+    # Review date extraction
+    review_date = None
+    review_patterns = [
+        r"review\s+date[:\s]+(\d{1,2}(?:st|nd|rd|th)?\s+\w+\s+\d{4})",
+        r"review\s+date[:\s]+(\d{2}[/-]\d{2}[/-]\d{4})",
+        r"next\s+review[:\s]+(\d{1,2}(?:st|nd|rd|th)?\s+\w+\s+\d{4})",
+    ]
+    for pattern in review_patterns:
+        match = re.search(pattern, text, re.I)
+        if match:
+            date_str = match.group(1)
+            review_date = _convert_text_date_to_iso(date_str)
+            if not review_date:
+                review_date = date_str
+            break
+
+    # Evacuation strategy detection
+    evacuation_strategy = None
+    if "stay put" in text_lower or "stay-put" in text_lower:
+        evacuation_strategy = "STAY_PUT"
+    elif "simultaneous evacuation" in text_lower or "full evacuation" in text_lower:
+        evacuation_strategy = "SIMULTANEOUS"
+    elif "phased evacuation" in text_lower:
+        evacuation_strategy = "PHASED"
+    elif "defend in place" in text_lower:
+        evacuation_strategy = "DEFEND_IN_PLACE"
+
+    # Compliance indicators
+    fso_compliant = (
+        "regulatory reform (fire safety) order" in text_lower
+        or "fire safety order 2005" in text_lower
+        or "rr(fs)o" in text_lower
+    )
+    housing_act_compliant = (
+        "housing act 2004" in text_lower
+        or "lacors" in text_lower
+    )
+
+    # Key sections detection
+    has_significant_findings = "significant findings" in text_lower
+    has_action_plan = "action plan" in text_lower
+    has_fire_hazards_section = "fire hazards" in text_lower
+    has_management_section = "management of fire safety" in text_lower
+
+    return {
+        "overall_risk_rating": overall_risk_rating,
+        "risk_areas": risk_areas if risk_areas else None,
+        "building_name": building_name,
+        "address": address,
+        "assessment_type": assessment_type,
+        "assessment_date": assessment_date,
+        "review_date": review_date,
+        "assessor_name": assessor_name,
+        "assessor_company": assessor_company,
+        "client_name": client_name,
+        "evacuation_strategy": evacuation_strategy,
+        "fso_compliant": fso_compliant,
+        "housing_act_compliant": housing_act_compliant,
+        "has_significant_findings": has_significant_findings,
+        "has_action_plan": has_action_plan,
+        "has_fire_hazards_section": has_fire_hazards_section,
+        "has_management_section": has_management_section,
+    }
+
+
+def _convert_text_date_to_iso(date_str: str) -> Optional[str]:
+    """
+    Convert text date format (e.g., '8th February 2023') to ISO format.
+    """
+    import calendar
+
+    # Month name mapping
+    months = {name.lower(): num for num, name in enumerate(calendar.month_name) if name}
+    months.update({name.lower(): num for num, name in enumerate(calendar.month_abbr) if name})
+
+    # Try parsing "8th February 2023" format
+    match = re.match(r"(\d{1,2})(?:st|nd|rd|th)?\s+(\w+)\s+(\d{4})", date_str, re.I)
+    if match:
+        day = int(match.group(1))
+        month_name = match.group(2).lower()
+        year = int(match.group(3))
+        month = months.get(month_name)
+        if month:
+            return f"{year:04d}-{month:02d}-{day:02d}"
+
+    # Try parsing DD/MM/YYYY or DD-MM-YYYY
+    match = re.match(r"(\d{2})[/-](\d{2})[/-](\d{4})", date_str)
+    if match:
+        day, month, year = match.groups()
+        return f"{year}-{month}-{day}"
+
+    return None
+
+
 def _check_pdf_accessible(file_bytes: bytes) -> None:
     """
     Check if PDF is accessible (not password-protected, not corrupted).
@@ -562,6 +813,9 @@ def build_pdf_artifacts(
     if file_type == "fraew_document":
         fraew_specific = extract_fraew_features(text_sample)
         features_core["fraew_specific"] = fraew_specific
+    elif file_type == "fra_document":
+        fra_specific = extract_fra_features(text_sample)
+        features_core["fra_specific"] = fra_specific
 
     extraction = {
         "schema_version": "pdf-extraction/v1",

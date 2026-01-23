@@ -13,8 +13,7 @@ class FileType(Enum):
     """Supported file types."""
     PROPERTY_SCHEDULE = "property_schedule"
     EPC_DATA = "epc_data"
-    FRA_DOCUMENT = "fra_document"
-    FRSA_DOCUMENT = "frsa_document"
+    FRA_DOCUMENT = "fra_document"  # Fire Risk Assessment (includes FRSA)
     FRAEW_DOCUMENT = "fraew_document"  # PAS 9980 - Fire Risk Appraisal of External Walls
     SCR_DOCUMENT = "scr_document"  # Safety Case Report
     UNKNOWN = "unknown"
@@ -35,14 +34,12 @@ class FileTypeDetector:
         'certificate', 'sap', 'rdsap'
     ]
     
-    # Keywords for FRA detection (Fire Risk Assessment)
+    # Keywords for FRA detection (Fire Risk Assessment / Fire Risk Safety Assessment)
     FRA_KEYWORDS = [
-        'fra', 'fire risk assessment', 'fire_risk_assessment'
-    ]
-    
-    # Keywords for FRSA detection (Fire Risk Safety Assessment)
-    FRSA_KEYWORDS = [
-        'frsa', 'fire risk safety assessment', 'fire_risk_safety_assessment'
+        'fra', 'frsa', 'fire risk assessment', 'fire_risk_assessment',
+        'fire-risk-assessment', 'fire risk safety assessment',
+        'fire_risk_safety_assessment', 'fire-risk-safety-assessment',
+        'fireriskassessment',  # Handle concatenated versions
     ]
     
     # Keywords for FRAEW detection (PAS 9980 - Fire Risk Appraisal of External Walls)
@@ -137,12 +134,8 @@ class FileTypeDetector:
         # Check for SCR keywords (Safety Case Report) - check before general fire keywords
         if any(keyword in filename_lower for keyword in self.SCR_KEYWORDS):
             return FileType.SCR_DOCUMENT
-        
-        # Check for FRSA keywords (more specific than FRA)
-        if any(keyword in filename_lower for keyword in self.FRSA_KEYWORDS):
-            return FileType.FRSA_DOCUMENT
-        
-        # Check for FRA keywords (Fire Risk Assessment)
+
+        # Check for FRA keywords (Fire Risk Assessment / Fire Risk Safety Assessment)
         if any(keyword in filename_lower for keyword in self.FRA_KEYWORDS):
             return FileType.FRA_DOCUMENT
         
@@ -292,16 +285,8 @@ class FileTypeDetector:
             )
             if scr_score >= 2:
                 return FileType.SCR_DOCUMENT
-            
-            # Check for FRSA keywords (more specific than FRA)
-            frsa_score = sum(
-                1 for keyword in self.FRSA_KEYWORDS
-                if keyword in text_lower
-            )
-            if frsa_score >= 1:
-                return FileType.FRSA_DOCUMENT
-            
-            # Check for FRA keywords (Fire Risk Assessment)
+
+            # Check for FRA keywords (Fire Risk Assessment / Fire Risk Safety Assessment)
             fra_score = sum(
                 1 for keyword in self.FRA_KEYWORDS
                 if keyword in text_lower

@@ -8,7 +8,7 @@ from pydantic import BaseModel, Field
 
 class UploadRequest(BaseModel):
     """Upload request model."""
-    file_type: str = Field(..., description="Type of file: property_schedule, epc_data, or frsa_document")
+    file_type: str = Field(..., description="Type of file: property_schedule, epc_data, fra_document, fraew_document, scr_document")
     ha_id: Optional[str] = Field(None, description="Housing Association ID (extracted from token if not provided)")
 
 

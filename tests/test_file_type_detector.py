@@ -117,13 +117,13 @@ class TestFRSADetection:
         """Test that PDF files with FRSA in filename are detected as FRSA documents."""
         detected_type = detector.detect_file_type_from_filename('frsa_report_block_a.pdf')
         
-        assert detected_type == FileType.FRSA_DOCUMENT
+        assert detected_type == FileType.FRA_DOCUMENT
     
     def test_detects_frsa_by_fire_risk_safety_assessment_keywords(self, detector):
         """Test that PDF files with fire risk safety assessment keywords are detected as FRSA documents."""
         detected_type = detector.detect_file_type_from_filename('fire_risk_safety_assessment.pdf')
         
-        assert detected_type == FileType.FRSA_DOCUMENT
+        assert detected_type == FileType.FRA_DOCUMENT
 
 
 class TestFRAEWDetection:
@@ -214,7 +214,7 @@ class TestFilenameBasedDetection:
         """Test that FRSA detection takes priority over FRA."""
         detected_type = detector.detect_file_type_from_filename('frsa_report.pdf')
         
-        assert detected_type == FileType.FRSA_DOCUMENT
+        assert detected_type == FileType.FRA_DOCUMENT
 
 
 class TestUncertaintyHandling:
@@ -302,7 +302,7 @@ class TestPDFContentDetection:
             pdf_content, "generic_document.pdf"
         )
         
-        assert detected_type == FileType.FRSA_DOCUMENT
+        assert detected_type == FileType.FRA_DOCUMENT
     
     def test_detects_fraew_from_pdf_content(self, detector):
         """Test that PDFs with FRAEW (PAS 9980) content are detected correctly."""
@@ -353,7 +353,7 @@ class TestPDFContentDetection:
         )
         
         # Should use filename since content is unclear
-        assert detected_type == FileType.FRSA_DOCUMENT
+        assert detected_type == FileType.FRA_DOCUMENT
     
     def test_pdf_defaults_to_fra_if_both_unclear(self, detector):
         """Test that PDF defaults to FRA if both content and filename are unclear."""

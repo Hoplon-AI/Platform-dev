@@ -17,7 +17,6 @@ from backend.workers.silver_processor import (
     _write_fraew_features,
     _write_fra_features,
     _write_scr_features,
-    _write_frsa_features,
     _update_processing_audit,
 )
 
@@ -360,27 +359,27 @@ class TestProcessFeaturesToSilver:
             assert result["document_type"] == "scr_document"
 
     @pytest.mark.asyncio
-    async def test_processes_frsa_document(self):
-        """Test processing FRSA document features."""
+    async def test_processes_fra_document_with_features(self):
+        """Test processing FRA document features."""
         event = {
             "bucket": "test-bucket",
-            "key": "ha_id=test_ha/bronze/dataset=frsa_document/ingest_date=2024-01-15/submission_id=123e4567-e89b-12d3-a456-426614174000/features.json",
+            "key": "ha_id=test_ha/bronze/dataset=fra_document/ingest_date=2024-01-15/submission_id=123e4567-e89b-12d3-a456-426614174000/features.json",
         }
-        
+
         features_json = {
             "features": {}
         }
-        
+
         with patch("backend.workers.silver_processor.UploadService") as mock_upload_service:
-            
+
             mock_service = MagicMock()
             mock_service.get_json.return_value = features_json
             mock_upload_service.return_value = mock_service
-            
+
             mock_conn = AsyncMock()
             mock_conn.execute = AsyncMock()
-            
+
             result = await process_features_to_silver(event, db_conn=mock_conn, upload_service=mock_service)
-            
+
             assert result["status"] == "completed"
-            assert result["document_type"] == "frsa_document"
+            assert result["document_type"] == "fra_document"
