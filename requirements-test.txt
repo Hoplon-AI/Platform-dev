@@ -1,0 +1,10 @@
+# Test dependencies
+# These are only needed for running tests, not for production
+
+# Testing framework
+pytest==7.4.3
+pytest-asyncio==0.21.1
+httpx==0.25.2
+
+# PDF generation for tests (creating test PDFs programmatically)
+reportlab==4.0.7
