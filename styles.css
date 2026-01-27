@@ -1,0 +1,394 @@
+/* styles.css */
+
+/* Optional leftover from templates */
+.App {
+  font-family: sans-serif;
+  text-align: center;
+}
+
+/* -----------------------------
+   Global reset + base
+----------------------------- */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  font-family: "Open Sans", Arial, sans-serif;
+}
+
+body {
+  background: #f5f5f5;
+  color: #0d141a;
+}
+
+/* -----------------------------
+   App shell
+----------------------------- */
+
+.app-root {
+  min-height: 100vh;
+  padding: 0;
+  display: flex;
+  justify-content: center;
+  background: #f5f5f5;
+}
+
+.app-shell {
+  width: 100%;
+  max-width: 1400px;
+  background: #fff;
+  min-height: 100vh;
+}
+
+/* -----------------------------
+   Header
+----------------------------- */
+
+.app-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 24px;
+  padding: 40px 40px 30px;
+  align-items: flex-end;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: #fff;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  position: relative;
+}
+
+.app-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 14px;
+  border-radius: 50px;
+  font-size: 12px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  background: rgba(255, 255, 255, 0.2);
+  color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  font-weight: 600;
+}
+
+.app-title {
+  margin: 10px 0 4px;
+  font-size: 32px;
+  font-weight: bold;
+  letter-spacing: -0.02em;
+  color: #fff;
+}
+
+.app-subtitle {
+  margin: 0;
+  font-size: 16px;
+  color: rgba(255, 255, 255, 0.92);
+  max-width: 700px;
+  line-height: 1.6;
+}
+
+.app-meta {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.85);
+}
+
+/* Back button */
+.back-home-btn {
+  border: none;
+  cursor: pointer;
+  background: rgba(255, 255, 255, 0.18);
+  color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  padding: 10px 14px;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 600;
+  transition: transform 0.2s ease, background 0.2s ease, box-shadow 0.2s ease;
+  align-self: flex-start;
+}
+
+.back-home-btn:hover {
+  background: rgba(255, 255, 255, 0.28);
+  transform: translateY(-1px);
+  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.16);
+}
+
+/* -----------------------------
+   Tabs
+----------------------------- */
+
+.tab-bar {
+  display: flex;
+  gap: 0;
+  background: #fff;
+  border-bottom: 2px solid #e5e7eb;
+  padding: 0 40px;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+.tab {
+  padding: 16px 24px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  font-size: 15px;
+  font-weight: 500;
+  color: #6b7280;
+  border-bottom: 3px solid transparent;
+  transition: all 0.25s ease;
+  font-family: "Open Sans", Arial, sans-serif;
+}
+
+.tab:hover {
+  color: #667eea;
+  background: rgba(102, 126, 234, 0.05);
+}
+
+.tab-active {
+  color: #667eea;
+  border-bottom-color: #667eea;
+  font-weight: 700;
+}
+
+/* -----------------------------
+   Cards
+----------------------------- */
+
+.card {
+  background: #fff;
+  border-radius: 14px;
+  border: 1px solid #e5e7eb;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
+  overflow: hidden;
+}
+
+.card-header {
+  padding: 20px 24px;
+  border-bottom: 1px solid #e5e7eb;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: #fafafa;
+}
+
+.card-title {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 650;
+  color: #0d141a;
+}
+
+.card-badge {
+  padding: 5px 12px;
+  border-radius: 50px;
+  font-size: 12px;
+  background: rgba(102, 126, 234, 0.12);
+  color: #667eea;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+/* -----------------------------
+   Summary cards (KPI row)
+----------------------------- */
+
+.summary-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 20px;
+}
+
+.summary-card {
+  background: #fff;
+  border-radius: 14px;
+  border: 1px solid #e5e7eb;
+  padding: 24px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.summary-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.12);
+}
+
+.summary-label {
+  font-size: 13px;
+  color: #6b7280;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-bottom: 10px;
+  font-weight: 700;
+}
+
+.summary-value {
+  font-size: 32px;
+  font-weight: 800;
+  color: #667eea;
+  margin-bottom: 8px;
+}
+
+.summary-footnote {
+  font-size: 12px;
+  color: #9ca3af;
+}
+
+/* -----------------------------
+   Inputs (filters)
+----------------------------- */
+
+.filter-label {
+  font-size: 12px;
+  color: #6b7280;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.input,
+select.input {
+  width: 100%;
+  padding: 10px 14px;
+  border: 1px solid #d1d5db;
+  border-radius: 10px;
+  font-size: 14px;
+  background: #fff;
+  color: #0d141a;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  font-family: "Open Sans", Arial, sans-serif;
+}
+
+.input:focus,
+select.input:focus {
+  outline: none;
+  border-color: #667eea;
+  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.12);
+}
+
+/* Buttons (simple default) */
+.btn-primary {
+  padding: 12px 18px;
+  border-radius: 999px;
+  border: none;
+  cursor: pointer;
+  background: #0d141a;
+  color: #fff;
+  font-weight: 700;
+  transition: transform 0.2s ease, box-shadow 0.2s ease,
+    background-color 0.2s ease;
+}
+
+.btn-primary:hover {
+  background: #4f46e5;
+  transform: translateY(-2px);
+  box-shadow: 0 10px 18px rgba(79, 70, 229, 0.25);
+}
+
+/* -----------------------------
+   Tables
+----------------------------- */
+
+.table-wrapper {
+  overflow-x: auto;
+  max-height: 600px;
+  overflow-y: auto;
+}
+
+.risk-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.risk-table thead {
+  position: sticky;
+  top: 0;
+  background: #fafafa;
+  z-index: 10;
+}
+
+.risk-table th {
+  padding: 14px 16px;
+  text-align: left;
+  font-weight: 800;
+  color: #374151;
+  border-bottom: 2px solid #e5e7eb;
+  text-transform: uppercase;
+  font-size: 11px;
+  letter-spacing: 0.06em;
+}
+
+.risk-table td {
+  padding: 16px;
+  border-bottom: 1px solid #f3f4f6;
+  vertical-align: top;
+  color: #0d141a;
+}
+
+.risk-table tbody tr {
+  transition: background-color 0.15s ease;
+}
+
+.risk-table tbody tr:hover {
+  background: #f9fafb;
+}
+
+/* -----------------------------
+   Map
+----------------------------- */
+
+.map-card {
+  height: 500px;
+}
+
+.map-wrapper {
+  height: 440px;
+  position: relative;
+}
+
+/* Keep Leaflet popup readable */
+.leaflet-popup-content {
+  margin: 10px 12px;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+/* -----------------------------
+   Responsive
+----------------------------- */
+
+@media (max-width: 1024px) {
+  .summary-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 768px) {
+  .tab-bar {
+    overflow-x: auto;
+  }
+
+  .app-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .back-home-btn {
+    position: absolute;
+    top: 18px;
+    right: 18px;
+    background: rgba(13, 20, 26, 0.75);
+    border: 1px solid rgba(255, 255, 255, 0.28);
+  }
+}
