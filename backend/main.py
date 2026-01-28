@@ -8,6 +8,7 @@ from typing import Dict, Any
 from backend.api.ingestion.upload_router import router as upload_router
 from backend.api.v1.lineage_router import router as lineage_router
 from backend.api.v1.portfolios_router import router as portfolios_router
+from backend.geo import router as geo_router
 from backend.core.database.db_pool import DatabasePool
 from infrastructure.storage.s3_config import get_s3_config
 
@@ -53,6 +54,7 @@ app.add_middleware(
 app.include_router(upload_router)
 app.include_router(lineage_router)
 app.include_router(portfolios_router)
+app.include_router(geo_router)
 
 
 @app.get("/")
