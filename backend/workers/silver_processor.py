@@ -205,7 +205,7 @@ async def _write_document_features(
     
     await conn.execute(
         """
-        INSERT INTO document_features (
+        INSERT INTO silver.document_features (
             feature_id, ha_id, upload_id, document_type,
             building_name, address, uprn, postcode, assessment_date,
             job_reference, client_name, assessor_company,
@@ -262,7 +262,7 @@ async def _write_fraew_features(
     
     await conn.execute(
         """
-        INSERT INTO fraew_features (
+        INSERT INTO silver.fraew_features (
             fraew_id, feature_id, ha_id, upload_id,
             pas_9980_compliant, pas_9980_version,
             building_risk_rating,
@@ -303,7 +303,7 @@ async def _write_fra_features(
     
     await conn.execute(
         """
-        INSERT INTO fra_features (
+        INSERT INTO silver.fra_features (
             fra_id, feature_id, ha_id, upload_id,
             fra_features_json, created_at, updated_at
         )
@@ -329,22 +329,185 @@ async def _write_scr_features(
 ) -> None:
     """Write SCR-specific features to scr_features table."""
     features = features_json.get("features", {})
-    
+    scr_specific = features.get("scr_specific", {})
+
+    # Extract building identification
+    building_name = scr_specific.get("building_name")
+    building_address = scr_specific.get("building_address")
+    bsr_registration = scr_specific.get("bsr_registration_number")
+    building_reference = scr_specific.get("building_reference")
+    uprn_labeled = scr_specific.get("uprn_labeled")
+    uprns = scr_specific.get("uprns") or []  # List of standard 12-digit UPRNs
+
+    # Extract building characteristics
+    building_height = scr_specific.get("building_height_metres")
+    storeys = scr_specific.get("number_of_storeys")
+    construction_year = scr_specific.get("construction_year")
+    building_type = scr_specific.get("building_type")
+    height_category = scr_specific.get("height_category")
+    total_units = scr_specific.get("total_units")
+
+    # Extract safety case metadata
+    safety_case_version = scr_specific.get("safety_case_version")
+    safety_case_date_str = scr_specific.get("safety_case_date")
+    safety_case_date = _normalize_date(safety_case_date_str).date() if safety_case_date_str and _normalize_date(safety_case_date_str) else None
+    report_author = scr_specific.get("report_author")
+    pap = scr_specific.get("principal_accountable_person")
+    bsm = scr_specific.get("building_safety_manager")
+    accountable_entity = scr_specific.get("accountable_person_entity")
+
+    # Extract FRA information
+    fra_type = scr_specific.get("fra_type")
+    fra_date_str = scr_specific.get("fra_date")
+    fra_date = _normalize_date(fra_date_str).date() if fra_date_str and _normalize_date(fra_date_str) else None
+    fra_assessor = scr_specific.get("fra_assessor")
+    fra_credentials = scr_specific.get("fra_assessor_credentials")
+    fra_peer_reviewer = scr_specific.get("fra_peer_reviewer")
+    fra_outcome = scr_specific.get("fra_outcome")
+
+    # Extract evacuation strategy
+    evacuation_strategy = scr_specific.get("evacuation_strategy")
+    evacuation_description = scr_specific.get("evacuation_strategy_description")
+    peeps_required = scr_specific.get("personal_evacuation_plans_required", False)
+
+    # Extract fire safety systems
+    fire_alarm_type = scr_specific.get("fire_alarm_system_type")
+    fire_alarm_coverage = scr_specific.get("fire_alarm_coverage")
+    smoke_detection = scr_specific.get("smoke_detection_type")
+    firefighters_lift = scr_specific.get("firefighters_lift_present", False)
+    dry_riser = scr_specific.get("dry_riser_present", False)
+    wet_riser = scr_specific.get("wet_riser_present", False)
+    sprinklers = scr_specific.get("sprinklers_present", False)
+    aov = scr_specific.get("aov_present", False)
+    emergency_lighting = scr_specific.get("emergency_lighting_present", False)
+    compartmentation = scr_specific.get("fire_compartmentation_status")
+    pib = scr_specific.get("premises_information_box_present", False)
+
+    # Extract structural information
+    construction_type = scr_specific.get("construction_type")
+    cladding_type = scr_specific.get("cladding_type")
+    cladding_status = scr_specific.get("cladding_status")
+    bcc = scr_specific.get("building_control_certificate", False)
+    structural_issues = scr_specific.get("structural_issues_identified", False)
+    structural_issues_desc = scr_specific.get("structural_issues_description")
+    gas_detectors = scr_specific.get("gas_detectors_present", False)
+    lightning_protection = scr_specific.get("lightning_protection_present", False)
+
+    # Extract BSA 2022 compliance
+    bsa_applicable = scr_specific.get("bsa_2022_applicable", True)
+    part4_compliance = scr_specific.get("part_4_duties_compliance_status")
+    mor_in_place = scr_specific.get("mandatory_occurrence_reporting_in_place", False)
+    resident_engagement = scr_specific.get("resident_engagement_strategy_present", False)
+
+    # Key contacts
+    key_contacts = scr_specific.get("key_contacts")
+
+    # Extraction metadata
+    extraction_method = features_json.get("extraction_method", "regex")
+    agentic_confidence = scr_specific.get("agentic_confidence_score")
+    comparison_json = features_json.get("extraction_comparison_metadata")
+
+    # Determine safety_case_status from various fields
+    safety_case_status = scr_specific.get("safety_case_status", "active")
+
+    now = _utc_now().replace(tzinfo=None)
     await conn.execute(
         """
-        INSERT INTO scr_features (
+        INSERT INTO silver.scr_features (
             scr_id, feature_id, ha_id, upload_id,
+            safety_case_status,
+            building_name, building_address, bsr_registration_number, building_reference,
+            uprn_labeled, uprns,
+            building_height_metres, number_of_storeys, construction_year, building_type,
+            height_category, total_units,
+            safety_case_version, safety_case_date, report_author,
+            principal_accountable_person, building_safety_manager, accountable_person_entity,
+            fra_type, fra_date, fra_assessor, fra_assessor_credentials, fra_peer_reviewer, fra_outcome,
+            evacuation_strategy, evacuation_strategy_description, personal_evacuation_plans_required,
+            fire_alarm_system_type, fire_alarm_coverage, smoke_detection_type,
+            firefighters_lift_present, dry_riser_present, wet_riser_present,
+            sprinklers_present, aov_present, emergency_lighting_present,
+            fire_compartmentation_status, premises_information_box_present,
+            construction_type, cladding_type, cladding_status,
+            building_control_certificate, structural_issues_identified, structural_issues_description,
+            gas_detectors_present, lightning_protection_present,
+            bsa_2022_applicable, part_4_duties_compliance_status,
+            mandatory_occurrence_reporting_in_place, resident_engagement_strategy_present,
+            key_contacts_json,
+            extraction_method, agentic_confidence_score, extraction_comparison_json,
             scr_features_json, created_at, updated_at
         )
-        VALUES ($1, $2, $3, $4, $5::jsonb, $6, $7)
+        VALUES (
+            $1, $2, $3, $4, $5, $6, $7, $8, $9, $10,
+            $11, $12, $13, $14, $15, $16, $17, $18, $19, $20,
+            $21, $22, $23, $24, $25, $26, $27, $28, $29, $30,
+            $31, $32, $33, $34, $35, $36, $37, $38, $39, $40,
+            $41, $42, $43, $44, $45, $46, $47, $48, $49, $50,
+            $51, $52, $53, $54, $55, $56::jsonb, $57, $58, $59::jsonb, $60::jsonb, $61, $62
+        )
         """,
-        uuid.uuid4(),
-        feature_id,
-        ha_id,
-        upload_id,
-        json.dumps(features),
-        _utc_now().replace(tzinfo=None),
-        _utc_now().replace(tzinfo=None),
+        uuid.uuid4(),                      # $1 scr_id
+        feature_id,                        # $2 feature_id
+        ha_id,                             # $3 ha_id
+        upload_id,                         # $4 upload_id
+        safety_case_status,                # $5 safety_case_status
+        building_name,                     # $6
+        building_address,                  # $7
+        bsr_registration,                  # $8
+        building_reference,                # $9
+        uprn_labeled,                      # $10
+        uprns,                             # $11 (TEXT[] array)
+        building_height,                   # $12
+        storeys,                           # $13
+        construction_year,                 # $14
+        building_type,                     # $15
+        height_category,                   # $16
+        total_units,                       # $17
+        safety_case_version,               # $18
+        safety_case_date,                  # $19
+        report_author,                     # $20
+        pap,                               # $21
+        bsm,                               # $22
+        accountable_entity,                # $23
+        fra_type,                          # $24
+        fra_date,                          # $25
+        fra_assessor,                      # $26
+        fra_credentials,                   # $27
+        fra_peer_reviewer,                 # $28
+        fra_outcome,                       # $29
+        evacuation_strategy,               # $30
+        evacuation_description,            # $31
+        peeps_required,                    # $32
+        fire_alarm_type,                   # $33
+        fire_alarm_coverage,               # $34
+        smoke_detection,                   # $35
+        firefighters_lift,                 # $36
+        dry_riser,                         # $37
+        wet_riser,                         # $38
+        sprinklers,                        # $39
+        aov,                               # $40
+        emergency_lighting,                # $41
+        compartmentation,                  # $42
+        pib,                               # $43
+        construction_type,                 # $44
+        cladding_type,                     # $45
+        cladding_status,                   # $46
+        bcc,                               # $47
+        structural_issues,                 # $48
+        structural_issues_desc,            # $49
+        gas_detectors,                     # $50
+        lightning_protection,              # $51
+        bsa_applicable,                    # $52
+        part4_compliance,                  # $53
+        mor_in_place,                      # $54
+        resident_engagement,               # $55
+        json.dumps(key_contacts) if key_contacts else None,  # $56 key_contacts_json
+        extraction_method,                 # $57
+        agentic_confidence,                # $58
+        json.dumps(comparison_json) if comparison_json else None,  # $59 extraction_comparison_json
+        json.dumps(scr_specific) if scr_specific else json.dumps(features),  # $60 scr_features_json
+        now,                               # $61 created_at
+        now,                               # $62 updated_at
     )
 
 
@@ -447,7 +610,7 @@ async def _write_building_safety_features(
     
     await conn.execute(
         """
-        INSERT INTO building_safety_features (
+        INSERT INTO silver.building_safety_features (
             safety_feature_id, feature_id, ha_id, upload_id,
             high_rise_building_mentioned, building_height_category, number_of_storeys,
             building_height_metres, number_of_high_rise_buildings, building_safety_act_applicable,
@@ -569,7 +732,7 @@ async def _write_docb_features(
     
     await conn.execute(
         """
-        INSERT INTO docb_features (
+        INSERT INTO silver.docb_features (
             docb_id, feature_id, ha_id, upload_id,
             cladding_type, ews_status, fire_risk_management_summary, docb_ref,
             fire_protection, alarms, evacuation_strategy,
@@ -618,7 +781,7 @@ async def _update_document_features_with_agentic(
     
     await conn.execute(
         """
-        UPDATE document_features
+        UPDATE silver.document_features
         SET agentic_features_json = $1::jsonb,
             extraction_method = $2,
             extraction_comparison_metadata = $3::jsonb,
@@ -714,9 +877,18 @@ async def process_features_to_silver(
     document_type = metadata["file_type"]
     
     # Only process PDF document types
-    pdf_types = {"fra_document", "fraew_document", "scr_document"}
+    # Accept both short names (scr, fra) and full names (scr_document, fra_document)
+    pdf_types = {"fra", "fra_document", "fraew", "fraew_document", "scr", "scr_document"}
     if document_type not in pdf_types:
         return {"status": "ignored", "reason": "not_pdf_document", "document_type": document_type}
+
+    # Normalize document type to full name for consistent processing
+    document_type_map = {
+        "fra": "fra_document",
+        "fraew": "fraew_document",
+        "scr": "scr_document",
+    }
+    document_type = document_type_map.get(document_type, document_type)
     
     # S3 helpers (dependency injection support)
     if upload_service is None:
@@ -752,7 +924,7 @@ async def process_features_to_silver(
         
         # Get UPRN and postcode from document_features for denormalization
         doc_row = await conn.fetchrow(
-            "SELECT uprn, postcode FROM document_features WHERE feature_id = $1",
+            "SELECT uprn, postcode FROM silver.document_features WHERE feature_id = $1",
             feature_id,
         )
         uprn = doc_row["uprn"] if doc_row else None

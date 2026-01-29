@@ -25,6 +25,7 @@ The infrastructure is organized into 6 separate stacks:
    - EventBridge rule (filters S3 Object Created for keys containing `/file=`)
    - Step Functions state machine
    - Worker Lambda (PDF extraction/validation/features)
+   - **Agentic extraction** (Bedrock/Claude) enabled by default for enhanced feature extraction
 
 5. **ComputeStack** (`PlatformComputeDev`)
    - ECS Fargate cluster
@@ -45,6 +46,10 @@ The infrastructure is organized into 6 separate stacks:
    ```bash
    cdk bootstrap aws://025215344919/eu-west-1
    ```
+5. **Bedrock model access** (for agentic extraction):
+   - Enable Claude models in AWS Bedrock console (Model access)
+   - Default model: `anthropic.claude-3-5-sonnet-v2`
+   - To disable agentic extraction, set `USE_AGENTIC_EXTRACTION=false` in `ingestion_stack.py`
 
 ## Setup
 
@@ -113,6 +118,32 @@ cdk deploy PlatformObservabilityDev
 ```
 
 ## Post-Deployment Steps
+
+### Verify Agentic Extraction (Bedrock)
+
+Agentic extraction is enabled by default. To verify it's working:
+
+1. **Check Lambda environment variable**:
+   ```bash
+   aws lambda get-function-configuration \
+     --function-name platform-dev-ingestion-worker \
+     --query 'Environment.Variables.USE_AGENTIC_EXTRACTION'
+   ```
+   Should return `"true"`.
+
+2. **Check Bedrock permissions**:
+   ```bash
+   aws lambda get-policy \
+     --function-name platform-dev-ingestion-worker \
+     --query 'Policy' | jq -r '.'
+   ```
+   Should include `bedrock:InvokeModel` permission.
+
+3. **Test with a PDF upload** and check CloudWatch logs for agentic extraction activity.
+
+4. **To disable agentic extraction** (fallback to regex-only):
+   - Edit `infrastructure/aws/cdk/cdk/ingestion_stack.py`: set `USE_AGENTIC_EXTRACTION: "false"`
+   - Redeploy: `cdk deploy PlatformIngestionDev`
 
 ### Enable PostGIS Extension
 
@@ -230,7 +261,9 @@ aws cloudformation describe-stacks \
 - ECS Fargate (512MB, 0.25 vCPU): ~$10
 - ALB: ~$20
 - S3 (minimal usage): ~$5
-- **Total: ~$85/month** (varies with usage)
+- Bedrock (Claude 3.5 Sonnet): ~$3 per 1M input tokens, ~$15 per 1M output tokens
+  - Typical PDF extraction: ~$0.01-0.05 per document (depends on document size and extraction complexity)
+- **Total: ~$85-100/month** (varies with usage and document volume)
 
 ## Troubleshooting
 

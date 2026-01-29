@@ -52,6 +52,10 @@ data_stack = DataStack(
 )
 
 # Stack 3b: Ingestion (EventBridge -> Step Functions -> worker Lambda)
+# Note: CDK may report a false positive circular dependency during synthesis.
+# The actual dependency is one-way: IngestionStack -> DataStack (for bronze_bucket).
+# DataStack does NOT reference IngestionStack.
+# Workaround: Deploy DataStack first, then IngestionStack (see CIRCULAR_DEPENDENCY_WORKAROUND.md)
 ingestion_stack = IngestionStack(
     app,
     "PlatformIngestionDev",
@@ -60,8 +64,8 @@ ingestion_stack = IngestionStack(
     private_subnets=networking_stack.private_subnets,
     database_security_group=data_stack.database_security_group,
     db_secret=data_stack.db_secret,
-    database_host=data_stack.database.instance_endpoint.hostname,
-    database_port=data_stack.database.instance_endpoint.port,
+    database_host=data_stack.database.cluster_endpoint.hostname,
+    database_port=data_stack.database.cluster_endpoint.port,
     s3_key=security_stack.s3_key,
     secrets_key=data_stack.secrets_key,
     env=env,
@@ -78,7 +82,10 @@ compute_stack = ComputeStack(
     bronze_bucket=data_stack.bronze_bucket,
     db_secret=data_stack.db_secret,
     secrets_key=data_stack.secrets_key,
+    s3_key=security_stack.s3_key,
     database_security_group=data_stack.database_security_group,
+    database_host=data_stack.database.cluster_endpoint.hostname,
+    database_port=data_stack.database.cluster_endpoint.port,
     env=env,
     description="Compute infrastructure: ECS Fargate cluster and ALB",
 )
@@ -90,7 +97,7 @@ observability_stack = ObservabilityStack(
     cluster_name=compute_stack.cluster.cluster_name,
     service_name=compute_stack.service.service_name,
     alb_arn=compute_stack.alb.load_balancer_arn,
-    database_endpoint=data_stack.database.instance_endpoint.hostname,
+    database_endpoint=data_stack.database.cluster_endpoint.hostname,
     log_group_name="/ecs/platform-dev",
     lambda_function_name=ingestion_stack.ingestion_lambda.function_name,
     env=env,
@@ -115,7 +122,8 @@ NagSuppressions.add_stack_suppressions(
         {"id": "AwsSolutions-SMG4", "reason": "Dev: Secret rotation deferred; enable rotation when workloads stabilize."},
         {"id": "AwsSolutions-S1", "reason": "Dev: Access logs bucket not configured yet; enable for staging/prod."},
         {"id": "AwsSolutions-S10", "reason": "Dev: SSL enforced via bucket policy; cdk-nag may not detect it."},
-        {"id": "AwsSolutions-RDS3", "reason": "Dev: Single-AZ RDS for cost; enable Multi-AZ in staging/prod."},
+        {"id": "AwsSolutions-RDS3", "reason": "Dev: Single-AZ Aurora for cost; enable Multi-AZ in staging/prod."},
+        {"id": "AwsSolutions-RDS6", "reason": "Dev: IAM database authentication disabled for simplicity; enable for prod."},
         {"id": "AwsSolutions-RDS10", "reason": "Dev: Deletion protection disabled for iteration; enable in prod."},
         {"id": "AwsSolutions-RDS11", "reason": "Dev: Using default Postgres port; will review for prod hardening."},
         {"id": "AwsSolutions-IAM4", "reason": "Dev: CDK-generated Lambda roles may use AWS managed policies; tighten later."},

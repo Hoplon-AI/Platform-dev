@@ -826,9 +826,9 @@ class TestUpdateDocumentFeaturesWithAgentic:
         
         conn.execute.assert_called_once()
         call_args = conn.execute.call_args
-        assert call_args[0][1] == feature_id  # WHERE clause
+        assert call_args[0][5] == feature_id  # WHERE clause (5th positional arg)
         # Check that agentic_features_json is set
-        assert call_args[0][0].startswith("UPDATE document_features")
+        assert "UPDATE silver.document_features" in call_args[0][0]
 
     @pytest.mark.asyncio
     async def test_updates_with_comparison_metadata(self):

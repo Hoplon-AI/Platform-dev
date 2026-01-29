@@ -1,0 +1,72 @@
+# Git
+.git
+.gitignore
+
+# Python
+__pycache__
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+venv_local/
+.venv*/
+*.egg-info/
+.eggs/
+dist/
+build/
+
+# IDE
+.idea/
+.vscode/
+.cursor/
+*.swp
+*.swo
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+
+# Environment
+.env
+.env.*
+*.local
+
+# Documentation
+docs/
+*.md
+
+# Frontend (not needed for backend image)
+frontend/
+node_modules/
+
+# Data files
+data/
+*.csv
+*.xlsx
+*.pdf
+
+# CDK
+infrastructure/aws/cdk/.venv/
+infrastructure/aws/cdk/cdk.out/
+infrastructure/aws/cdk/node_modules/
+
+# DBT
+dbt/
+
+# Mac
+.DS_Store
+
+# Logs
+*.log
+
+# Local scripts
+scripts/
+
+# Tests (optional - remove if you want to run tests in container)
+tests/
+
+# Claude
+.claude/

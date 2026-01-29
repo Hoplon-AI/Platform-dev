@@ -27,9 +27,9 @@ CREATE TABLE IF NOT EXISTS upload_audit (
     metadata JSONB
 );
 
-CREATE INDEX idx_upload_audit_ha_id ON upload_audit(ha_id);
-CREATE INDEX idx_upload_audit_status ON upload_audit(status);
-CREATE INDEX idx_upload_audit_uploaded_at ON upload_audit(uploaded_at);
+CREATE INDEX IF NOT EXISTS idx_upload_audit_ha_id ON upload_audit(ha_id);
+CREATE INDEX IF NOT EXISTS idx_upload_audit_status ON upload_audit(status);
+CREATE INDEX IF NOT EXISTS idx_upload_audit_uploaded_at ON upload_audit(uploaded_at);
 
 -- Enhanced lineage tracking
 CREATE TABLE IF NOT EXISTS data_lineage (
@@ -42,8 +42,8 @@ CREATE TABLE IF NOT EXISTS data_lineage (
     created_at TIMESTAMP DEFAULT NOW()
 );
 
-CREATE INDEX idx_data_lineage_source ON data_lineage(source_type, source_id);
-CREATE INDEX idx_data_lineage_target ON data_lineage(target_type, target_id);
+CREATE INDEX IF NOT EXISTS idx_data_lineage_source ON data_lineage(source_type, source_id);
+CREATE INDEX IF NOT EXISTS idx_data_lineage_target ON data_lineage(target_type, target_id);
 
 -- UPRN lineage mapping
 CREATE TABLE IF NOT EXISTS uprn_lineage_map (
@@ -56,9 +56,9 @@ CREATE TABLE IF NOT EXISTS uprn_lineage_map (
     PRIMARY KEY (uprn, ha_id, submission_id)
 );
 
-CREATE INDEX idx_uprn_lineage_uprn ON uprn_lineage_map(uprn);
-CREATE INDEX idx_uprn_lineage_submission ON uprn_lineage_map(submission_id);
-CREATE INDEX idx_uprn_lineage_ha ON uprn_lineage_map(ha_id);
+CREATE INDEX IF NOT EXISTS idx_uprn_lineage_uprn ON uprn_lineage_map(uprn);
+CREATE INDEX IF NOT EXISTS idx_uprn_lineage_submission ON uprn_lineage_map(submission_id);
+CREATE INDEX IF NOT EXISTS idx_uprn_lineage_ha ON uprn_lineage_map(ha_id);
 
 -- Processing audit table
 CREATE TABLE IF NOT EXISTS processing_audit (
@@ -75,9 +75,9 @@ CREATE TABLE IF NOT EXISTS processing_audit (
     metadata JSONB
 );
 
-CREATE INDEX idx_processing_audit_ha_id ON processing_audit(ha_id);
-CREATE INDEX idx_processing_audit_source ON processing_audit(source_type, source_id);
-CREATE INDEX idx_processing_audit_target ON processing_audit(target_type, target_id);
+CREATE INDEX IF NOT EXISTS idx_processing_audit_ha_id ON processing_audit(ha_id);
+CREATE INDEX IF NOT EXISTS idx_processing_audit_source ON processing_audit(source_type, source_id);
+CREATE INDEX IF NOT EXISTS idx_processing_audit_target ON processing_audit(target_type, target_id);
 
 -- Output audit table
 CREATE TABLE IF NOT EXISTS output_audit (
@@ -90,9 +90,9 @@ CREATE TABLE IF NOT EXISTS output_audit (
     metadata JSONB
 );
 
-CREATE INDEX idx_output_audit_ha_id ON output_audit(ha_id);
-CREATE INDEX idx_output_audit_type ON output_audit(output_type);
-CREATE INDEX idx_output_audit_generated_at ON output_audit(generated_at);
+CREATE INDEX IF NOT EXISTS idx_output_audit_ha_id ON output_audit(ha_id);
+CREATE INDEX IF NOT EXISTS idx_output_audit_type ON output_audit(output_type);
+CREATE INDEX IF NOT EXISTS idx_output_audit_generated_at ON output_audit(generated_at);
 
 -- GDPR compliance tables
 CREATE TABLE IF NOT EXISTS gdpr_consents (
@@ -108,8 +108,8 @@ CREATE TABLE IF NOT EXISTS gdpr_consents (
     metadata JSONB
 );
 
-CREATE INDEX idx_gdpr_consents_ha_user ON gdpr_consents(ha_id, user_id);
-CREATE INDEX idx_gdpr_consents_type ON gdpr_consents(consent_type);
+CREATE INDEX IF NOT EXISTS idx_gdpr_consents_ha_user ON gdpr_consents(ha_id, user_id);
+CREATE INDEX IF NOT EXISTS idx_gdpr_consents_type ON gdpr_consents(consent_type);
 
 -- Data retention policies
 CREATE TABLE IF NOT EXISTS data_retention_policies (
@@ -143,9 +143,9 @@ CREATE TABLE IF NOT EXISTS deletion_audit (
     metadata JSONB -- Store what was deleted for audit purposes
 );
 
-CREATE INDEX idx_deletion_audit_ha_id ON deletion_audit(ha_id);
-CREATE INDEX idx_deletion_audit_type ON deletion_audit(deletion_type);
-CREATE INDEX idx_deletion_audit_entity ON deletion_audit(entity_type, entity_id);
+CREATE INDEX IF NOT EXISTS idx_deletion_audit_ha_id ON deletion_audit(ha_id);
+CREATE INDEX IF NOT EXISTS idx_deletion_audit_type ON deletion_audit(deletion_type);
+CREATE INDEX IF NOT EXISTS idx_deletion_audit_entity ON deletion_audit(entity_type, entity_id);
 
 -- Row-level security (PostgreSQL RLS) - Enable for tenant isolation
 -- Note: This requires PostgreSQL 9.5+
@@ -158,26 +158,32 @@ ALTER TABLE uprn_lineage_map ENABLE ROW LEVEL SECURITY;
 
 -- RLS Policies (example - will be customized per table)
 -- Policy: Users can only access data for their ha_id
+DROP POLICY IF EXISTS ha_isolation_upload_audit ON upload_audit;
 CREATE POLICY ha_isolation_upload_audit ON upload_audit
     FOR ALL
     USING (ha_id = current_setting('app.current_ha_id', true));
 
+DROP POLICY IF EXISTS ha_isolation_processing_audit ON processing_audit;
 CREATE POLICY ha_isolation_processing_audit ON processing_audit
     FOR ALL
     USING (ha_id = current_setting('app.current_ha_id', true));
 
+DROP POLICY IF EXISTS ha_isolation_output_audit ON output_audit;
 CREATE POLICY ha_isolation_output_audit ON output_audit
     FOR ALL
     USING (ha_id = current_setting('app.current_ha_id', true));
 
+DROP POLICY IF EXISTS ha_isolation_gdpr_consents ON gdpr_consents;
 CREATE POLICY ha_isolation_gdpr_consents ON gdpr_consents
     FOR ALL
     USING (ha_id = current_setting('app.current_ha_id', true));
 
+DROP POLICY IF EXISTS ha_isolation_deletion_audit ON deletion_audit;
 CREATE POLICY ha_isolation_deletion_audit ON deletion_audit
     FOR ALL
     USING (ha_id = current_setting('app.current_ha_id', true));
 
+DROP POLICY IF EXISTS ha_isolation_uprn_lineage ON uprn_lineage_map;
 CREATE POLICY ha_isolation_uprn_lineage ON uprn_lineage_map
     FOR ALL
     USING (ha_id = current_setting('app.current_ha_id', true));

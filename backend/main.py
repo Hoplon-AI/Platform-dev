@@ -65,8 +65,14 @@ async def root():
     }
 
 
-# TODO review 
+# Lightweight health check for ALB (always returns 200 if app is running)
 @app.get("/health")
+async def alb_health_check() -> Dict[str, str]:
+    """Simple health check for ALB - returns 200 if app is running."""
+    return {"status": "ok"}
+
+
+@app.get("/health/detailed")
 async def health_check() -> Dict[str, Any]:
     """
     Comprehensive health check endpoint.

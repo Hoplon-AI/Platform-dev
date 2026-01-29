@@ -62,9 +62,6 @@ CREATE TABLE IF NOT EXISTS building_safety_features (
     mandatory_occurrence_report_mentioned BOOLEAN DEFAULT FALSE,
     mandatory_occurrence_reporting_process_mentioned BOOLEAN DEFAULT FALSE,
     
-    -- Category B: Building Safety Regulator interactions
-    building_safety_regulator_mentioned BOOLEAN DEFAULT FALSE, -- Duplicate for clarity (same as above)
-    
     -- Full agentic features JSON (Category A + B detailed data)
     agentic_features_json JSONB,
     
