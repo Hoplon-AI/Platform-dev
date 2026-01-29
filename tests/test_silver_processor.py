@@ -17,6 +17,9 @@ from backend.workers.silver_processor import (
     _write_fraew_features,
     _write_fra_features,
     _write_scr_features,
+    _write_building_safety_features,
+    _write_docb_features,
+    _update_document_features_with_agentic,
     _update_processing_audit,
 )
 
@@ -226,6 +229,7 @@ class TestProcessFeaturesToSilver:
             # Mock database connection (dependency injection)
             mock_conn = AsyncMock()
             mock_conn.execute = AsyncMock()
+            mock_conn.fetchrow = AsyncMock(return_value={"uprn": None, "postcode": None})
             
             result = await process_features_to_silver(event, db_conn=mock_conn, upload_service=mock_service)
             
@@ -326,6 +330,7 @@ class TestProcessFeaturesToSilver:
             
             mock_conn = AsyncMock()
             mock_conn.execute = AsyncMock()
+            mock_conn.fetchrow = AsyncMock(return_value={"uprn": None, "postcode": None})
             
             result = await process_features_to_silver(event, db_conn=mock_conn, upload_service=mock_service)
             
@@ -352,6 +357,7 @@ class TestProcessFeaturesToSilver:
             
             mock_conn = AsyncMock()
             mock_conn.execute = AsyncMock()
+            mock_conn.fetchrow = AsyncMock(return_value={"uprn": None, "postcode": None})
             
             result = await process_features_to_silver(event, db_conn=mock_conn, upload_service=mock_service)
             
@@ -378,8 +384,579 @@ class TestProcessFeaturesToSilver:
 
             mock_conn = AsyncMock()
             mock_conn.execute = AsyncMock()
+            mock_conn.fetchrow = AsyncMock(return_value={"uprn": None, "postcode": None})
 
             result = await process_features_to_silver(event, db_conn=mock_conn, upload_service=mock_service)
 
             assert result["status"] == "completed"
             assert result["document_type"] == "fra_document"
+
+
+class TestWriteBuildingSafetyFeatures:
+    """Tests for writing building safety features (Category A + B)."""
+
+    @pytest.mark.asyncio
+    async def test_writes_high_rise_indicators(self):
+        """Test writing high-rise building indicators."""
+        conn = AsyncMock()
+        feature_id = uuid.uuid4()
+        ha_id = "test_ha"
+        upload_id = uuid.uuid4()
+        
+        features_json = {
+            "agentic_features": {
+                "high_rise_indicators": {
+                    "high_rise_building_mentioned": True,
+                    "building_height_category": "HIGH_RISE",
+                    "number_of_storeys": 20,
+                    "building_height_metres": 60.5,
+                    "building_safety_act_applicable": True,
+                }
+            },
+            "extraction_method": "agentic"
+        }
+        
+        await _write_building_safety_features(
+            conn,
+            feature_id=feature_id,
+            ha_id=ha_id,
+            upload_id=upload_id,
+            features_json=features_json,
+        )
+        
+        conn.execute.assert_called_once()
+        call_args = conn.execute.call_args
+        # Check that high_rise_building_mentioned is True (5th positional arg after safety_feature_id, feature_id, ha_id, upload_id)
+        assert call_args[0][5] is True  # high_rise_building_mentioned
+        assert call_args[0][6] == "HIGH_RISE"  # building_height_category
+        assert call_args[0][7] == 20  # number_of_storeys
+
+    @pytest.mark.asyncio
+    async def test_writes_evacuation_strategy(self):
+        """Test writing evacuation strategy features."""
+        conn = AsyncMock()
+        feature_id = uuid.uuid4()
+        ha_id = "test_ha"
+        upload_id = uuid.uuid4()
+        
+        features_json = {
+            "agentic_features": {
+                "evacuation_strategy": {
+                    "evacuation_strategy_mentioned": True,
+                    "evacuation_strategy_type": "STAY_PUT",
+                    "evacuation_strategy_description": "Stay in flat if fire elsewhere",
+                    "personal_evacuation_plans_mentioned": True,
+                }
+            },
+            "extraction_method": "merged"
+        }
+        
+        await _write_building_safety_features(
+            conn,
+            feature_id=feature_id,
+            ha_id=ha_id,
+            upload_id=upload_id,
+            features_json=features_json,
+        )
+        
+        conn.execute.assert_called_once()
+        call_args = conn.execute.call_args
+        # Check evacuation strategy fields (11th positional arg is evacuation_strategy_mentioned)
+        assert call_args[0][11] is True  # evacuation_strategy_mentioned
+        assert call_args[0][12] == "STAY_PUT"  # evacuation_strategy_type
+
+    @pytest.mark.asyncio
+    async def test_writes_fire_safety_measures(self):
+        """Test writing fire safety measures."""
+        conn = AsyncMock()
+        feature_id = uuid.uuid4()
+        ha_id = "test_ha"
+        upload_id = uuid.uuid4()
+        
+        features_json = {
+            "agentic_features": {
+                "fire_safety_measures": {
+                    "fire_safety_measures_mentioned": True,
+                    "fire_doors_mentioned": True,
+                    "fire_safety_officers_mentioned": True,
+                }
+            }
+        }
+        
+        await _write_building_safety_features(
+            conn,
+            feature_id=feature_id,
+            ha_id=ha_id,
+            upload_id=upload_id,
+            features_json=features_json,
+        )
+        
+        conn.execute.assert_called_once()
+        call_args = conn.execute.call_args
+        assert call_args[0][17] is True  # fire_safety_measures_mentioned
+        assert call_args[0][18] is True  # fire_doors_mentioned
+
+    @pytest.mark.asyncio
+    async def test_writes_bsa_compliance(self):
+        """Test writing Building Safety Act 2022 compliance features."""
+        conn = AsyncMock()
+        feature_id = uuid.uuid4()
+        ha_id = "test_ha"
+        upload_id = uuid.uuid4()
+        
+        features_json = {
+            "agentic_features": {
+                "building_safety_act_2022": {
+                    "building_safety_act_2022_mentioned": True,
+                    "building_safety_act_compliance_status": "COMPLIANT",
+                    "part_4_duties_mentioned": True,
+                    "building_safety_regulator_mentioned": True,
+                }
+            }
+        }
+        
+        await _write_building_safety_features(
+            conn,
+            feature_id=feature_id,
+            ha_id=ha_id,
+            upload_id=upload_id,
+            features_json=features_json,
+        )
+        
+        conn.execute.assert_called_once()
+        call_args = conn.execute.call_args
+        assert call_args[0][29] is True  # building_safety_act_2022_mentioned
+        assert call_args[0][30] == "COMPLIANT"  # building_safety_act_compliance_status
+
+    @pytest.mark.asyncio
+    async def test_writes_mor_references(self):
+        """Test writing Mandatory Occurrence Report references."""
+        conn = AsyncMock()
+        feature_id = uuid.uuid4()
+        ha_id = "test_ha"
+        upload_id = uuid.uuid4()
+        
+        features_json = {
+            "agentic_features": {
+                "mandatory_occurrence_reports": {
+                    "mandatory_occurrence_report_mentioned": True,
+                    "mandatory_occurrence_reporting_process_mentioned": True,
+                }
+            }
+        }
+        
+        await _write_building_safety_features(
+            conn,
+            feature_id=feature_id,
+            ha_id=ha_id,
+            upload_id=upload_id,
+            features_json=features_json,
+        )
+        
+        conn.execute.assert_called_once()
+        call_args = conn.execute.call_args
+        assert call_args[0][35] is True  # mandatory_occurrence_report_mentioned
+
+    @pytest.mark.asyncio
+    async def test_skips_when_no_agentic_features(self):
+        """Test that function returns early when no agentic features present."""
+        conn = AsyncMock()
+        feature_id = uuid.uuid4()
+        ha_id = "test_ha"
+        upload_id = uuid.uuid4()
+        
+        features_json = {
+            "features": {
+                "fraew_specific": {}  # Only regex features, no agentic
+            }
+        }
+        
+        await _write_building_safety_features(
+            conn,
+            feature_id=feature_id,
+            ha_id=ha_id,
+            upload_id=upload_id,
+            features_json=features_json,
+        )
+        
+        # Should not call execute since no agentic features
+        conn.execute.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_extracts_from_features_agentic_features(self):
+        """Test extracting agentic features from features.agentic_features path."""
+        conn = AsyncMock()
+        feature_id = uuid.uuid4()
+        ha_id = "test_ha"
+        upload_id = uuid.uuid4()
+        
+        features_json = {
+            "features": {
+                "agentic_features": {
+                    "high_rise_indicators": {
+                        "high_rise_building_mentioned": True,
+                    }
+                }
+            }
+        }
+        
+        await _write_building_safety_features(
+            conn,
+            feature_id=feature_id,
+            ha_id=ha_id,
+            upload_id=upload_id,
+            features_json=features_json,
+        )
+        
+        conn.execute.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_calculates_confidence_score(self):
+        """Test that confidence scores are calculated from feature groups."""
+        conn = AsyncMock()
+        feature_id = uuid.uuid4()
+        ha_id = "test_ha"
+        upload_id = uuid.uuid4()
+        
+        features_json = {
+            "agentic_features": {
+                "high_rise_indicators": {
+                    "high_rise_building_mentioned": {"value": True, "confidence": 0.9},
+                },
+                "evacuation_strategy": {
+                    "evacuation_strategy_type": {"value": "STAY_PUT", "confidence": 0.85},
+                }
+            }
+        }
+        
+        await _write_building_safety_features(
+            conn,
+            feature_id=feature_id,
+            ha_id=ha_id,
+            upload_id=upload_id,
+            features_json=features_json,
+        )
+        
+        conn.execute.assert_called_once()
+        call_args = conn.execute.call_args
+        # agentic_confidence_score should be average of 0.9 and 0.85 = 0.875
+        assert call_args[0][39] == 0.875  # agentic_confidence_score
+
+
+class TestWriteDocBFeatures:
+    """Tests for writing DocB/PlanB features (Category C)."""
+
+    @pytest.mark.asyncio
+    async def test_writes_required_docb_fields(self):
+        """Test writing required DocB fields."""
+        conn = AsyncMock()
+        feature_id = uuid.uuid4()
+        ha_id = "test_ha"
+        upload_id = uuid.uuid4()
+        
+        features_json = {
+            "docb_features": {
+                "claddingType": "ACM",
+                "ewsStatus": "A1",
+                "fireRiskManagementSummary": "Comprehensive fire safety measures in place",
+                "docBRef": "DOCB-12345",
+            }
+        }
+        
+        await _write_docb_features(
+            conn,
+            feature_id=feature_id,
+            ha_id=ha_id,
+            upload_id=upload_id,
+            features_json=features_json,
+        )
+        
+        conn.execute.assert_called_once()
+        call_args = conn.execute.call_args
+        assert call_args[0][5] == "ACM"  # cladding_type
+        assert call_args[0][6] == "A1"  # ews_status
+        assert call_args[0][7] == "Comprehensive fire safety measures in place"  # fire_risk_management_summary
+        assert call_args[0][8] == "DOCB-12345"  # docb_ref
+
+    @pytest.mark.asyncio
+    async def test_writes_optional_docb_fields(self):
+        """Test writing optional DocB context fields."""
+        conn = AsyncMock()
+        feature_id = uuid.uuid4()
+        ha_id = "test_ha"
+        upload_id = uuid.uuid4()
+        
+        features_json = {
+            "docb_features": {
+                "claddingType": "HPL",
+                "fireProtection": "Sprinkler system",
+                "alarms": "Grade A fire alarm",
+                "evacuationStrategy": "Stay Put",
+                "floorsAboveGround": 15,
+                "floorsBelowGround": 2,
+            }
+        }
+        
+        await _write_docb_features(
+            conn,
+            feature_id=feature_id,
+            ha_id=ha_id,
+            upload_id=upload_id,
+            features_json=features_json,
+        )
+        
+        conn.execute.assert_called_once()
+        call_args = conn.execute.call_args
+        assert call_args[0][9] == "Sprinkler system"  # fire_protection
+        assert call_args[0][10] == "Grade A fire alarm"  # alarms
+        assert call_args[0][11] == "Stay Put"  # evacuation_strategy
+        assert call_args[0][12] == 15  # floors_above_ground
+        assert call_args[0][13] == 2  # floors_below_ground
+
+    @pytest.mark.asyncio
+    async def test_extracts_from_agentic_features_path(self):
+        """Test extracting DocB features from nested agentic_features path."""
+        conn = AsyncMock()
+        feature_id = uuid.uuid4()
+        ha_id = "test_ha"
+        upload_id = uuid.uuid4()
+        
+        features_json = {
+            "features": {
+                "agentic_features": {
+                    "category_c_docb_planb": {
+                        "docb_required_fields": {
+                            "claddingType": "Composite",
+                            "ewsStatus": "B2",
+                        }
+                    }
+                }
+            }
+        }
+        
+        await _write_docb_features(
+            conn,
+            feature_id=feature_id,
+            ha_id=ha_id,
+            upload_id=upload_id,
+            features_json=features_json,
+        )
+        
+        conn.execute.assert_called_once()
+        call_args = conn.execute.call_args
+        assert call_args[0][5] == "Composite"  # cladding_type
+        assert call_args[0][6] == "B2"  # ews_status
+
+    @pytest.mark.asyncio
+    async def test_handles_snake_case_field_names(self):
+        """Test that function handles both camelCase and snake_case field names."""
+        conn = AsyncMock()
+        feature_id = uuid.uuid4()
+        ha_id = "test_ha"
+        upload_id = uuid.uuid4()
+        
+        features_json = {
+            "docb_features": {
+                "cladding_type": "Timber",  # snake_case
+                "ews_status": "A2",  # snake_case
+                "fire_risk_management_summary": "Summary text",  # snake_case
+            }
+        }
+        
+        await _write_docb_features(
+            conn,
+            feature_id=feature_id,
+            ha_id=ha_id,
+            upload_id=upload_id,
+            features_json=features_json,
+        )
+        
+        conn.execute.assert_called_once()
+        call_args = conn.execute.call_args
+        assert call_args[0][5] == "Timber"  # cladding_type
+        assert call_args[0][6] == "A2"  # ews_status
+
+    @pytest.mark.asyncio
+    async def test_skips_when_no_docb_features(self):
+        """Test that function returns early when no DocB features present."""
+        conn = AsyncMock()
+        feature_id = uuid.uuid4()
+        ha_id = "test_ha"
+        upload_id = uuid.uuid4()
+        
+        features_json = {
+            "features": {
+                "fraew_specific": {}  # No DocB features
+            }
+        }
+        
+        await _write_docb_features(
+            conn,
+            feature_id=feature_id,
+            ha_id=ha_id,
+            upload_id=upload_id,
+            features_json=features_json,
+        )
+        
+        # Should not call execute since no DocB features
+        conn.execute.assert_not_called()
+
+
+class TestUpdateDocumentFeaturesWithAgentic:
+    """Tests for updating document_features with agentic metadata."""
+
+    @pytest.mark.asyncio
+    async def test_updates_with_agentic_features(self):
+        """Test updating document_features with agentic features JSON."""
+        conn = AsyncMock()
+        feature_id = uuid.uuid4()
+        
+        features_json = {
+            "agentic_features": {
+                "high_rise_indicators": {"high_rise_building_mentioned": True},
+            },
+            "extraction_method": "agentic"
+        }
+        
+        await _update_document_features_with_agentic(
+            conn,
+            feature_id=feature_id,
+            features_json=features_json,
+        )
+        
+        conn.execute.assert_called_once()
+        call_args = conn.execute.call_args
+        assert call_args[0][5] == feature_id  # WHERE clause (5th positional arg)
+        # Check that agentic_features_json is set
+        assert "UPDATE silver.document_features" in call_args[0][0]
+
+    @pytest.mark.asyncio
+    async def test_updates_with_comparison_metadata(self):
+        """Test updating document_features with comparison metadata."""
+        conn = AsyncMock()
+        feature_id = uuid.uuid4()
+        
+        features_json = {
+            "extraction_method": "merged",
+            "extraction_comparison_metadata": {
+                "agreement_score": 0.85,
+                "discrepancies": ["evacuation_strategy_type"],
+            }
+        }
+        
+        await _update_document_features_with_agentic(
+            conn,
+            feature_id=feature_id,
+            features_json=features_json,
+        )
+        
+        conn.execute.assert_called_once()
+        call_args = conn.execute.call_args
+        # extraction_method should be "merged"
+        assert "merged" in str(call_args[0])
+
+    @pytest.mark.asyncio
+    async def test_skips_when_no_agentic_metadata(self):
+        """Test that function returns early when no agentic metadata present."""
+        conn = AsyncMock()
+        feature_id = uuid.uuid4()
+        
+        features_json = {
+            "features": {
+                "fraew_specific": {}  # Only regex features
+            }
+        }
+        
+        await _update_document_features_with_agentic(
+            conn,
+            feature_id=feature_id,
+            features_json=features_json,
+        )
+        
+        # Should not call execute since no agentic metadata
+        conn.execute.assert_not_called()
+
+
+class TestProcessFeaturesToSilverWithAgentic:
+    """Tests for main processing function with agentic features."""
+
+    @pytest.mark.asyncio
+    async def test_processes_with_agentic_features(self):
+        """Test processing document with agentic features."""
+        event = {
+            "bucket": "test-bucket",
+            "key": "ha_id=test_ha/bronze/dataset=fraew_document/ingest_date=2024-01-15/submission_id=123e4567-e89b-12d3-a456-426614174000/features.json",
+        }
+        
+        features_json = {
+            "features": {
+                "fraew_specific": {
+                    "pas_9980_compliant": True,
+                }
+            },
+            "agentic_features": {
+                "high_rise_indicators": {
+                    "high_rise_building_mentioned": True,
+                    "building_height_category": "HIGH_RISE",
+                },
+                "evacuation_strategy": {
+                    "evacuation_strategy_mentioned": True,
+                    "evacuation_strategy_type": "STAY_PUT",
+                }
+            },
+            "extraction_method": "merged",
+            "extraction_comparison_metadata": {
+                "agreement_score": 0.9
+            }
+        }
+        
+        with patch("backend.workers.silver_processor.UploadService") as mock_upload_service:
+            mock_service = MagicMock()
+            mock_service.get_json.return_value = features_json
+            mock_upload_service.return_value = mock_service
+            
+            mock_conn = AsyncMock()
+            mock_conn.execute = AsyncMock()
+            mock_conn.fetchrow = AsyncMock(return_value={"uprn": None, "postcode": None})
+            
+            result = await process_features_to_silver(event, db_conn=mock_conn, upload_service=mock_service)
+            
+            assert result["status"] == "completed"
+            # Verify that all write functions were called
+            # _write_document_features, _write_fraew_features, _write_building_safety_features,
+            # _write_docb_features, _update_document_features_with_agentic, _update_processing_audit
+            assert mock_conn.execute.call_count >= 4  # At least document_features, fraew_features, building_safety_features, processing_audit
+
+    @pytest.mark.asyncio
+    async def test_processes_with_docb_features(self):
+        """Test processing document with DocB features."""
+        event = {
+            "bucket": "test-bucket",
+            "key": "ha_id=test_ha/bronze/dataset=fra_document/ingest_date=2024-01-15/submission_id=123e4567-e89b-12d3-a456-426614174000/features.json",
+        }
+        
+        features_json = {
+            "features": {},
+            "docb_features": {
+                "claddingType": "ACM",
+                "ewsStatus": "A1",
+                "fireRiskManagementSummary": "Test summary",
+                "docBRef": "DOCB-123",
+            }
+        }
+        
+        with patch("backend.workers.silver_processor.UploadService") as mock_upload_service:
+            mock_service = MagicMock()
+            mock_service.get_json.return_value = features_json
+            mock_upload_service.return_value = mock_service
+            
+            mock_conn = AsyncMock()
+            mock_conn.execute = AsyncMock()
+            mock_conn.fetchrow = AsyncMock(return_value={"uprn": None, "postcode": None})
+            
+            result = await process_features_to_silver(event, db_conn=mock_conn, upload_service=mock_service)
+            
+            assert result["status"] == "completed"
+            # Verify docb_features write was attempted
+            # The function should have been called (even if it returns early if no features match)
+            assert mock_conn.execute.call_count >= 2  # At least document_features and processing_audit

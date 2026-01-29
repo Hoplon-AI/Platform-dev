@@ -15,7 +15,7 @@ class S3Config:
     def __init__(
         self,
         bucket_name: Optional[str] = None,
-        region: str = "us-east-1",
+        region: str = None,
         endpoint_url: Optional[str] = None,
         access_key_id: Optional[str] = None,
         secret_access_key: Optional[str] = None,
@@ -31,12 +31,19 @@ class S3Config:
             secret_access_key: AWS secret key (defaults to env var)
         """
         self.bucket_name = bucket_name or os.getenv("S3_BUCKET_NAME", "platform-bronze")
-        self.region = region
+        self.region = region or os.getenv("AWS_REGION", "eu-west-1")
         self.endpoint_url = endpoint_url or os.getenv("S3_ENDPOINT_URL")
         
-        # AWS credentials from environment or parameters
-        self.access_key_id = access_key_id or os.getenv("AWS_ACCESS_KEY_ID")
-        self.secret_access_key = secret_access_key or os.getenv("AWS_SECRET_ACCESS_KEY")
+        # AWS credentials: only use explicit credentials for local/test environments.
+        # In Lambda (when AWS_LAMBDA_FUNCTION_NAME is set), use IAM role credentials.
+        if os.getenv("AWS_LAMBDA_FUNCTION_NAME"):
+            # Running in Lambda - use IAM role credentials (don't set explicit keys)
+            self.access_key_id = None
+            self.secret_access_key = None
+        else:
+            # Local/test environment - allow explicit credentials
+            self.access_key_id = access_key_id or os.getenv("AWS_ACCESS_KEY_ID")
+            self.secret_access_key = secret_access_key or os.getenv("AWS_SECRET_ACCESS_KEY")
         
         # S3 client configuration
         self.config = Config(

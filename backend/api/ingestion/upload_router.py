@@ -28,6 +28,18 @@ router = APIRouter(prefix="/api/v1/upload", tags=["upload"])
 security = HTTPBearer(auto_error=False)  # Don't auto-raise on missing token
 validator = UploadValidator()
 detector = FileTypeDetector()
+
+
+def _get_upload_status() -> str:
+    """Return initial upload status based on environment.
+
+    In LOCAL_DEV mode (no background worker), files are marked as 'completed'.
+    In AWS/production (with Step Functions worker), files are 'queued'.
+
+    Note: DEV_MODE controls auth bypass, LOCAL_DEV controls upload status.
+    """
+    local_dev = os.getenv("LOCAL_DEV", "false").lower() == "true"
+    return "completed" if local_dev else "queued"
 middleware = TenantMiddleware()
 
 def _derive_sidecar_keys(s3_key: str) -> tuple[Optional[str], Optional[str]]:
@@ -292,7 +304,7 @@ async def _process_single_file(
         checksum=checksum,
         file_size=len(file_content),
         user_id=user_id,
-        status="queued",
+        status=_get_upload_status(),
     )
     
     return UploadResponse(
@@ -310,7 +322,7 @@ async def _process_single_file(
         checksum=checksum,
         file_size=len(file_content),
         uploaded_at=datetime.utcnow(),
-        status='queued',
+        status=_get_upload_status(),
         message=f"Successfully uploaded {file.filename}",
     )
 
@@ -417,7 +429,7 @@ async def upload_files_batch(
                 checksum=checksum,
                 file_size=len(file_content),
                 user_id=user_id,
-                status="queued",
+                status=_get_upload_status(),
             )
             
             results.append(UploadResponse(
@@ -435,7 +447,7 @@ async def upload_files_batch(
                 checksum=checksum,
                 file_size=len(file_content),
                 uploaded_at=datetime.utcnow(),
-                status='queued',
+                status=_get_upload_status(),
                 message=f"Successfully uploaded {file.filename} (detected as {file_type_str})",
             ))
             

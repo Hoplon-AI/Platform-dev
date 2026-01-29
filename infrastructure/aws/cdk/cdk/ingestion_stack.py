@@ -15,6 +15,7 @@ from aws_cdk import (
     CfnOutput,
     Duration,
     BundlingOptions,
+    Fn,
     aws_events as events,
     aws_events_targets as targets,
     aws_lambda as lambda_,
@@ -53,6 +54,16 @@ class IngestionStack(Stack):
         **kwargs,
     ) -> None:
         super().__init__(scope, construct_id, **kwargs)
+        
+        # Store bucket reference (needed for EventBridge rule target)
+        self._bronze_bucket = bronze_bucket
+        
+        # Use CloudFormation import to break CDK dependency cycle
+        # Import bucket name from DataStack export instead of direct reference
+        data_stack_name = f"{scope.node.try_get_context('@aws-cdk/core:stackId') or 'PlatformDataDev'}"
+        # For now, still use direct reference but extract name early
+        # TODO: Refactor to use Fn.importValue when DataStack is deployed
+        self._bucket_name = bronze_bucket.bucket_name
 
         # Resolve repo root to package Lambda code from project root
         current_file = os.path.abspath(__file__)  # infrastructure/aws/cdk/cdk/ingestion_stack.py
@@ -86,11 +97,35 @@ class IngestionStack(Stack):
             self,
             "IngestionWorkerDeps",
             compatible_runtimes=[lambda_.Runtime.PYTHON_3_12],
+            compatible_architectures=[lambda_.Architecture.ARM_64],
             code=worker_layer_code,
             description=(
                 "Dependencies for ingestion worker (asyncpg, pdfplumber, etc.). "
                 "Set CDK_USE_DOCKER_BUNDLING=true to build this layer."
             ),
+        )
+
+        # Lambda security group: allows outbound HTTPS (AWS services) and DB access
+        lambda_security_group = ec2.SecurityGroup(
+            self,
+            "LambdaSecurityGroup",
+            vpc=vpc,
+            description="Security group for ingestion Lambda functions",
+            allow_all_outbound=True,  # Allow outbound to AWS services (S3, Secrets Manager, Bedrock)
+        )
+        # Allow Lambda to connect to database
+        lambda_security_group.connections.allow_to(
+            database_security_group,
+            ec2.Port.tcp(5432),
+            "Allow PostgreSQL access from Lambda",
+        )
+
+        # Log group for ingestion worker Lambda
+        ingestion_lambda_log_group = logs.LogGroup(
+            self,
+            "IngestionWorkerLambdaLogs",
+            log_group_name="/aws/lambda/platform-dev-ingestion-worker",
+            retention=logs.RetentionDays.ONE_WEEK,
         )
 
         # Lambda worker
@@ -99,21 +134,39 @@ class IngestionStack(Stack):
             "IngestionWorkerLambda",
             function_name="platform-dev-ingestion-worker",
             runtime=lambda_.Runtime.PYTHON_3_12,
+            architecture=lambda_.Architecture.ARM_64,
             handler="backend.workers.stepfn_ingestion_worker.handler",
             code=lambda_.Code.from_asset(
                 project_root,
                 exclude=[
+                    ".git",
                     ".git/**",
+                    "**/__pycache__",
                     "**/__pycache__/**",
-                    "frontend/node_modules/**",
-                    "frontend/dist/**",
+                    "**/node_modules",
+                    "**/node_modules/**",
+                    "frontend",
+                    "frontend/**",
+                    "docs",
+                    "docs/**",
+                    "data",
+                    "data/**",
+                    "dbt",
+                    "dbt/**",
+                    "infrastructure/aws",
+                    "infrastructure/aws/**",
+                    "scripts",
+                    "scripts/**",
+                    "tests",
+                    "tests/**",
+                    "venv",
                     "venv/**",
+                    "venv_local",
                     "venv_local/**",
-                    "infrastructure/aws/cdk/.venv/**",
-                    "infrastructure/aws/cdk/cdk.out/**",
                     "*.sqlite",
                     "*.log",
                     ".DS_Store",
+                    ".env*",
                 ],
             ),
             memory_size=1536,
@@ -127,18 +180,38 @@ class IngestionStack(Stack):
                 # Worker will read Secrets Manager for user/password
                 "DATABASE_SECRET_ARN": db_secret.secret_arn,
                 # Optional: let worker know bucket, though it is passed in the event
-                "S3_BUCKET_NAME": bronze_bucket.bucket_name,
+                "S3_BUCKET_NAME": self._bucket_name,
                 # Keep max attempts consistent across infra and app logic
                 "PDF_PROCESSING_MAX_ATTEMPTS": "5",
+                # Agentic extraction (Bedrock/Claude): enabled by default
+                "USE_AGENTIC_EXTRACTION": "true",
+                "BEDROCK_MODEL_ID": "mistral.mistral-large-2402-v1:0",
+                # Path to schemas for agentic feature definitions
+                "SCHEMAS_PATH": "/var/task/schemas",
             },
             vpc=vpc,
             vpc_subnets=ec2.SubnetSelection(subnets=list(private_subnets)),
-            security_groups=[database_security_group],
-            log_retention=logs.RetentionDays.ONE_WEEK,
+            security_groups=[lambda_security_group],
+            log_group=ingestion_lambda_log_group,
+        )
+
+        # Bedrock: invoke models for agentic feature extraction
+        region = self.region or "eu-west-1"
+        ingestion_lambda.add_to_role_policy(
+            iam.PolicyStatement(
+                actions=["bedrock:InvokeModel"],
+                resources=[
+                    f"arn:aws:bedrock:{region}::foundation-model/anthropic.claude-*",
+                    f"arn:aws:bedrock:{region}::foundation-model/amazon.nova-*",
+                    f"arn:aws:bedrock:{region}::foundation-model/mistral.*",
+                ],
+            )
         )
 
         # Permissions (avoid cross-stack resource policy mutations to prevent cycles)
         # S3: read/write objects + list bucket
+        # Use bucket name to construct ARN to avoid CDK cross-stack reference issues
+        bucket_arn_ingestion = f"arn:aws:s3:::{self._bucket_name}"
         ingestion_lambda.add_to_role_policy(
             iam.PolicyStatement(
                 actions=[
@@ -148,8 +221,8 @@ class IngestionStack(Stack):
                     "s3:ListBucket",
                 ],
                 resources=[
-                    bronze_bucket.bucket_arn,
-                    f"{bronze_bucket.bucket_arn}/*",
+                    bucket_arn_ingestion,
+                    f"{bucket_arn_ingestion}/*",
                 ],
             )
         )
@@ -162,12 +235,21 @@ class IngestionStack(Stack):
             )
         )
 
-        # KMS decrypt (S3 CMK + Secrets CMK). Assumes key policies allow IAM in-account usage.
+        # KMS (S3 CMK + Secrets CMK). Assumes key policies allow IAM in-account usage.
+        # GenerateDataKey needed for writing to encrypted S3 bucket
         ingestion_lambda.add_to_role_policy(
             iam.PolicyStatement(
-                actions=["kms:Decrypt", "kms:DescribeKey"],
+                actions=["kms:Decrypt", "kms:GenerateDataKey", "kms:DescribeKey"],
                 resources=[s3_key.key_arn, secrets_key.key_arn],
             )
+        )
+
+        # Log group for silver processor Lambda
+        silver_processor_log_group = logs.LogGroup(
+            self,
+            "SilverProcessorLambdaLogs",
+            log_group_name="/aws/lambda/platform-dev-silver-processor",
+            retention=logs.RetentionDays.ONE_WEEK,
         )
 
         # Silver processor Lambda (writes features to normalized PG tables)
@@ -176,21 +258,39 @@ class IngestionStack(Stack):
             "SilverProcessorLambda",
             function_name="platform-dev-silver-processor",
             runtime=lambda_.Runtime.PYTHON_3_12,
+            architecture=lambda_.Architecture.ARM_64,
             handler="backend.workers.silver_processor.handler",
             code=lambda_.Code.from_asset(
                 project_root,
                 exclude=[
+                    ".git",
                     ".git/**",
+                    "**/__pycache__",
                     "**/__pycache__/**",
-                    "frontend/node_modules/**",
-                    "frontend/dist/**",
+                    "**/node_modules",
+                    "**/node_modules/**",
+                    "frontend",
+                    "frontend/**",
+                    "docs",
+                    "docs/**",
+                    "data",
+                    "data/**",
+                    "dbt",
+                    "dbt/**",
+                    "infrastructure/aws",
+                    "infrastructure/aws/**",
+                    "scripts",
+                    "scripts/**",
+                    "tests",
+                    "tests/**",
+                    "venv",
                     "venv/**",
+                    "venv_local",
                     "venv_local/**",
-                    "infrastructure/aws/cdk/.venv/**",
-                    "infrastructure/aws/cdk/cdk.out/**",
                     "*.sqlite",
                     "*.log",
                     ".DS_Store",
+                    ".env*",
                 ],
             ),
             memory_size=512,
@@ -201,19 +301,41 @@ class IngestionStack(Stack):
                 "DB_PORT": str(database_port),
                 "DB_NAME": "platform_dev",
                 "DATABASE_SECRET_ARN": db_secret.secret_arn,
-                "S3_BUCKET_NAME": bronze_bucket.bucket_name,
+                "S3_BUCKET_NAME": self._bucket_name,
             },
             vpc=vpc,
             vpc_subnets=ec2.SubnetSelection(subnets=list(private_subnets)),
-            security_groups=[database_security_group],
-            log_retention=logs.RetentionDays.ONE_WEEK,
+            security_groups=[lambda_security_group],
+            log_group=silver_processor_log_group,
         )
 
         # Silver processor permissions
-        bronze_bucket.grant_read(silver_processor_lambda)
-        db_secret.grant_read(silver_processor_lambda)
-        s3_key.grant_decrypt(silver_processor_lambda)
-        secrets_key.grant_decrypt(silver_processor_lambda)
+        # Use explicit IAM policies with bucket name to avoid cross-stack dependency cycles
+        # Construct ARN from bucket name to avoid CDK cross-stack reference issues
+        bucket_arn_silver = f"arn:aws:s3:::{self._bucket_name}"
+        silver_processor_lambda.add_to_role_policy(
+            iam.PolicyStatement(
+                actions=["s3:GetObject", "s3:ListBucket"],
+                resources=[
+                    bucket_arn_silver,
+                    f"{bucket_arn_silver}/*",
+                ],
+            )
+        )
+        # Use explicit IAM policies instead of grant_* methods to avoid cross-stack
+        # resource policy modifications that create circular dependencies
+        silver_processor_lambda.add_to_role_policy(
+            iam.PolicyStatement(
+                actions=["secretsmanager:GetSecretValue", "secretsmanager:DescribeSecret"],
+                resources=[db_secret.secret_arn],
+            )
+        )
+        silver_processor_lambda.add_to_role_policy(
+            iam.PolicyStatement(
+                actions=["kms:Decrypt", "kms:DescribeKey"],
+                resources=[s3_key.key_arn, secrets_key.key_arn],
+            )
+        )
 
         # Step Functions: invoke extraction Lambda with retries
         invoke_worker = sfn_tasks.LambdaInvoke(
@@ -228,6 +350,7 @@ class IngestionStack(Stack):
                 }
             ),
             result_path="$.worker",
+            payload_response_only=True,  # Return Lambda response directly (no Payload wrapper)
         )
 
         invoke_worker.add_retry(
@@ -251,6 +374,7 @@ class IngestionStack(Stack):
                 }
             ),
             result_path="$.silver",
+            payload_response_only=True,  # Return Lambda response directly (no Payload wrapper)
         )
 
         invoke_silver.add_retry(
@@ -298,6 +422,7 @@ class IngestionStack(Stack):
 
         # EventBridge rule: S3 object created events for source objects only (keys containing /file=)
         # Requires bucket event_bridge_enabled=True (set in DataStack).
+        # Use bucket name string to avoid cross-stack reference issues
         rule = events.Rule(
             self,
             "BronzeSourceObjectCreatedRule",
@@ -306,7 +431,7 @@ class IngestionStack(Stack):
                 source=["aws.s3"],
                 detail_type=["Object Created"],
                 detail={
-                    "bucket": {"name": [bronze_bucket.bucket_name]},
+                    "bucket": {"name": [self._bucket_name]},
                     "object": {"key": [{"wildcard": "*/file=*"}]},
                 },
             ),
@@ -324,9 +449,88 @@ class IngestionStack(Stack):
             )
         )
 
+        # Migration runner Lambda (for running database migrations)
+        migration_runner_log_group = logs.LogGroup(
+            self,
+            "MigrationRunnerLambdaLogs",
+            log_group_name="/aws/lambda/platform-dev-migration-runner",
+            retention=logs.RetentionDays.ONE_WEEK,
+        )
+
+        migration_runner_lambda = lambda_.Function(
+            self,
+            "MigrationRunnerLambda",
+            function_name="platform-dev-migration-runner",
+            runtime=lambda_.Runtime.PYTHON_3_12,
+            architecture=lambda_.Architecture.ARM_64,
+            handler="backend.workers.migration_runner.handler",
+            code=lambda_.Code.from_asset(
+                project_root,
+                exclude=[
+                    ".git",
+                    ".git/**",
+                    "**/__pycache__",
+                    "**/__pycache__/**",
+                    "**/node_modules",
+                    "**/node_modules/**",
+                    "frontend",
+                    "frontend/**",
+                    "docs",
+                    "docs/**",
+                    "data",
+                    "data/**",
+                    "dbt",
+                    "dbt/**",
+                    "infrastructure/aws",
+                    "infrastructure/aws/**",
+                    "scripts",
+                    "scripts/**",
+                    "tests",
+                    "tests/**",
+                    "venv",
+                    "venv/**",
+                    "venv_local",
+                    "venv_local/**",
+                    "*.sqlite",
+                    "*.log",
+                    ".DS_Store",
+                    ".env*",
+                ],
+            ),
+            memory_size=256,
+            timeout=Duration.minutes(5),
+            layers=[worker_deps_layer],
+            environment={
+                "DB_HOST": database_host,
+                "DB_PORT": str(database_port),
+                "DB_NAME": "platform_dev",
+                "DATABASE_SECRET_ARN": db_secret.secret_arn,
+                "MIGRATIONS_DIR": "/var/task/database/migrations",
+            },
+            vpc=vpc,
+            vpc_subnets=ec2.SubnetSelection(subnets=list(private_subnets)),
+            security_groups=[lambda_security_group],
+            log_group=migration_runner_log_group,
+        )
+
+        # Migration runner permissions
+        migration_runner_lambda.add_to_role_policy(
+            iam.PolicyStatement(
+                actions=["secretsmanager:GetSecretValue", "secretsmanager:DescribeSecret"],
+                resources=[db_secret.secret_arn],
+            )
+        )
+        migration_runner_lambda.add_to_role_policy(
+            iam.PolicyStatement(
+                actions=["kms:Decrypt", "kms:DescribeKey"],
+                resources=[secrets_key.key_arn],
+            )
+        )
+
         # Expose references
         self.ingestion_lambda = ingestion_lambda
         self.silver_processor_lambda = silver_processor_lambda
+        self.migration_runner_lambda = migration_runner_lambda
         self.state_machine = state_machine
         self.event_rule = rule
 
@@ -337,6 +541,13 @@ class IngestionStack(Stack):
             value=ingestion_lambda.function_arn,
             description="ARN of ingestion worker Lambda",
             export_name=f"{self.stack_name}-IngestionWorkerLambdaArn",
+        )
+        CfnOutput(
+            self,
+            "MigrationRunnerLambdaArn",
+            value=migration_runner_lambda.function_arn,
+            description="ARN of migration runner Lambda",
+            export_name=f"{self.stack_name}-MigrationRunnerLambdaArn",
         )
         CfnOutput(
             self,

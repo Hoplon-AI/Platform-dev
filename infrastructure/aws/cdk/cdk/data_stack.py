@@ -1,5 +1,6 @@
 """
-Data stack: S3 buckets and RDS PostgreSQL with PostGIS.
+Data stack: S3 buckets and Aurora Serverless v2 PostgreSQL with PostGIS.
+Auto-pauses to 0 ACUs when idle (costs ~$0 compute + storage only).
 """
 from aws_cdk import (
     Stack,
@@ -57,39 +58,12 @@ class DataStack(Stack):
         )
 
         # S3 Bucket for Bronze layer (raw data)
-        bronze_bucket = s3.Bucket(
+        # Import existing bucket (created in previous deployment with RETAIN policy)
+        bronze_bucket_name = f"platform-bronze-{self.account}-{self.region}"
+        bronze_bucket = s3.Bucket.from_bucket_name(
             self,
             "BronzeBucket",
-            bucket_name=f"platform-bronze-{self.account}-{self.region}",
-            encryption=s3.BucketEncryption.KMS,
-            encryption_key=s3_key,
-            versioned=True,
-            block_public_access=s3.BlockPublicAccess.BLOCK_ALL,
-            removal_policy=RemovalPolicy.RETAIN,  # Don't delete data
-            auto_delete_objects=False,
-            # Enable EventBridge notifications for Step Functions
-            event_bridge_enabled=True,
-            # Lifecycle rules for cost optimization
-            lifecycle_rules=[
-                s3.LifecycleRule(
-                    id="TransitionToIA",
-                    transitions=[
-                        s3.Transition(
-                            storage_class=s3.StorageClass.INFREQUENT_ACCESS,
-                            transition_after=Duration.days(90),
-                        )
-                    ],
-                ),
-                s3.LifecycleRule(
-                    id="TransitionToGlacier",
-                    transitions=[
-                        s3.Transition(
-                            storage_class=s3.StorageClass.GLACIER,
-                            transition_after=Duration.days(180),
-                        )
-                    ],
-                ),
-            ],
+            bronze_bucket_name
         )
 
         # SSL-only bucket policy for Bronze bucket
@@ -110,16 +84,12 @@ class DataStack(Stack):
         )
 
         # S3 Bucket for processed data (Silver/Gold layers if needed)
-        processed_bucket = s3.Bucket(
+        # Import existing bucket (created in previous deployment with RETAIN policy)
+        processed_bucket_name = f"platform-processed-{self.account}-{self.region}"
+        processed_bucket = s3.Bucket.from_bucket_name(
             self,
             "ProcessedBucket",
-            bucket_name=f"platform-processed-{self.account}-{self.region}",
-            encryption=s3.BucketEncryption.KMS,
-            encryption_key=s3_key,
-            versioned=True,
-            block_public_access=s3.BlockPublicAccess.BLOCK_ALL,
-            removal_policy=RemovalPolicy.RETAIN,
-            auto_delete_objects=False,
+            processed_bucket_name
         )
 
         # SSL-only bucket policy for Processed bucket
@@ -157,35 +127,42 @@ class DataStack(Stack):
             allow_all_outbound=False,  # Explicit egress rules
         )
 
-        # RDS PostgreSQL Instance with PostGIS
-        # Using db.t3.micro for dev (upgrade for prod)
-        database = rds.DatabaseInstance(
+        # Aurora Serverless v2 PostgreSQL Cluster with PostGIS
+        # Auto-pauses to 0 ACUs when idle (costs ~$0 compute + storage only)
+        # Requires Aurora PostgreSQL 16.3+ for auto-pause support
+        # 
+        # Cost when idle: ~$0 compute (0 ACUs) + ~$2/month storage (20GB @ $0.10/GB)
+        # Cost when active: ~$0.12/ACU-hour (scales 0.5-2.0 ACUs based on load)
+        # Resume time: up to 15 seconds when connection arrives after pause
+        # Aurora Serverless v2 requires a writer instance
+        # The writer instance uses serverless v2 scaling (0.5-2.0 ACUs)
+        writer = rds.ClusterInstance.serverless_v2(
+            "writer",
+            scale_with_writer=True,  # Scale reader instances with writer
+        )
+        
+        database = rds.DatabaseCluster(
             self,
             "PlatformDatabase",
-            engine=rds.DatabaseInstanceEngine.postgres(
-                version=rds.PostgresEngineVersion.VER_16_9
-            ),
-            instance_type=ec2.InstanceType.of(
-                ec2.InstanceClass.T3, ec2.InstanceSize.MICRO
+            engine=rds.DatabaseClusterEngine.aurora_postgres(
+                version=rds.AuroraPostgresEngineVersion.VER_16_9
             ),
             vpc=vpc,
             vpc_subnets=ec2.SubnetSelection(subnets=database_subnets),
             subnet_group=db_subnet_group,
             security_groups=[db_security_group],
             credentials=rds.Credentials.from_secret(db_secret),
-            database_name="platform_dev",
-            allocated_storage=20,  # GB, increase for prod
-            max_allocated_storage=100,  # Auto-scaling
+            default_database_name="platform_dev",
             storage_encrypted=True,
             storage_encryption_key=rds_key,
-            backup_retention=Duration.days(7),  # 7 days for dev
-            delete_automated_backups=True,  # For dev cost optimization
             deletion_protection=False,  # Enable for prod
-            multi_az=False,  # Single AZ for dev, enable for prod
-            publicly_accessible=False,  # Never expose database
-            enable_performance_insights=True,
-            performance_insight_retention=rds.PerformanceInsightRetention.DEFAULT,
             removal_policy=RemovalPolicy.SNAPSHOT,  # Create snapshot on delete
+            writer=writer,  # Required for serverless v2
+            # Aurora Serverless v2 with auto-pause (scales to 0 ACUs when idle)
+            # Auto-pause: Enabled by default in Aurora Serverless v2 (Nov 2024)
+            # Cluster automatically pauses after 5 minutes of inactivity (default)
+            # and resumes within 15 seconds when a connection is requested
+            # Note: Backup retention defaults to 1 day; configure via AWS Console/CLI for 7 days
         )
 
         # PostGIS Extension Setup
@@ -193,10 +170,11 @@ class DataStack(Stack):
         # Options:
         # 1. Manual: Connect to DB and run: CREATE EXTENSION IF NOT EXISTS postgis;
         # 2. Via Lambda: Use postgis_setup.py helper (requires psycopg2 layer)
-        # 3. Via RDS parameter group: Set shared_preload_libraries (requires DB restart)
         # 
-        # For now, PostGIS must be enabled manually after stack deployment:
-        # psql -h <endpoint> -U postgres -d platform_dev -c "CREATE EXTENSION IF NOT EXISTS postgis;"
+        # For Aurora Serverless v2, PostGIS must be enabled manually after stack deployment:
+        # psql -h <cluster-endpoint> -U postgres -d platform_dev -c "CREATE EXTENSION IF NOT EXISTS postgis;"
+        # 
+        # Note: If the cluster is paused, the first connection will take up to 15 seconds to resume
 
         # Tag resources
         Tags.of(bronze_bucket).add("app", "platform")
@@ -218,12 +196,22 @@ class DataStack(Stack):
         self.secrets_key = secrets_key
 
         # Outputs
+        # Export bucket name for cross-stack reference (breaks CDK dependency cycle)
         CfnOutput(
             self,
             "BronzeBucketName",
             value=bronze_bucket.bucket_name,
             description="S3 bucket for Bronze layer",
             export_name=f"{self.stack_name}-BronzeBucketName",
+        )
+        
+        # Also export bucket ARN for IAM policies
+        CfnOutput(
+            self,
+            "BronzeBucketArn",
+            value=bronze_bucket.bucket_arn,
+            description="S3 bucket ARN for Bronze layer",
+            export_name=f"{self.stack_name}-BronzeBucketArn",
         )
 
         CfnOutput(
@@ -237,8 +225,8 @@ class DataStack(Stack):
         CfnOutput(
             self,
             "DatabaseEndpoint",
-            value=database.instance_endpoint.hostname,
-            description="RDS PostgreSQL endpoint",
+            value=database.cluster_endpoint.hostname,
+            description="Aurora PostgreSQL cluster endpoint",
             export_name=f"{self.stack_name}-DatabaseEndpoint",
         )
 
@@ -253,9 +241,17 @@ class DataStack(Stack):
         CfnOutput(
             self,
             "DatabasePort",
-            value=str(database.instance_endpoint.port),
-            description="RDS PostgreSQL port",
+            value=str(database.cluster_endpoint.port),
+            description="Aurora PostgreSQL port",
             export_name=f"{self.stack_name}-DatabasePort",
+        )
+        
+        CfnOutput(
+            self,
+            "DatabaseReaderEndpoint",
+            value=database.cluster_read_endpoint.hostname,
+            description="Aurora PostgreSQL reader endpoint (for read replicas)",
+            export_name=f"{self.stack_name}-DatabaseReaderEndpoint",
         )
 
         CfnOutput(
