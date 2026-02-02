@@ -11,10 +11,9 @@ import re
 
 class ConfidenceBand(str, Enum):
     """Score interpretation bands. Never call anything "verified" without licensed data."""
-    HIGH = "High"          # ≥ 0.75: Strong evidence, low ambiguity
-    MEDIUM = "Medium"      # 0.55-0.74: Likely, but not definitive
-    LOW = "Low"            # 0.35-0.54: Weak association
-    UNCERTAIN = "Uncertain"  # < 0.35: Do not rely on
+    HIGH = "Green"          # ≥ 0.75: Strong evidence, low ambiguity
+    MEDIUM = "Yellow"      # 0.45-0.74: Likely, but not definitive
+    LOW = "Red"            # <0.45: Weak association
 
 
 class AddressHint(str, Enum):

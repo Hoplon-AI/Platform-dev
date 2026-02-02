@@ -30,8 +30,7 @@ Returns UPRN candidates with deterministic confidence scores.
 **Score Bands:**
 - High (≥0.75): Strong evidence, low ambiguity
 - Medium (0.55-0.74): Likely, but not definitive
-- Low (0.35-0.54): Weak association
-- Uncertain (<0.35): Do not rely on
+- Low (<0.45): Weak association
     """
 )
 async def match_uprn(request: UPRNMatchRequest) -> UPRNMatchResponse:

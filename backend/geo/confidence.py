@@ -139,11 +139,10 @@ class ConfidenceScorer:
         """Map score to confidence band."""
         if score >= 0.75:
             return ConfidenceBand.HIGH
-        elif score >= 0.55:
+        elif score >= 0.45:
             return ConfidenceBand.MEDIUM
-        elif score >= 0.35:
-            return ConfidenceBand.LOW
-        return ConfidenceBand.UNCERTAIN
+        return ConfidenceBand.LOW
+
 
     def generate_notes(
             self, distance_m: float, neighbor_count: int,

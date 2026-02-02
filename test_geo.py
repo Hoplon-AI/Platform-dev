@@ -22,7 +22,7 @@ results = scorer.score_all_candidates(
 for r in results:
     print(f"UPRN: {r.uprn}")
     print(f"  Score: {r.confidence_score} ({r.confidence_band.value})")
-    print(f"  Signals: postcode={r.signals.postcode}, spatial={r.signals.spatial}, density={r.signals.density}")
+    print(f"  Signals: postcode={r.signals.postcode}, spatial={r.signals.spatial}, density={r.signals.density}, penalties={r.signals.penalties}")
     print(f"  Notes: {r.notes}")
     print()
 
