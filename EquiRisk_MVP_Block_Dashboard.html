@@ -1,0 +1,1360 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EquiRisk - Block Risk Dashboard</title>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary-blue: #1a56db;
+            --primary-blue-light: #e8f0fe;
+            --primary-blue-dark: #1e40af;
+            --amber: #f59e0b;
+            --amber-light: #fef3c7;
+            --amber-dark: #d97706;
+            --green: #10b981;
+            --green-light: #d1fae5;
+            --red: #ef4444;
+            --red-light: #fee2e2;
+            --purple: #6366f1;
+            --purple-light: #e0e7ff;
+            --gray-50: #f9fafb;
+            --gray-100: #f3f4f6;
+            --gray-200: #e5e7eb;
+            --gray-300: #d1d5db;
+            --gray-400: #9ca3af;
+            --gray-500: #6b7280;
+            --gray-600: #4b5563;
+            --gray-700: #374151;
+            --gray-800: #1f2937;
+            --gray-900: #111827;
+            --white: #ffffff;
+            --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+            --shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
+            --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: var(--gray-50);
+            color: var(--gray-800);
+            line-height: 1.5;
+            min-height: 100vh;
+        }
+
+        .app-container {
+            display: flex;
+            min-height: 100vh;
+        }
+
+        /* Sidebar */
+        .sidebar {
+            width: 220px;
+            background: var(--white);
+            border-right: 1px solid var(--gray-200);
+            padding: 20px 0;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 0 20px;
+            margin-bottom: 28px;
+        }
+
+        .logo-icon {
+            width: 34px;
+            height: 34px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+        }
+
+        .logo-icon svg {
+            width: 34px;
+            height: 34px;
+        }
+
+        .logo-text {
+            font-weight: 700;
+            font-size: 18px;
+            color: #1a2b4a;
+            letter-spacing: -0.5px;
+        }
+
+        .nav-label {
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: var(--gray-400);
+            padding: 0 20px;
+            margin-bottom: 8px;
+        }
+
+        .nav-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px 20px;
+            color: var(--gray-600);
+            text-decoration: none;
+            font-size: 14px;
+            font-weight: 500;
+            transition: all 0.15s ease;
+            cursor: pointer;
+        }
+
+        .nav-item:hover {
+            background: var(--gray-50);
+            color: var(--gray-800);
+        }
+
+        .nav-item.active {
+            background: var(--primary-blue-light);
+            color: var(--primary-blue);
+            border-right: 3px solid var(--primary-blue);
+        }
+
+        .nav-item svg {
+            width: 18px;
+            height: 18px;
+            flex-shrink: 0;
+        }
+
+        .sidebar-footer {
+            margin-top: auto;
+            padding: 16px 20px;
+        }
+
+        .settings-btn {
+            width: 36px;
+            height: 36px;
+            border-radius: 8px;
+            background: var(--gray-100);
+            border: none;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            color: var(--gray-500);
+        }
+
+        .settings-btn:hover {
+            background: var(--gray-200);
+        }
+
+        /* Main Content */
+        .main-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        /* Top Bar */
+        .top-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 16px 24px;
+            background: var(--white);
+            border-bottom: 1px solid var(--gray-200);
+        }
+
+        .top-bar-left {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 14px;
+            color: var(--gray-600);
+        }
+
+        .top-bar-left strong {
+            color: var(--gray-800);
+        }
+
+        .portfolio-name {
+            color: var(--primary-blue);
+            font-weight: 600;
+        }
+
+        .top-bar-right {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 18px;
+            font-size: 13px;
+            font-weight: 600;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            border: none;
+            font-family: inherit;
+        }
+
+        .btn-primary {
+            background: var(--primary-blue);
+            color: var(--white);
+        }
+
+        .btn-primary:hover {
+            background: var(--primary-blue-dark);
+        }
+
+        .btn svg {
+            width: 16px;
+            height: 16px;
+        }
+
+        /* Breadcrumb */
+        .breadcrumb-bar {
+            padding: 12px 24px;
+            background: var(--gray-50);
+            border-bottom: 1px solid var(--gray-200);
+            font-size: 13px;
+            color: var(--gray-500);
+        }
+
+        .breadcrumb-bar strong {
+            color: var(--gray-700);
+        }
+
+        /* Content Area */
+        .content-area {
+            display: flex;
+            flex: 1;
+            overflow: hidden;
+        }
+
+        /* Main Panel */
+        .main-panel {
+            flex: 1;
+            padding: 20px 24px;
+            overflow-y: auto;
+        }
+
+        /* Filter Bar */
+        .filter-bar {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+
+        .filter-toggle {
+            display: flex;
+            background: var(--gray-100);
+            border-radius: 8px;
+            padding: 4px;
+        }
+
+        .filter-toggle-btn {
+            padding: 8px 16px;
+            font-size: 13px;
+            font-weight: 500;
+            border: none;
+            background: transparent;
+            color: var(--gray-600);
+            cursor: pointer;
+            border-radius: 6px;
+            transition: all 0.15s;
+        }
+
+        .filter-toggle-btn.active {
+            background: var(--white);
+            color: var(--primary-blue);
+            box-shadow: var(--shadow-sm);
+        }
+
+        .filter-dropdown {
+            padding: 8px 14px;
+            font-size: 13px;
+            border: 1px solid var(--gray-300);
+            border-radius: 8px;
+            background: var(--white);
+            color: var(--gray-700);
+            cursor: pointer;
+            min-width: 140px;
+        }
+
+        .filter-dropdown:focus {
+            outline: none;
+            border-color: var(--primary-blue);
+        }
+
+        .search-input {
+            padding: 8px 14px;
+            font-size: 13px;
+            border: 1px solid var(--gray-300);
+            border-radius: 8px;
+            background: var(--white);
+            color: var(--gray-700);
+            width: 200px;
+        }
+
+        .search-input::placeholder {
+            color: var(--gray-400);
+        }
+
+        .search-input:focus {
+            outline: none;
+            border-color: var(--primary-blue);
+        }
+
+        /* Page Header */
+        .page-header {
+            display: flex;
+            align-items: baseline;
+            gap: 12px;
+            margin-bottom: 16px;
+        }
+
+        .page-title {
+            font-size: 22px;
+            font-weight: 700;
+            color: var(--gray-900);
+        }
+
+        .block-count {
+            font-size: 13px;
+            color: var(--gray-500);
+        }
+
+        /* Block Table */
+        .block-table-container {
+            background: var(--white);
+            border-radius: 12px;
+            border: 1px solid var(--gray-200);
+            overflow: hidden;
+        }
+
+        .block-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13px;
+        }
+
+        .block-table thead {
+            background: var(--gray-50);
+            border-bottom: 1px solid var(--gray-200);
+        }
+
+        .block-table th {
+            padding: 12px 16px;
+            text-align: left;
+            font-weight: 600;
+            color: var(--gray-600);
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .block-table tbody tr {
+            border-bottom: 1px solid var(--gray-100);
+            transition: background 0.15s;
+        }
+
+        .block-table tbody tr:hover {
+            background: var(--gray-50);
+        }
+
+        .block-table tbody tr:last-child {
+            border-bottom: none;
+        }
+
+        .block-table td {
+            padding: 14px 16px;
+            vertical-align: top;
+        }
+
+        /* Jurisdiction Badge */
+        .jurisdiction-badge {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 10px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+        }
+
+        .jurisdiction-badge.eng {
+            background: var(--primary-blue-light);
+            color: var(--primary-blue);
+        }
+
+        .jurisdiction-badge.sco {
+            background: var(--purple-light);
+            color: var(--purple);
+        }
+
+        /* Block Name Cell */
+        .block-name {
+            font-weight: 600;
+            color: var(--gray-900);
+            margin-bottom: 2px;
+        }
+
+        .block-link {
+            font-size: 12px;
+            color: var(--primary-blue);
+            text-decoration: none;
+        }
+
+        .block-link:hover {
+            text-decoration: underline;
+        }
+
+        /* Height Cell */
+        .height-value {
+            font-weight: 600;
+            color: var(--gray-800);
+        }
+
+        .height-band {
+            font-size: 11px;
+            color: var(--gray-500);
+        }
+
+        /* Construction Cell */
+        .construction-primary {
+            font-weight: 500;
+            color: var(--gray-800);
+            margin-bottom: 2px;
+        }
+
+        .construction-secondary {
+            font-size: 11px;
+            color: var(--gray-500);
+        }
+
+        /* EWS / Cladding Cell */
+        .ews-status {
+            font-weight: 500;
+            margin-bottom: 2px;
+        }
+
+        .ews-status.yes {
+            color: var(--green);
+        }
+
+        .ews-status.no, .ews-status.unknown {
+            color: var(--amber-dark);
+        }
+
+        .ews-status.na {
+            color: var(--gray-400);
+        }
+
+        .ews-detail {
+            font-size: 11px;
+            color: var(--gray-500);
+        }
+
+        /* FRA Remediation Cell */
+        .fra-summary {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .fra-counts {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 12px;
+        }
+
+        .fra-tag {
+            display: inline-flex;
+            align-items: center;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-weight: 600;
+            font-size: 11px;
+        }
+
+        .fra-tag.p1 {
+            background: var(--red-light);
+            color: var(--red);
+        }
+
+        .fra-tag.p2 {
+            background: var(--amber-light);
+            color: var(--amber-dark);
+        }
+
+        .fra-tag.open {
+            background: var(--gray-100);
+            color: var(--gray-600);
+        }
+
+        .fra-next-action {
+            font-size: 11px;
+            color: var(--gray-500);
+        }
+
+        .fra-next-action.overdue {
+            color: var(--red);
+            font-weight: 500;
+        }
+
+        .fra-next-action.no-date {
+            color: var(--amber-dark);
+            font-weight: 500;
+        }
+
+        /* FRA Rating Indicator */
+        .fra-rating {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 3px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 600;
+        }
+
+        .fra-rating.red {
+            background: var(--red-light);
+            color: var(--red);
+        }
+
+        .fra-rating.amber {
+            background: var(--amber-light);
+            color: var(--amber-dark);
+        }
+
+        .fra-rating.green {
+            background: var(--green-light);
+            color: var(--green);
+        }
+
+        .fra-rating-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+        }
+
+        .fra-rating.red .fra-rating-dot { background: var(--red); }
+        .fra-rating.amber .fra-rating-dot { background: var(--amber); }
+        .fra-rating.green .fra-rating-dot { background: var(--green); }
+
+        /* Right Sidebar */
+        .right-sidebar {
+            width: 320px;
+            background: var(--white);
+            border-left: 1px solid var(--gray-200);
+            padding: 20px;
+            overflow-y: auto;
+        }
+
+        .sidebar-section {
+            margin-bottom: 24px;
+        }
+
+        .sidebar-section-title {
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--gray-900);
+            margin-bottom: 16px;
+        }
+
+        /* Block Summary Chart */
+        .block-summary {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .summary-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .summary-grade {
+            width: 28px;
+            height: 28px;
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            font-weight: 700;
+            color: var(--white);
+            flex-shrink: 0;
+        }
+
+        .summary-grade.e { background: var(--red); }
+        .summary-grade.d { background: #f97316; }
+        .summary-grade.c { background: var(--amber); }
+        .summary-grade.b { background: #84cc16; }
+        .summary-grade.a { background: var(--green); }
+
+        .summary-bar-container {
+            flex: 1;
+            height: 12px;
+            background: var(--gray-100);
+            border-radius: 6px;
+            overflow: hidden;
+        }
+
+        .summary-bar {
+            height: 100%;
+            border-radius: 6px;
+            transition: width 0.3s ease;
+        }
+
+        .summary-bar.e { background: var(--red); }
+        .summary-bar.d { background: #f97316; }
+        .summary-bar.c { background: var(--amber); }
+        .summary-bar.b { background: #84cc16; }
+        .summary-bar.a { background: var(--green); }
+
+        .summary-count {
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--gray-700);
+            min-width: 30px;
+            text-align: right;
+        }
+
+        /* Readiness Bars */
+        .readiness-section {
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
+        }
+
+        .readiness-item {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .readiness-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .readiness-label {
+            font-size: 12px;
+            color: var(--gray-600);
+        }
+
+        .readiness-value {
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--gray-800);
+        }
+
+        .readiness-bar-container {
+            height: 8px;
+            background: var(--gray-100);
+            border-radius: 4px;
+            overflow: hidden;
+        }
+
+        .readiness-bar {
+            height: 100%;
+            border-radius: 4px;
+        }
+
+        .readiness-bar.red { background: var(--red); }
+        .readiness-bar.amber { background: var(--amber); }
+        .readiness-bar.green { background: var(--green); }
+
+        /* Missing Info Gaps */
+        .gap-tabs {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 16px;
+        }
+
+        .gap-tab {
+            padding: 6px 14px;
+            font-size: 12px;
+            font-weight: 500;
+            border-radius: 6px;
+            border: none;
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+
+        .gap-tab.active {
+            background: var(--primary-blue);
+            color: var(--white);
+        }
+
+        .gap-tab:not(.active) {
+            background: var(--gray-100);
+            color: var(--gray-600);
+        }
+
+        .gap-tab:not(.active):hover {
+            background: var(--gray-200);
+        }
+
+        .gap-list {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .gap-item {
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+            padding: 10px 12px;
+            background: var(--gray-50);
+            border-radius: 8px;
+            border-left: 3px solid;
+        }
+
+        .gap-item.red { border-left-color: var(--red); }
+        .gap-item.amber { border-left-color: var(--amber); }
+
+        .gap-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            margin-top: 4px;
+            flex-shrink: 0;
+        }
+
+        .gap-item.red .gap-dot { background: var(--red); }
+        .gap-item.amber .gap-dot { background: var(--amber); }
+
+        .gap-content {
+            flex: 1;
+        }
+
+        .gap-title {
+            font-size: 12px;
+            font-weight: 500;
+            color: var(--gray-800);
+            margin-bottom: 2px;
+        }
+
+        .gap-meta {
+            font-size: 11px;
+            color: var(--gray-500);
+        }
+
+        .gap-count {
+            font-size: 11px;
+            color: var(--gray-500);
+            white-space: nowrap;
+        }
+
+        /* Sidebar Actions */
+        .sidebar-actions {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+        }
+
+        .btn-sidebar {
+            flex: 1;
+            padding: 10px 14px;
+            font-size: 12px;
+            font-weight: 600;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.15s;
+            border: none;
+            font-family: inherit;
+            text-align: center;
+        }
+
+        .btn-sidebar.secondary {
+            background: var(--white);
+            color: var(--gray-700);
+            border: 1px solid var(--gray-300);
+        }
+
+        .btn-sidebar.secondary:hover {
+            background: var(--gray-50);
+        }
+
+        .btn-sidebar.primary {
+            background: var(--primary-blue);
+            color: var(--white);
+        }
+
+        .btn-sidebar.primary:hover {
+            background: var(--primary-blue-dark);
+        }
+
+        /* Expandable FRA Details */
+        .fra-expandable {
+            cursor: pointer;
+        }
+
+        .fra-expand-icon {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            text-align: center;
+            line-height: 16px;
+            font-size: 10px;
+            color: var(--gray-400);
+            transition: transform 0.2s;
+        }
+
+        .fra-details {
+            display: none;
+            margin-top: 8px;
+            padding: 10px 12px;
+            background: var(--gray-50);
+            border-radius: 6px;
+            font-size: 11px;
+        }
+
+        .fra-details.visible {
+            display: block;
+        }
+
+        .fra-detail-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 4px 0;
+            border-bottom: 1px solid var(--gray-200);
+        }
+
+        .fra-detail-item:last-child {
+            border-bottom: none;
+        }
+
+        .fra-detail-label {
+            color: var(--gray-600);
+        }
+
+        .fra-detail-value {
+            font-weight: 500;
+            color: var(--gray-800);
+        }
+
+        .fra-detail-value.red {
+            color: var(--red);
+        }
+
+        .fra-detail-value.no-date {
+            color: var(--amber-dark);
+        }
+
+        /* Footer */
+        .footer {
+            text-align: center;
+            padding: 16px;
+            font-size: 12px;
+            color: var(--gray-400);
+            border-top: 1px solid var(--gray-200);
+            background: var(--white);
+        }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="logo">
+                <div class="logo-icon">
+                    <svg viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M20 8L32 16L20 20L8 16L20 8Z" fill="#c41e3a"/>
+                        <path d="M20 14L32 22L20 26L8 22L20 14Z" fill="#d64456"/>
+                        <path d="M20 20L32 28L20 32L8 28L20 20Z" fill="#e85a6b"/>
+                    </svg>
+                </div>
+                <span class="logo-text">EquiRisk</span>
+            </div>
+
+            <div class="nav-label">Navigation</div>
+            <a class="nav-item" href="#">
+                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/></svg>
+                Uploads
+            </a>
+            <a class="nav-item" href="#">
+                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>
+                Portfolio Overview
+            </a>
+            <a class="nav-item" href="#">
+                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
+                Data Quality
+            </a>
+            <a class="nav-item active" href="#">
+                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>
+                Blocks
+            </a>
+            <a class="nav-item" href="#">
+                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>
+                Exports
+            </a>
+
+            <div class="sidebar-footer">
+                <button class="settings-btn">
+                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" width="18" height="18"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                </button>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Top Bar -->
+            <div class="top-bar">
+                <div class="top-bar-left">
+                    <strong>Example Housing Association</strong>
+                    <span>â€¢</span>
+                    <span class="portfolio-name">Portfolio: 2025 Renewal</span>
+                </div>
+                <div class="top-bar-right">
+                    <button class="btn btn-primary">
+                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                        Export Underwriter Pack
+                    </button>
+                </div>
+            </div>
+
+            <!-- Breadcrumb -->
+            <div class="breadcrumb-bar">
+                Dashboard â€º <strong>Example Housing Association</strong> â€º Portfolio: 2025 Renewal
+            </div>
+
+            <!-- Content Area -->
+            <div class="content-area">
+                <!-- Main Panel -->
+                <div class="main-panel">
+                    <!-- Filter Bar -->
+                    <div class="filter-bar">
+                        <div class="filter-toggle">
+                            <button class="filter-toggle-btn">England</button>
+                            <button class="filter-toggle-btn active">Scotland</button>
+                        </div>
+                        <select class="filter-dropdown">
+                            <option>FRA Rating</option>
+                            <option>Red Only</option>
+                            <option>Amber Only</option>
+                            <option>Green Only</option>
+                        </select>
+                        <select class="filter-dropdown">
+                            <option>Height</option>
+                            <option>&lt;11m</option>
+                            <option>11-18m</option>
+                            <option>&gt;18m</option>
+                        </select>
+                        <select class="filter-dropdown">
+                            <option>Remediation Status</option>
+                            <option>Open items</option>
+                            <option>Overdue</option>
+                            <option>No date assigned</option>
+                        </select>
+                        <input type="text" class="search-input" placeholder="Search blocks...">
+                    </div>
+
+                    <!-- Page Header -->
+                    <div class="page-header">
+                        <h1 class="page-title">Blocks</h1>
+                        <span class="block-count">â€¢ 2024: 395 blocks</span>
+                    </div>
+
+                    <!-- Block Table -->
+                    <div class="block-table-container">
+                        <table class="block-table">
+                            <thead>
+                                <tr>
+                                    <th style="width: 60px;">Juris.</th>
+                                    <th style="width: 160px;">Block Name</th>
+                                    <th style="width: 60px;">Units</th>
+                                    <th style="width: 120px;">Height</th>
+                                    <th style="width: 60px;">Build</th>
+                                    <th style="width: 140px;">Construction</th>
+                                    <th style="width: 140px;">EWS / Cladding</th>
+                                    <th>FRA Remediation</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td><span class="jurisdiction-badge eng">ENG</span></td>
+                                    <td>
+                                        <div class="block-name">Ash Towers</div>
+                                        <a href="#" class="block-link">View details</a>
+                                    </td>
+                                    <td>72</td>
+                                    <td>
+                                        <div class="height-value">10.8m</div>
+                                        <div class="height-band">(&lt;11m)</div>
+                                    </td>
+                                    <td>1972</td>
+                                    <td>
+                                        <div class="construction-primary">Concrete frame</div>
+                                        <div class="construction-secondary">Wall/Floor/Roof: known</div>
+                                    </td>
+                                    <td>
+                                        <div class="ews-status unknown">Brick / Unknown</div>
+                                        <div class="ews-detail">Cavity barriers: Unknown</div>
+                                    </td>
+                                    <td>
+                                        <div class="fra-summary">
+                                            <div class="fra-counts">
+                                                <span class="fra-rating red"><span class="fra-rating-dot"></span> RED</span>
+                                                <span class="fra-tag p1">P1: 8</span>
+                                                <span class="fra-tag open">5 open</span>
+                                            </div>
+                                            <div class="fra-next-action no-date">âš  No resolution dates assigned</div>
+                                        </div>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td><span class="jurisdiction-badge sco">SCO</span></td>
+                                    <td>
+                                        <div class="block-name">Oak House</div>
+                                        <a href="#" class="block-link">View details</a>
+                                    </td>
+                                    <td>64</td>
+                                    <td>
+                                        <div class="height-value">14.2m</div>
+                                        <div class="height-band">(11-16m)</div>
+                                    </td>
+                                    <td>1965</td>
+                                    <td>
+                                        <div class="construction-primary">Masonry</div>
+                                        <div class="construction-secondary">Timber frame: No</div>
+                                    </td>
+                                    <td>
+                                        <div class="ews-status unknown">Status: Mixed</div>
+                                        <div class="ews-detail">SBA: In-scope</div>
+                                    </td>
+                                    <td>
+                                        <div class="fra-summary">
+                                            <div class="fra-counts">
+                                                <span class="fra-rating amber"><span class="fra-rating-dot"></span> AMBER</span>
+                                                <span class="fra-tag p1">P1: 3</span>
+                                                <span class="fra-tag open">3 open</span>
+                                            </div>
+                                            <div class="fra-next-action">Next action due: 14d</div>
+                                        </div>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td><span class="jurisdiction-badge sco">SCO</span></td>
+                                    <td>
+                                        <div class="block-name">River Court</div>
+                                        <a href="#" class="block-link">View details</a>
+                                    </td>
+                                    <td>9</td>
+                                    <td>
+                                        <div class="height-value">17.6m</div>
+                                        <div class="height-band">(11-18m)</div>
+                                    </td>
+                                    <td>1988</td>
+                                    <td>
+                                        <div class="construction-primary">Concrete</div>
+                                        <div class="construction-secondary">Basement flats: No</div>
+                                    </td>
+                                    <td>
+                                        <div class="ews-status yes">PAS9980: Yes</div>
+                                        <div class="ews-detail">SBA: Commissioned</div>
+                                    </td>
+                                    <td>
+                                        <div class="fra-summary">
+                                            <div class="fra-counts">
+                                                <span class="fra-rating amber"><span class="fra-rating-dot"></span> AMBER</span>
+                                                <span class="fra-tag p1">P1: 4</span>
+                                                <span class="fra-tag open">4 open</span>
+                                            </div>
+                                            <div class="fra-next-action">Next action due: 14d</div>
+                                        </div>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td><span class="jurisdiction-badge sco">SCO</span></td>
+                                    <td>
+                                        <div class="block-name">Mountain Towers</div>
+                                        <a href="#" class="block-link">View details</a>
+                                    </td>
+                                    <td>87</td>
+                                    <td>
+                                        <div class="height-value">21.4m</div>
+                                        <div class="height-band">(18m+)</div>
+                                    </td>
+                                    <td>1988</td>
+                                    <td>
+                                        <div class="construction-primary">Concrete</div>
+                                        <div class="construction-secondary">Basement flats: Yes</div>
+                                    </td>
+                                    <td>
+                                        <div class="ews-status yes">PAS9980: Yes</div>
+                                        <div class="ews-detail">SBA: In progress</div>
+                                    </td>
+                                    <td>
+                                        <div class="fra-summary">
+                                            <div class="fra-counts">
+                                                <span class="fra-rating red"><span class="fra-rating-dot"></span> RED</span>
+                                                <span class="fra-tag p1">P1: 4</span>
+                                                <span class="fra-tag open">3 open</span>
+                                            </div>
+                                            <div class="fra-next-action overdue">âš  2 items overdue</div>
+                                        </div>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td><span class="jurisdiction-badge sco">SCO</span></td>
+                                    <td>
+                                        <div class="block-name">Claremont Towers</div>
+                                        <a href="#" class="block-link">View details</a>
+                                    </td>
+                                    <td>87</td>
+                                    <td>
+                                        <div class="height-value">15.9m</div>
+                                        <div class="height-band">(11-16m)</div>
+                                    </td>
+                                    <td>1988</td>
+                                    <td>
+                                        <div class="construction-primary">Masonry</div>
+                                        <div class="construction-secondary">Wall/Floor/Roof: partial</div>
+                                    </td>
+                                    <td>
+                                        <div class="ews-status unknown">EWS: Unknown</div>
+                                        <div class="ews-detail">SBA: In-scope</div>
+                                    </td>
+                                    <td>
+                                        <div class="fra-summary">
+                                            <div class="fra-counts">
+                                                <span class="fra-rating red"><span class="fra-rating-dot"></span> RED</span>
+                                                <span class="fra-tag p1">P1: 8</span>
+                                                <span class="fra-tag open">1 open</span>
+                                            </div>
+                                            <div class="fra-next-action">Next action due: 14d</div>
+                                        </div>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td><span class="jurisdiction-badge sco">SCO</span></td>
+                                    <td>
+                                        <div class="block-name">Claremont (Low-rise)</div>
+                                        <a href="#" class="block-link">View details</a>
+                                    </td>
+                                    <td>87</td>
+                                    <td>
+                                        <div class="height-value">9.6m</div>
+                                        <div class="height-band">(&lt;11m)</div>
+                                    </td>
+                                    <td>1988</td>
+                                    <td>
+                                        <div class="construction-primary">Masonry</div>
+                                        <div class="construction-secondary">Timber frame: Unknown</div>
+                                    </td>
+                                    <td>
+                                        <div class="ews-status na">EWS: N/A</div>
+                                        <div class="ews-detail">SBA: Not required</div>
+                                    </td>
+                                    <td>
+                                        <div class="fra-summary">
+                                            <div class="fra-counts">
+                                                <span class="fra-rating green"><span class="fra-rating-dot"></span> GREEN</span>
+                                                <span class="fra-tag p2">P2: 1</span>
+                                                <span class="fra-tag open">0 open</span>
+                                            </div>
+                                            <div class="fra-next-action" style="color: var(--green);">âœ“ All actions complete</div>
+                                        </div>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Right Sidebar -->
+                <aside class="right-sidebar">
+                    <!-- Block Summary -->
+                    <div class="sidebar-section">
+                        <div class="sidebar-section-title">Block Summary (FRA Rating)</div>
+                        <div class="block-summary">
+                            <div class="summary-row">
+                                <div class="summary-grade e">E</div>
+                                <div class="summary-bar-container">
+                                    <div class="summary-bar e" style="width: 2%;"></div>
+                                </div>
+                                <div class="summary-count">4</div>
+                            </div>
+                            <div class="summary-row">
+                                <div class="summary-grade d">D</div>
+                                <div class="summary-bar-container">
+                                    <div class="summary-bar d" style="width: 7%;"></div>
+                                </div>
+                                <div class="summary-count">15</div>
+                            </div>
+                            <div class="summary-row">
+                                <div class="summary-grade c">C</div>
+                                <div class="summary-bar-container">
+                                    <div class="summary-bar c" style="width: 32%;"></div>
+                                </div>
+                                <div class="summary-count">63</div>
+                            </div>
+                            <div class="summary-row">
+                                <div class="summary-grade b">B</div>
+                                <div class="summary-bar-container">
+                                    <div class="summary-bar b" style="width: 52%;"></div>
+                                </div>
+                                <div class="summary-count">102</div>
+                            </div>
+                            <div class="summary-row">
+                                <div class="summary-grade a">A</div>
+                                <div class="summary-bar-container">
+                                    <div class="summary-bar a" style="width: 100%;"></div>
+                                </div>
+                                <div class="summary-count">211</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Legislation & Market Readiness -->
+                    <div class="sidebar-section">
+                        <div class="sidebar-section-title">Legislation & Market Readiness</div>
+                        <div class="readiness-section">
+                            <div class="readiness-item">
+                                <div class="readiness-header">
+                                    <span class="readiness-label">Statutory readiness</span>
+                                    <span class="readiness-value">28%</span>
+                                </div>
+                                <div class="readiness-bar-container">
+                                    <div class="readiness-bar red" style="width: 28%;"></div>
+                                </div>
+                            </div>
+                            <div class="readiness-item">
+                                <div class="readiness-header">
+                                    <span class="readiness-label">Insurance readiness</span>
+                                    <span class="readiness-value">48%</span>
+                                </div>
+                                <div class="readiness-bar-container">
+                                    <div class="readiness-bar amber" style="width: 48%;"></div>
+                                </div>
+                            </div>
+                            <div class="readiness-item">
+                                <div class="readiness-header">
+                                    <span class="readiness-label">Data completeness</span>
+                                    <span class="readiness-value">62%</span>
+                                </div>
+                                <div class="readiness-bar-container">
+                                    <div class="readiness-bar green" style="width: 62%;"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Missing Info Gaps -->
+                    <div class="sidebar-section">
+                        <div class="sidebar-section-title">Missing Info Gaps</div>
+                        <div class="gap-tabs">
+                            <button class="gap-tab active">Statutory</button>
+                            <button class="gap-tab">Insurance</button>
+                        </div>
+                        <div class="gap-list">
+                            <div class="gap-item red">
+                                <div class="gap-dot"></div>
+                                <div class="gap-content">
+                                    <div class="gap-title">Missing FSDS (Scotland)</div>
+                                    <div class="gap-meta">Fire Safety Design Summary</div>
+                                </div>
+                                <div class="gap-count">6 days ago</div>
+                            </div>
+                            <div class="gap-item red">
+                                <div class="gap-dot"></div>
+                                <div class="gap-content">
+                                    <div class="gap-title">Missing SBA sign-off (11m+)</div>
+                                    <div class="gap-meta">Single Building Assessment</div>
+                                </div>
+                                <div class="gap-count">2 days ago</div>
+                            </div>
+                            <div class="gap-item red">
+                                <div class="gap-dot"></div>
+                                <div class="gap-content">
+                                    <div class="gap-title">Stale FRA (12+ months)</div>
+                                    <div class="gap-meta">57 blocks affected</div>
+                                </div>
+                                <div class="gap-count">2 days ago</div>
+                            </div>
+                            <div class="gap-item amber">
+                                <div class="gap-dot"></div>
+                                <div class="gap-content">
+                                    <div class="gap-title">Unknown EWS / cladding status</div>
+                                    <div class="gap-meta">23 blocks affected</div>
+                                </div>
+                                <div class="gap-count">12 days ago</div>
+                            </div>
+                            <div class="gap-item amber">
+                                <div class="gap-dot"></div>
+                                <div class="gap-content">
+                                    <div class="gap-title">Missing plans pack / drawings</div>
+                                    <div class="gap-meta">Fire evacuation plans</div>
+                                </div>
+                                <div class="gap-count">14 days ago</div>
+                            </div>
+                            <div class="gap-item amber">
+                                <div class="gap-dot"></div>
+                                <div class="gap-content">
+                                    <div class="gap-title">Door checks evidence missing</div>
+                                    <div class="gap-meta">Flat entrance doors</div>
+                                </div>
+                                <div class="gap-count">17 days ago</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Actions -->
+                    <div class="sidebar-actions">
+                        <button class="btn-sidebar secondary">Upload evidence</button>
+                        <button class="btn-sidebar primary">Export Underwriter Pack</button>
+                    </div>
+                </aside>
+            </div>
+
+            <!-- Footer -->
+            <div class="footer">
+                EquiRisk â€” Underwriting-grade building safety intelligence
+            </div>
+        </main>
+    </div>
+
+    <script>
+        // Toggle jurisdiction filter
+        document.querySelectorAll('.filter-toggle-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('.filter-toggle-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+            });
+        });
+
+        // Toggle gap tabs
+        document.querySelectorAll('.gap-tab').forEach(tab => {
+            tab.addEventListener('click', () => {
+                document.querySelectorAll('.gap-tab').forEach(t => t.classList.remove('active'));
+                tab.classList.add('active');
+            });
+        });
+    </script>
+</body>
+</html>
