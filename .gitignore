@@ -270,3 +270,6 @@ os_datahub_credentials.json
 # RTF files (if they contain sensitive info)
 # Uncomment if needed:
 # *.rtf
+
+#analyze test
+analyze_scoring.py

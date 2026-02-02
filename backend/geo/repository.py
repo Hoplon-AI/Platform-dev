@@ -9,7 +9,7 @@ if TYPE_CHECKING:
     pass
 
 from backend.core.database.db_pool import DatabasePool
-from backend.geo.confidence import RawCandidate
+from backend.geo.confidence_v2 import RawCandidate
 
 
 class UPRNRepository:
@@ -27,9 +27,9 @@ class UPRNRepository:
         """
         query = """
         WITH postcode_geom AS (
-            SELECT geom 
-            FROM postcode_centroids 
-            WHERE postcode = $1
+            SELECT geom
+            FROM postcode_centroids
+            WHERE REPLACE(postcode, ' ', '') = REPLACE($1, ' ', '')
         ),
         candidates AS (
             SELECT 
@@ -64,7 +64,8 @@ class UPRNRepository:
     @staticmethod
     async def postcode_exists(postcode: str) -> bool:
         """Check if postcode exists in our database."""
-        query = "SELECT EXISTS(SELECT 1 FROM postcode_centroids WHERE postcode = $1)"
+        # Normalize whitespace: database may have variable spacing (e.g., 'NW1  0AA' vs 'SW1A 2AA')
+        query = "SELECT EXISTS(SELECT 1 FROM postcode_centroids WHERE REPLACE(postcode, ' ', '') = REPLACE($1, ' ', ''))"
         result = await DatabasePool.fetchval(query, postcode)
         return result
 

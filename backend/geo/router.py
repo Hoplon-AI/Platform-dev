@@ -6,13 +6,13 @@ from fastapi import APIRouter, HTTPException, status
 from typing import Dict, Any
 
 from .models import UPRNMatchRequest, UPRNMatchResponse
-from .confidence import ConfidenceScorer, ScoringConfig
+from .confidence_v2 import ConfidenceScorerV2, ScoringConfigV2
 from .repository import UPRNRepository
 
 router = APIRouter(prefix="/api/v1/geo", tags=["UPRN Matching"])
 
-# Initialize scorer with default config
-scorer = ConfidenceScorer(ScoringConfig())
+# Initialize scorer with default config (V2 - improved scoring)
+scorer = ConfidenceScorerV2(ScoringConfigV2())
 
 
 @router.post(

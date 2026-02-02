@@ -1,4 +1,4 @@
-from detect_functions import *
+from backend.dataprocessing.detect_functions import *
 
 def auto_detect_column_types(df):
     """

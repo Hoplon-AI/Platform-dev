@@ -2,7 +2,7 @@ from fastapi import FastAPI, File, UploadFile, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 import pandas as pd
 import io
-from preprocessing import standardize_columns
+from backend.dataprocessing.preprocessing import standardize_columns
 
 app = FastAPI()
 
