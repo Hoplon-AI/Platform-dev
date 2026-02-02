@@ -1,0 +1,1090 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EquiRisk - Upload & Data Ingestion</title>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary-blue: #1a56db;
+            --primary-blue-light: #e8f0fe;
+            --primary-blue-dark: #1e40af;
+            --amber: #f59e0b;
+            --amber-light: #fef3c7;
+            --amber-dark: #d97706;
+            --green: #10b981;
+            --green-light: #d1fae5;
+            --red: #ef4444;
+            --red-light: #fee2e2;
+            --purple: #6366f1;
+            --purple-light: #e0e7ff;
+            --gray-50: #f9fafb;
+            --gray-100: #f3f4f6;
+            --gray-200: #e5e7eb;
+            --gray-300: #d1d5db;
+            --gray-400: #9ca3af;
+            --gray-500: #6b7280;
+            --gray-600: #4b5563;
+            --gray-700: #374151;
+            --gray-800: #1f2937;
+            --gray-900: #111827;
+            --white: #ffffff;
+            --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+            --shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
+            --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+            --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: var(--gray-50);
+            color: var(--gray-800);
+            line-height: 1.5;
+            min-height: 100vh;
+        }
+
+        .app-container {
+            display: flex;
+            min-height: 100vh;
+        }
+
+        /* Sidebar */
+        .sidebar {
+            width: 220px;
+            background: var(--white);
+            border-right: 1px solid var(--gray-200);
+            padding: 20px 0;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 0 20px;
+            margin-bottom: 28px;
+        }
+
+        .logo-icon {
+            width: 34px;
+            height: 34px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+        }
+
+        .logo-icon svg {
+            width: 34px;
+            height: 34px;
+        }
+
+        .logo-text {
+            font-weight: 700;
+            font-size: 18px;
+            color: #1a2b4a;
+            letter-spacing: -0.5px;
+        }
+
+        .nav-label {
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: var(--gray-400);
+            padding: 0 20px;
+            margin-bottom: 8px;
+        }
+
+        .nav-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px 20px;
+            color: var(--gray-600);
+            text-decoration: none;
+            font-size: 14px;
+            font-weight: 500;
+            transition: all 0.15s ease;
+            cursor: pointer;
+        }
+
+        .nav-item:hover {
+            background: var(--gray-50);
+            color: var(--gray-800);
+        }
+
+        .nav-item.active {
+            background: var(--primary-blue-light);
+            color: var(--primary-blue);
+            border-right: 3px solid var(--primary-blue);
+        }
+
+        .nav-item svg {
+            width: 18px;
+            height: 18px;
+            flex-shrink: 0;
+        }
+
+        .sidebar-footer {
+            margin-top: auto;
+            padding: 16px 20px;
+        }
+
+        .settings-btn {
+            width: 36px;
+            height: 36px;
+            border-radius: 8px;
+            background: var(--gray-100);
+            border: none;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            color: var(--gray-500);
+        }
+
+        .settings-btn:hover {
+            background: var(--gray-200);
+        }
+
+        /* Main Content */
+        .main-content {
+            flex: 1;
+            padding: 20px 28px;
+            overflow-y: auto;
+            background: var(--gray-50);
+        }
+
+        /* Top Bar */
+        .top-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 24px;
+        }
+
+        .top-bar-left {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 14px;
+            color: var(--gray-600);
+        }
+
+        .top-bar-left strong {
+            color: var(--gray-800);
+        }
+
+        .top-bar-right {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .gdpr-badge-prominent {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 8px 14px;
+            background: var(--green-light);
+            border: 1px solid var(--green);
+            border-radius: 8px;
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--green);
+        }
+
+        .gdpr-badge-prominent svg {
+            width: 16px;
+            height: 16px;
+        }
+
+        /* Page Header */
+        .page-header {
+            text-align: center;
+            margin-bottom: 32px;
+        }
+
+        .page-title {
+            font-size: 28px;
+            font-weight: 700;
+            color: var(--gray-900);
+            margin-bottom: 4px;
+        }
+
+        .page-strapline {
+            font-size: 14px;
+            font-weight: 500;
+            color: var(--primary-blue);
+            letter-spacing: 0.5px;
+            margin-bottom: 8px;
+        }
+
+        .page-subtitle {
+            font-size: 16px;
+            color: var(--gray-500);
+            max-width: 500px;
+            margin: 0 auto;
+        }
+
+        /* Journey Steps */
+        .journey-steps {
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            gap: 24px;
+            margin-bottom: 40px;
+            padding: 0 40px;
+        }
+
+        .journey-step {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            text-align: center;
+            flex: 1;
+            max-width: 200px;
+            position: relative;
+        }
+
+        .journey-step:not(:last-child)::after {
+            content: '';
+            position: absolute;
+            top: 24px;
+            left: calc(50% + 40px);
+            width: calc(100% - 40px);
+            height: 2px;
+            background: var(--gray-200);
+        }
+
+        .journey-step.active:not(:last-child)::after {
+            background: var(--primary-blue);
+        }
+
+        .step-number {
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+            font-weight: 700;
+            margin-bottom: 12px;
+            position: relative;
+            z-index: 1;
+        }
+
+        .step-number.active {
+            background: var(--primary-blue);
+            color: var(--white);
+        }
+
+        .step-number.pending {
+            background: var(--gray-200);
+            color: var(--gray-500);
+        }
+
+        .step-number.complete {
+            background: var(--green);
+            color: var(--white);
+        }
+
+        .step-title {
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--gray-800);
+            margin-bottom: 4px;
+        }
+
+        .step-description {
+            font-size: 12px;
+            color: var(--gray-500);
+            line-height: 1.4;
+        }
+
+        /* Upload Card */
+        .upload-card {
+            background: var(--white);
+            border-radius: 16px;
+            border: 2px solid var(--primary-blue);
+            padding: 40px;
+            max-width: 700px;
+            margin: 0 auto 32px;
+            box-shadow: var(--shadow-lg);
+        }
+
+        .upload-zone {
+            border: 2px dashed var(--gray-300);
+            border-radius: 12px;
+            padding: 48px 32px;
+            text-align: center;
+            background: var(--gray-50);
+            transition: all 0.2s ease;
+            cursor: pointer;
+        }
+
+        .upload-zone:hover {
+            border-color: var(--primary-blue);
+            background: var(--primary-blue-light);
+        }
+
+        .upload-zone.dragover {
+            border-color: var(--primary-blue);
+            background: var(--primary-blue-light);
+            transform: scale(1.01);
+        }
+
+        .upload-icon {
+            width: 64px;
+            height: 64px;
+            margin: 0 auto 16px;
+            background: var(--primary-blue-light);
+            border-radius: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--primary-blue);
+        }
+
+        .upload-icon svg {
+            width: 32px;
+            height: 32px;
+        }
+
+        .upload-title {
+            font-size: 18px;
+            font-weight: 600;
+            color: var(--gray-800);
+            margin-bottom: 8px;
+        }
+
+        .upload-subtitle {
+            font-size: 14px;
+            color: var(--gray-500);
+            margin-bottom: 20px;
+        }
+
+        .upload-actions {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 16px;
+        }
+
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 12px 24px;
+            font-size: 14px;
+            font-weight: 600;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            border: none;
+            font-family: inherit;
+        }
+
+        .btn-primary {
+            background: var(--primary-blue);
+            color: var(--white);
+        }
+
+        .btn-primary:hover {
+            background: var(--primary-blue-dark);
+        }
+
+        .btn-secondary {
+            background: var(--white);
+            color: var(--primary-blue);
+            border: 1px solid var(--primary-blue);
+        }
+
+        .btn-secondary:hover {
+            background: var(--primary-blue-light);
+        }
+
+        .btn svg {
+            width: 18px;
+            height: 18px;
+        }
+
+        .upload-formats {
+            margin-top: 20px;
+            font-size: 12px;
+            color: var(--gray-400);
+        }
+
+        /* What to Upload Section */
+        .what-to-upload {
+            background: var(--amber-light);
+            border: 1px solid var(--amber);
+            border-radius: 10px;
+            padding: 20px 24px;
+            margin-top: 24px;
+        }
+
+        .what-to-upload-title {
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--amber-dark);
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .what-to-upload-title svg {
+            width: 18px;
+            height: 18px;
+        }
+
+        .upload-items {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px 24px;
+        }
+
+        .upload-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 13px;
+            color: var(--gray-700);
+        }
+
+        .upload-item svg {
+            width: 16px;
+            height: 16px;
+            color: var(--amber-dark);
+            flex-shrink: 0;
+        }
+
+        .upload-item .required {
+            font-size: 10px;
+            font-weight: 600;
+            color: var(--red);
+            margin-left: 4px;
+        }
+
+        /* AMS Integration Card */
+        .ams-card {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+            background: var(--white);
+            border: 1px solid var(--gray-200);
+            border-radius: 12px;
+            padding: 20px 24px;
+            max-width: 700px;
+            margin: 0 auto 32px;
+            transition: all 0.2s ease;
+        }
+
+        .ams-card:hover {
+            border-color: var(--purple);
+            box-shadow: var(--shadow-md);
+        }
+
+        .ams-icon {
+            width: 48px;
+            height: 48px;
+            background: var(--purple-light);
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--purple);
+            flex-shrink: 0;
+        }
+
+        .ams-icon svg {
+            width: 24px;
+            height: 24px;
+        }
+
+        .ams-content {
+            flex: 1;
+        }
+
+        .ams-title {
+            font-size: 15px;
+            font-weight: 600;
+            color: var(--gray-900);
+            margin-bottom: 4px;
+        }
+
+        .ams-description {
+            font-size: 13px;
+            color: var(--gray-500);
+            line-height: 1.5;
+        }
+
+        .btn-ams {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 18px;
+            font-size: 13px;
+            font-weight: 600;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            border: 1px solid var(--purple);
+            background: var(--white);
+            color: var(--purple);
+            font-family: inherit;
+            white-space: nowrap;
+            flex-shrink: 0;
+        }
+
+        .btn-ams:hover {
+            background: var(--purple);
+            color: var(--white);
+        }
+
+        .btn-ams svg {
+            width: 16px;
+            height: 16px;
+        }
+
+        /* Info Cards Row */
+        .info-cards {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 20px;
+            max-width: 900px;
+            margin: 0 auto 32px;
+        }
+
+        .info-card {
+            background: var(--white);
+            border-radius: 12px;
+            border: 1px solid var(--gray-200);
+            padding: 24px;
+        }
+
+        .info-card-icon {
+            width: 44px;
+            height: 44px;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 16px;
+        }
+
+        .info-card-icon.blue {
+            background: var(--primary-blue-light);
+            color: var(--primary-blue);
+        }
+
+        .info-card-icon.green {
+            background: var(--green-light);
+            color: var(--green);
+        }
+
+        .info-card-icon.purple {
+            background: var(--purple-light);
+            color: var(--purple);
+        }
+
+        .info-card-icon svg {
+            width: 22px;
+            height: 22px;
+        }
+
+        .info-card-title {
+            font-size: 15px;
+            font-weight: 600;
+            color: var(--gray-900);
+            margin-bottom: 8px;
+        }
+
+        .info-card-list {
+            list-style: none;
+        }
+
+        .info-card-list li {
+            font-size: 13px;
+            color: var(--gray-600);
+            padding: 4px 0;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .info-card-list li svg {
+            width: 14px;
+            height: 14px;
+            color: var(--green);
+            flex-shrink: 0;
+        }
+
+        /* Ingestion Progress (hidden by default, shown when processing) */
+        .ingestion-progress {
+            background: var(--white);
+            border-radius: 12px;
+            border: 1px solid var(--gray-200);
+            padding: 24px;
+            max-width: 700px;
+            margin: 0 auto;
+            display: none;
+        }
+
+        .ingestion-progress.active {
+            display: block;
+        }
+
+        .ingestion-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 20px;
+        }
+
+        .ingestion-title {
+            font-size: 16px;
+            font-weight: 600;
+            color: var(--gray-800);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .ingestion-status {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 13px;
+            font-weight: 500;
+        }
+
+        .status-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: var(--amber);
+            animation: pulse 1.5s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .status-dot.complete {
+            background: var(--green);
+            animation: none;
+        }
+
+        .ingestion-steps {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 20px;
+            padding: 0 10px;
+        }
+
+        .ingestion-step {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            font-size: 11px;
+            color: var(--gray-400);
+            position: relative;
+        }
+
+        .ingestion-step.active {
+            color: var(--primary-blue);
+            font-weight: 600;
+        }
+
+        .ingestion-step.complete {
+            color: var(--green);
+        }
+
+        .ingestion-step::before {
+            content: '';
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--gray-300);
+            margin-bottom: 6px;
+        }
+
+        .ingestion-step.active::before {
+            background: var(--primary-blue);
+        }
+
+        .ingestion-step.complete::before {
+            background: var(--green);
+        }
+
+        .ingestion-stats {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 16px;
+            padding-top: 16px;
+            border-top: 1px solid var(--gray-100);
+        }
+
+        .ingestion-stat {
+            text-align: center;
+        }
+
+        .ingestion-stat-value {
+            font-family: 'Space Mono', monospace;
+            font-size: 20px;
+            font-weight: 700;
+            color: var(--gray-900);
+        }
+
+        .ingestion-stat-value.loading {
+            color: var(--gray-300);
+        }
+
+        .ingestion-stat-label {
+            font-size: 11px;
+            color: var(--gray-500);
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+        }
+
+        .ingestion-note {
+            text-align: center;
+            font-size: 12px;
+            color: var(--gray-500);
+            margin-top: 16px;
+        }
+
+        .ingestion-note svg {
+            width: 14px;
+            height: 14px;
+            display: inline;
+            vertical-align: middle;
+            margin-right: 4px;
+            color: var(--green);
+        }
+
+        /* Animations */
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(8px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .upload-card, .info-card {
+            animation: fadeIn 0.4s ease forwards;
+        }
+
+        .info-card:nth-child(2) { animation-delay: 0.1s; }
+        .info-card:nth-child(3) { animation-delay: 0.2s; }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="logo">
+                <div class="logo-icon">
+                    <svg viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <!-- Three stacked red chevrons -->
+                        <path d="M20 8L32 16L20 20L8 16L20 8Z" fill="#c41e3a"/>
+                        <path d="M20 14L32 22L20 26L8 22L20 14Z" fill="#d64456"/>
+                        <path d="M20 20L32 28L20 32L8 28L20 20Z" fill="#e85a6b"/>
+                    </svg>
+                </div>
+                <span class="logo-text">EquiRisk</span>
+            </div>
+
+            <div class="nav-label">Navigation</div>
+            <a class="nav-item active" href="#">
+                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/></svg>
+                Uploads
+            </a>
+            <a class="nav-item" href="#">
+                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                Previous Uploads
+            </a>
+            <a class="nav-item" href="#">
+                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>
+                Portfolio Overview
+            </a>
+            <a class="nav-item" href="#">
+                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
+                Data Quality
+            </a>
+            <a class="nav-item" href="#">
+                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>
+                Exports
+            </a>
+
+            <div class="sidebar-footer">
+                <button class="settings-btn">
+                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" width="18" height="18"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                </button>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Top Bar -->
+            <div class="top-bar">
+                <div class="top-bar-left">
+                    <strong>Example Housing Association</strong>
+                    <span>â€¢</span>
+                    2025 Renewal
+                </div>
+                <div class="top-bar-right">
+                    <div class="gdpr-badge-prominent">
+                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
+                        Asset data only â€¢ GDPR compliant
+                    </div>
+                </div>
+            </div>
+
+            <!-- Page Header -->
+            <div class="page-header">
+                <h1 class="page-title">Upload Your Portfolio Data</h1>
+                <div class="page-strapline">Premium Intelligence</div>
+                <p class="page-subtitle">Get your insurance submission ready in three simple steps</p>
+            </div>
+
+            <!-- Journey Steps -->
+            <div class="journey-steps">
+                <div class="journey-step">
+                    <div class="step-number active">1</div>
+                    <div class="step-title">Upload SoV</div>
+                    <div class="step-description">Drop your Schedule of Values and supporting documents</div>
+                </div>
+                <div class="journey-step">
+                    <div class="step-number pending">2</div>
+                    <div class="step-title">Portfolio Overview</div>
+                    <div class="step-description">See your readiness score and TIV summary</div>
+                </div>
+                <div class="journey-step">
+                    <div class="step-number pending">3</div>
+                    <div class="step-title">Data Quality</div>
+                    <div class="step-description">Review gaps and add missing documentation</div>
+                </div>
+            </div>
+
+            <!-- Upload Card -->
+            <div class="upload-card">
+                <div class="upload-zone" id="dropZone">
+                    <div class="upload-icon">
+                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/></svg>
+                    </div>
+                    <div class="upload-title">Drag & drop your files here</div>
+                    <div class="upload-subtitle">or click to browse from your computer</div>
+                    <div class="upload-actions">
+                        <button class="btn btn-primary">
+                            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>
+                            Browse Files
+                        </button>
+                        <button class="btn btn-secondary">
+                            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                            Download Template
+                        </button>
+                    </div>
+                    <div class="upload-formats">Supported: Excel (.xlsx, .xls), CSV, PDF, DOCX, ZIP</div>
+                </div>
+
+                <!-- What to Upload -->
+                <div class="what-to-upload">
+                    <div class="what-to-upload-title">
+                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                        What to upload for best results
+                    </div>
+                    <div class="upload-items">
+                        <div class="upload-item">
+                            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                            Schedule of Values (SoV)
+                            <span class="required">REQUIRED</span>
+                        </div>
+                        <div class="upload-item">
+                            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                            Fire Risk Assessments (FRAs)
+                        </div>
+                        <div class="upload-item">
+                            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                            EICR Certificates
+                        </div>
+                        <div class="upload-item">
+                            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                            EWS1 / PAS 9980 reports
+                        </div>
+                        <div class="upload-item">
+                            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                            Gas Safety Certificates
+                        </div>
+                        <div class="upload-item">
+                            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                            Asbestos Register
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- AMS Integration Card -->
+            <div class="ams-card">
+                <div class="ams-icon">
+                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+                </div>
+                <div class="ams-content">
+                    <div class="ams-title">Connect Your Asset Management System</div>
+                    <div class="ams-description">Reduce manual uploads by connecting directly to your AMS. We support Civica CX, NEC Housing, MRI Software, and others. Our team will work with your IT to set up a secure connection.</div>
+                </div>
+                <button class="btn btn-ams">
+                    Request Integration
+                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"/></svg>
+                </button>
+            </div>
+
+            <!-- Info Cards -->
+            <div class="info-cards">
+                <div class="info-card">
+                    <div class="info-card-icon blue">
+                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+                    </div>
+                    <div class="info-card-title">Smart Ingestion</div>
+                    <ul class="info-card-list">
+                        <li>
+                            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                            Address normalisation
+                        </li>
+                        <li>
+                            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                            UPRN verification
+                        </li>
+                        <li>
+                            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                            AI document extraction
+                        </li>
+                    </ul>
+                </div>
+
+                <div class="info-card">
+                    <div class="info-card-icon green">
+                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                    </div>
+                    <div class="info-card-title">Data Quality Checks</div>
+                    <ul class="info-card-list">
+                        <li>
+                            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                            Coverage by domain
+                        </li>
+                        <li>
+                            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                            Missing document flags
+                        </li>
+                        <li>
+                            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                            Policy impact warnings
+                        </li>
+                    </ul>
+                </div>
+
+                <div class="info-card">
+                    <div class="info-card-icon purple">
+                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                    </div>
+                    <div class="info-card-title">Fast Processing</div>
+                    <ul class="info-card-list">
+                        <li>
+                            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                            2-5 mins for 1,000 units
+                        </li>
+                        <li>
+                            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                            Real-time progress
+                        </li>
+                        <li>
+                            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                            Instant overview
+                        </li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Ingestion Progress (shown when processing) -->
+            <div class="ingestion-progress" id="ingestionProgress">
+                <div class="ingestion-header">
+                    <div class="ingestion-title">
+                        <span class="status-dot"></span>
+                        Processing your files...
+                    </div>
+                    <div class="ingestion-status">
+                        Step 2 of 5
+                    </div>
+                </div>
+
+                <div class="ingestion-steps">
+                    <div class="ingestion-step complete">Validating</div>
+                    <div class="ingestion-step active">Verifying UPRN</div>
+                    <div class="ingestion-step">Cleansing</div>
+                    <div class="ingestion-step">Normalising</div>
+                    <div class="ingestion-step">Complete</div>
+                </div>
+
+                <div class="ingestion-stats">
+                    <div class="ingestion-stat">
+                        <div class="ingestion-stat-value loading">---</div>
+                        <div class="ingestion-stat-label">Properties</div>
+                    </div>
+                    <div class="ingestion-stat">
+                        <div class="ingestion-stat-value loading">---</div>
+                        <div class="ingestion-stat-label">Total Value</div>
+                    </div>
+                    <div class="ingestion-stat">
+                        <div class="ingestion-stat-value loading">---</div>
+                        <div class="ingestion-stat-label">Data Passed</div>
+                    </div>
+                    <div class="ingestion-stat">
+                        <div class="ingestion-stat-value loading">---</div>
+                        <div class="ingestion-stat-label">Missing Core</div>
+                    </div>
+                </div>
+
+                <div class="ingestion-note">
+                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+                    Typical ingestion: <strong>2-5 minutes</strong> for portfolios under 1,000 units
+                </div>
+            </div>
+
+        </main>
+    </div>
+
+    <script>
+        // Simple drag and drop visual feedback
+        const dropZone = document.getElementById('dropZone');
+        
+        dropZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropZone.classList.add('dragover');
+        });
+        
+        dropZone.addEventListener('dragleave', () => {
+            dropZone.classList.remove('dragover');
+        });
+        
+        dropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropZone.classList.remove('dragover');
+            // In production, this would trigger file upload
+            // For demo, show the ingestion progress
+            document.getElementById('ingestionProgress').classList.add('active');
+        });
+    </script>
+</body>
+</html>
