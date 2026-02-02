@@ -43,6 +43,10 @@ from backend.core.pdf_extraction.pdf_pipeline import (
     CorruptedPDFError,
     EmptyPDFError,
 )
+from backend.workers.sov_processor import (
+    process_sov_to_silver,
+    is_sov_type,
+)
 from infrastructure.storage.s3_config import S3Config
 from infrastructure.storage.upload_service import UploadService
 
@@ -390,6 +394,11 @@ async def process_s3_put(event: Dict[str, Any]) -> Dict[str, Any]:
 
     parsed = _parse_partitioned_key(key)
     upload_id_uuid = uuid.UUID(parsed.submission_id)
+
+    # Handle property schedule (SOV) files - CSV/Excel property data
+    if is_sov_type(file_type=parsed.dataset, filename=key):
+        # Process SOV file to Silver layer
+        return await process_sov_to_silver(event)
 
     # If it's not a PDF dataset, no-op for now
     if not is_pdf_type(file_type=parsed.dataset, filename=key):
