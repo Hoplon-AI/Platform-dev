@@ -2,6 +2,8 @@
 
 ## Overview
 
+The UPRN mapping with confidence scoring is used to approximate the premium uprn API (too expensive for use) via postcode -> geospatial -> uprn. 
+
 The UPRN Confidence Scoring Engine provides a **deterministic, explainable** confidence score for address-to-UPRN matching. Unlike black-box ML approaches, every point in the score is attributable to a specific rule.
 
 ### Core Principle
@@ -105,26 +107,28 @@ final_score = clamp(final_score, 0.05, 0.95)
 
 The model provides implicit data quality signals:
 
-| Scenario | Signal |
-|----------|--------|
-| Green + MATCH | Data is good, matching works |
-| Green + MISMATCH | **UPRN data incomplete** - correct UPRN missing from database |
-| Yellow + MISMATCH | Expected - moderate ambiguity |
-| Red + MISMATCH | Expected - high ambiguity, need address matching |
+| Scenario | Signal                                                                                                        |
+|----------|---------------------------------------------------------------------------------------------------------------|
+| Green + MATCH | Data is good, matching works                                                                                  |
+| Green + MISMATCH | **UPRN data incomplete** - correct UPRN missing from database or 0.7 confidence and mismatch due to ambiguity |
+| Yellow + MISMATCH | Expected - moderate ambiguity                                                                                 |
+| Red + MISMATCH | Expected - high ambiguity, need address matching                                                              |
+
+"MISMATCH" refers to the premium API comparison
 
 ---
 
 ## Validation Results
 
-Tested against premium UPRN API (100 UK addresses):
+Tested against premium UPRN API (500 UK addresses):
 
-| Confidence Band | Accuracy | Interpretation |
-|-----------------|----------|----------------|
-| Green (HIGH) | ~100%* | Trustworthy when data is complete |
-| Yellow (MEDIUM) | ~58% | Needs verification |
-| Red (LOW) | ~20% | Manual check required |
+| Confidence Band | Accuracy        | Interpretation                                       |
+|-----------------|-----------------|------------------------------------------------------|
+| Green (HIGH) | ~67%*  (6/9)    | Trustworthy when data is complete and distance is 0m |
+| Yellow (MEDIUM) | ~60%  (25/42)   | Needs verification                                   |
+| Red (LOW) | ~11%   (51/449) | Manual check required                                |
 
-*Need some more testing, green is very rare + UPRN data was incomplete in the testing scenario.
+*The main issue is that the postcode db is incomplete.
 
 ---
 
@@ -184,11 +188,10 @@ class ScoringConfigV2:
 
 ---
 
-## Future Improvements
+## Potential Improvements
 
 To improve accuracy beyond the current model:
 
-1. **AddressBase Integration**: Licensed address-to-UPRN mapping would enable string matching
-2. **Building Name Matching**: Fuzzy matching on building/street names
-3. **Property Classification**: Residential vs commercial filtering
-4. **Historical Match Learning**: Track which candidates are confirmed correct over time
+1. **Better DB**: Find a complete postcode to geospatial data.
+2. **Property Classification**: Residential vs commercial filtering (not sure how).
+3. **Historical Match Learning**: Track which candidates are confirmed correct over time.
