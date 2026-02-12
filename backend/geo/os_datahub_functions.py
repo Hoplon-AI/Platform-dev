@@ -1,6 +1,32 @@
 import requests
 
 
+def get_coordinates_from_uprn(uprn, api_key):
+
+    url = "https://api.os.uk/search/places/v1/uprn"
+
+    params = {
+        'uprn': uprn,
+        'key': api_key
+    }
+
+    try:
+        response = requests.get(url, params=params)
+
+        response.raise_for_status()
+
+        data = response.json()
+
+        if 'results' in data and len(data['results']) > 0:
+            result = data['results'][0].get('DPA') or data['results'][0].get('LPI')
+            return result
+        else:
+            return "No match found."
+
+    except requests.exceptions.RequestException as e:
+        return f"An error occurred: {e}"
+
+
 def get_uprn_from_address(address, api_key):
 
     url = "https://api.os.uk/search/places/v1/find"
@@ -76,3 +102,8 @@ if isinstance(result, dict):
     print(f"DELIVERY_POINT_SUFFIX:   {result.get('DELIVERY_POINT_SUFFIX')}")
 else:
     print(result)
+
+result = get_coordinates_from_uprn(906421451, MY_API_KEY)
+if isinstance(result, dict):
+    print(f"X: {result.get('X_COORDINATE')}")
+    print(f"Y: {result.get('Y_COORDINATE')}")
