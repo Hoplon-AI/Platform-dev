@@ -6,16 +6,16 @@ Provides deterministic, auditable UPRN matching using:
 - ONS Postcode Directory (centroids)
 - PostGIS spatial queries
 """
-from .router import router
-from .models import (
+from backend.geo.confidence_mapping.router import router
+from backend.geo.confidence_mapping.models import (
     UPRNMatchRequest,
     UPRNMatchResponse,
     UPRNCandidate,
     ConfidenceBand,
     SignalBreakdown,
 )
-from .confidence import ConfidenceScorer, ScoringConfig
-from .repository import UPRNRepository
+from backend.geo.confidence_mapping.confidence import ConfidenceScorer, ScoringConfig
+from backend.geo.confidence_mapping.repository import UPRNRepository
 
 __all__ = [
     "router",

@@ -3,8 +3,8 @@ Tests for the UPRN Confidence Scoring Engine.
 Ensures deterministic, auditable behavior.
 """
 import pytest
-from backend.geo.confidence import ConfidenceScorer, RawCandidate, ScoringConfig
-from backend.geo.models import ConfidenceBand, AddressHint
+from backend.geo.confidence_mapping.confidence import ConfidenceScorer, RawCandidate
+from backend.geo.confidence_mapping.models import ConfidenceBand, AddressHint
 
 
 @pytest.fixture
