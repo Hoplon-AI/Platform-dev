@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
+import IngestionPage from "./pages/IngestionPage";
 
 import LandingPage from "./Landingpage.jsx";
 import { RAW_PROPERTIES } from "./data/properties";
@@ -199,46 +200,137 @@ function App() {
   }, []);
 
   // ✅ Leaflet map init + marker render (no react-leaflet)
-  useEffect(() => {
-    if (activeTab !== "portfolio") return;
-    if (!mapDivRef.current) return;
 
-    // Create map once
-    if (!leafletMapRef.current) {
-      const m = L.map(mapDivRef.current, {
-        scrollWheelZoom: false,
-        zoomControl: true,
-      }).setView([54.5, -3], 5);
+  // Group properties per city for popup detail
+const propertiesByCity = useMemo(() => {
+  const map = {};
+  RAW_PROPERTIES.forEach((p) => {
+    if (!p.city) return;
+    if (!map[p.city]) map[p.city] = [];
+    map[p.city].push(p);
+  });
+  return map;
+}, []);
 
-      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-        attribution: "&copy; OpenStreetMap",
-      }).addTo(m);
+/* ========================= MAP INITIALISATION ========================= */
 
-      leafletMapRef.current = m;
-      markerLayerRef.current = L.layerGroup().addTo(m);
+// create map ONLY when portfolio tab is first opened
+useEffect(() => {
+  if (activeTab !== "portfolio") return;
+  if (!mapDivRef.current) return;
+  if (leafletMapRef.current) return;
 
-      // When tab first opens, Leaflet sometimes needs a size nudge
-      setTimeout(() => m.invalidateSize(), 50);
-    }
+  const map = L.map(mapDivRef.current, {
+    scrollWheelZoom: false,
+    zoomControl: true,
+  }).setView([54.5, -3], 5);
 
-    // Refresh markers
-    const layer = markerLayerRef.current;
-    layer.clearLayers();
+  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+    attribution: "&copy; OpenStreetMap",
+  }).addTo(map);
 
-    citySummary.forEach((c) => {
-      const marker = L.marker([c.lat, c.lon]);
-      marker.bindPopup(
-        `<strong>${c.city}</strong><br/>
-         Properties: ${c.count}<br/>
-         Value: £${fmtMoneyM(c.totalValue, 1)}m<br/>
-         Avg risk: ${fmt(c.avgRisk, 2)}`
-      );
-      marker.addTo(layer);
+  leafletMapRef.current = map;
+  markerLayerRef.current = L.layerGroup().addTo(map);
+
+  // first render fix (React layout timing)
+  setTimeout(() => map.invalidateSize(), 150);
+
+}, [activeTab]);
+
+
+/* ========================= READINESS COLOUR ========================= */
+
+const getReadinessColour = (p) => {
+  let score = 0;
+
+  if (p.postcode) score++;
+  if (p.sumInsured) score++;
+  if (p.epcRating) score++;
+  if (p.wallConstruction) score++;
+  if (p.roofConstruction) score++;
+  if (p.numberOfStoreys != null) score++;
+  if (p.floodScore != null) score++;
+
+  if (score <= 2) return "#ef4444";   // red
+  if (score <= 5) return "#f59e0b";   // yellow
+  return "#22c55e";                   // green
+};
+
+
+/* ========================= PROPERTY MARKERS ========================= */
+
+useEffect(() => {
+  if (!leafletMapRef.current || !markerLayerRef.current) return;
+
+  const layer = markerLayerRef.current;
+  layer.clearLayers();
+
+  RAW_PROPERTIES.forEach((p) => {
+    if (!p.lat || !p.lon) return;
+
+    const colour = getReadinessColour(p);
+
+    const marker = L.circleMarker([p.lat, p.lon], {
+      radius: 8,
+      fillColor: colour,
+      color: "#1f2937",
+      weight: 1,
+      fillOpacity: 0.9,
     });
 
-    // Also invalidate size every time we land on the tab
-    setTimeout(() => leafletMapRef.current?.invalidateSize(), 50);
-  }, [activeTab, citySummary]);
+    marker.bindPopup(`
+      <div style="min-width:240px; font-size:13px;">
+        <strong style="font-size:14px;">${p.address1 || "Unknown address"}</strong><br/>
+        ${p.address2 || ""}<br/>
+        <b>${p.city || ""} ${p.postcode || ""}</b>
+
+        <hr/>
+
+        <b>Property</b><br/>
+        Type: ${p.propertyType || "—"}<br/>
+        Tenure: ${p.occupancyType || "—"}<br/>
+        Floors: ${p.numberOfStoreys ?? "—"}<br/>
+        Flats: ${p.numberOfFlats ?? "—"}
+
+        <hr/>
+
+        <b>Construction</b><br/>
+        Walls: ${p.wallConstruction || "—"}<br/>
+        Roof: ${p.roofConstruction || "—"}<br/>
+        EPC: ${p.epcRating || "—"}
+
+        <hr/>
+
+        <b>Risk</b><br/>
+        Flood score: ${fmt(p.floodScore,2)}<br/>
+        Claim frequency: ${fmt(p.claimFrequency,2)} /yr<br/>
+        Risk band: ${p.riskBand || "—"}
+
+        <hr/>
+
+        <b>Location</b><br/>
+        Lat: ${fmt(p.lat,5)}<br/>
+        Lon: ${fmt(p.lon,5)}
+      </div>
+    `);
+
+    marker.addTo(layer);
+  });
+
+}, [activeTab]);
+
+
+/* ========================= TAB SWITCH FIX ========================= */
+
+useEffect(() => {
+  if (activeTab !== "portfolio") return;
+  if (!leafletMapRef.current) return;
+
+  setTimeout(() => {
+    leafletMapRef.current.invalidateSize();
+  }, 120);
+
+}, [activeTab]);
 
   // Optional cleanup if you ever want map destroyed when leaving tab:
   // (keep it persistent for speed; uncomment to fully remove on tab switch)
@@ -299,64 +391,12 @@ function App() {
 
         {/* -------------------- INGESTION -------------------- */}
         {activeTab === "ingestion" && (
-          <div className="app-layout" style={{ gridTemplateColumns: "1fr" }}>
-            <section className="card">
-              <div className="card-header">
-                <h2 className="card-title">Upload schedules of values</h2>
-                <span className="card-badge">CSV parsed client-side</span>
-              </div>
-
-              <div style={{ padding: 24 }}>
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept=".csv"
-                  hidden
-                  onChange={(e) => handleFiles(e.target.files)}
-                />
-
-                <button
-                  className="btn-primary"
-                  onClick={() => fileInputRef.current?.click()}
-                >
-                  Upload CSV
-                </button>
-
-                <div style={{ marginTop: 14, fontSize: 13, color: "#6b7280" }}>
-                  Snapshot: {portfolioSnapshot.source} ·{" "}
-                  {portfolioSnapshot.propertyCount} properties · £
-                  {fmtMoneyM(portfolioSnapshot.totalValue, 1)}m · Missing core:{" "}
-                  {portfolioSnapshot.missingCore}
-                </div>
-
-                {pipelineStep && (
-                  <div style={{ marginTop: 12, fontSize: 13 }}>
-                    <strong>Pipeline:</strong> {pipelineStep}
-                  </div>
-                )}
-
-                {uploadError && (
-                  <div style={{ marginTop: 10, color: "crimson" }}>
-                    {uploadError}
-                  </div>
-                )}
-
-                {!!uploadedFiles.length && (
-                  <div style={{ marginTop: 14, fontSize: 13 }}>
-                    <strong>Selected files:</strong>{" "}
-                    {uploadedFiles.map((f) => f.name).join(", ")}
-                  </div>
-                )}
-
-                {ingestionSummary && (
-                  <pre style={{ marginTop: 16, fontSize: 12 }}>
-                    {JSON.stringify(ingestionSummary, null, 2)}
-                  </pre>
-                )}
-              </div>
-            </section>
-          </div>
-        )}
+  <IngestionPage
+    onFilesSelected={handleFiles}
+    pipelineStep={pipelineStep}
+    ingestionSummary={ingestionSummary}
+  />
+)}
 
         {/* -------------------- UNDERWRITER DASHBOARD -------------------- */}
         {activeTab === "portfolio" && (
