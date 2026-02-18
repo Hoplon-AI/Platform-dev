@@ -392,3 +392,105 @@ select.input:focus {
     border: 1px solid rgba(255, 255, 255, 0.28);
   }
 }
+
+.ingestion-wrapper {
+  padding: 40px;
+}
+
+.page-header {
+  text-align: center;
+  margin-bottom: 30px;
+}
+
+.page-title {
+  font-size: 28px;
+  font-weight: 700;
+}
+
+.page-strapline {
+  color: #4f46e5;
+  font-weight: 600;
+  margin-top: 6px;
+}
+
+.page-subtitle {
+  color: #6b7280;
+}
+
+.journey-steps {
+  display: flex;
+  justify-content: center;
+  gap: 40px;
+  margin: 40px 0;
+}
+
+.step-number {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #e5e7eb;
+  font-weight: bold;
+}
+
+.step-number.active {
+  background: #2563eb;
+  color: white;
+}
+
+.upload-card {
+  max-width: 720px;
+  margin: auto;
+  background: white;
+  border-radius: 14px;
+  padding: 32px;
+  border: 2px solid #2563eb;
+}
+
+.upload-zone {
+  border: 2px dashed #cbd5e1;
+  padding: 50px;
+  text-align: center;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: 0.2s;
+}
+
+.upload-zone.dragover {
+  background: #eff6ff;
+  border-color: #2563eb;
+}
+
+.btn {
+  padding: 12px 18px;
+  border-radius: 8px;
+  border: none;
+  margin: 10px;
+  cursor: pointer;
+}
+
+.btn-primary {
+  background: #2563eb;
+  color: white;
+}
+
+.btn-secondary {
+  background: white;
+  border: 1px solid #2563eb;
+  color: #2563eb;
+}
+
+.ingestion-progress {
+  margin-top: 30px;
+  padding: 20px;
+  background: #f8fafc;
+  border-radius: 10px;
+}
+
+.ingestion-stats {
+  display: flex;
+  justify-content: space-around;
+  margin-top: 15px;
+}
