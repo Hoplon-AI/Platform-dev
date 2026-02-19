@@ -58,7 +58,7 @@ def get_uprn_from_address(address, api_key):
 MY_API_KEY = "Ajrj5AiJphBOM2GdP7KqVx6Ax6CTemtY"
 search_address = "10 Downing Street, London"
 search_address = "2 Grange Loan, Edinburgh"
-search_address = "1/8 Cables Wynd, Leith, Edinburgh EH6 6DU"
+#search_address = "1/8 Cables Wynd, Leith, Edinburgh EH6 6DU"
 
 #parent_uprn: 906421443
 
