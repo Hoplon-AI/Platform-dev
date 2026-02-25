@@ -1,7 +1,8 @@
 {
   "permissions": {
     "allow": [
-      "WebFetch(domain:epc.opendatacommunities.org)"
+      "WebFetch(domain:epc.opendatacommunities.org)",
+      "WebSearch"
     ]
   }
 }
