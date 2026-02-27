@@ -1,3 +1,4 @@
+
 """
 Main FastAPI application entry point.
 """
@@ -9,6 +10,8 @@ from backend.api.ingestion.upload_router import router as upload_router
 from backend.api.v1.lineage_router import router as lineage_router
 from backend.api.v1.portfolios_router import router as portfolios_router
 from backend.api.v1.ha_profile_router import router as ha_profile_router
+from backend.api.v1.underwriter_router import router as underwriter_router
+from backend.api.v1.pdf_test_router import router as pdf_test_router
 from backend.core.database.db_pool import DatabasePool
 from infrastructure.storage.s3_config import get_s3_config
 
@@ -55,6 +58,9 @@ app.include_router(upload_router)
 app.include_router(lineage_router)
 app.include_router(portfolios_router)
 app.include_router(ha_profile_router)
+app.include_router(underwriter_router)
+app.include_router(pdf_test_router)
+
 
 
 @app.get("/")
