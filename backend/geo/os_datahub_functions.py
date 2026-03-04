@@ -1,7 +1,30 @@
+"""OS Data Hub API wrappers.
+
+Thin wrappers around the OS Places API for UPRN lookups and address searches.
+API docs: https://osdatahub.os.uk/docs/places/overview
+
+Both functions return either a DPA/LPI result dict on success, or an error
+string on failure. Callers should check ``isinstance(result, dict)``.
+"""
+
 import requests
 
 
 def get_coordinates_from_uprn(uprn, api_key):
+    """Look up a UPRN and return its full address record (DPA or LPI).
+
+    Uses the OS Places UPRN endpoint. This is an exact lookup — no fuzzy
+    matching. The returned dict includes X_COORDINATE / Y_COORDINATE
+    (British National Grid), ADDRESS, UPRN, PARENT_UPRN, POSTCODE, etc.
+
+    Args:
+        uprn: The UPRN to look up (str or int).
+        api_key: OS Data Hub API key (Places API).
+
+    Returns:
+        dict: DPA/LPI record with address fields and BNG coordinates.
+        str: Error message if no match or request fails.
+    """
 
     url = "https://api.os.uk/search/places/v1/uprn"
 
@@ -28,6 +51,21 @@ def get_coordinates_from_uprn(uprn, api_key):
 
 
 def get_uprn_from_address(address, api_key):
+    """Search for an address and return the best-matching record.
+
+    Uses the OS Places free-text search endpoint. Returns the top result
+    only (maxresults=1). The returned dict includes a MATCH score (0.0-1.0)
+    and MATCH_DESCRIPTION (EXACT / GOOD / FAIR / POOR) indicating how
+    closely the query matched the canonical address.
+
+    Args:
+        address: Free-text address string (e.g. "30 Sycamore Drive, Carterton").
+        api_key: OS Data Hub API key (Places API).
+
+    Returns:
+        dict: DPA/LPI record with UPRN, ADDRESS, MATCH, coordinates, etc.
+        str: Error message if no match or request fails.
+    """
 
     url = "https://api.os.uk/search/places/v1/find"
 
@@ -59,6 +97,7 @@ if __name__ == "__main__":
     MY_API_KEY = "Ajrj5AiJphBOM2GdP7KqVx6Ax6CTemtY"
     search_address = "10 Downing Street, London"
     search_address = "3/2 Grange Loan, Edinburgh, EH9 2NP"
+    search_address = "Flat 9 Whittingham Court, Tower Hill"
     #search_address = "1/8 Cables Wynd, Leith, Edinburgh EH6 6DU"
     #search_address = "30 Sycamore Drive, Carterton, OX18 3AT"
 

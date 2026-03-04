@@ -1,3 +1,15 @@
+"""Building height and floor count lookup via OS NGD Buildings API.
+
+Pipeline: UPRN -> BNG coordinates (OS Places) -> nearest building (NGD Buildings).
+Uses the bld-fts-building-4 collection which includes height data, number of
+floors, building area, and roof/construction attributes.
+
+API docs: https://osdatahub.os.uk/docs/ofa/overview
+Requires an NGD API key (separate from the Places API key).
+
+Returns a dict on success or an error string on failure.
+"""
+
 import requests
 from os_datahub_functions import get_coordinates_from_uprn
 
@@ -10,7 +22,18 @@ BBOX_BUFFER_M = 15  # meters around the UPRN point
 def get_building_from_coords(x: float, y: float, api_key: str) -> dict | str:
     """Query NGD Buildings API with a tight bbox around BNG coordinates.
 
-    Returns the nearest building feature dict, or an error string.
+    Creates a 30m x 30m bounding box centred on the point, fetches up to 10
+    building features, and returns the one whose centroid is closest to the
+    input coordinates. Handles both Polygon and MultiPolygon geometries.
+
+    Args:
+        x: Easting in British National Grid (EPSG:27700).
+        y: Northing in British National Grid (EPSG:27700).
+        api_key: OS Data Hub API key (NGD Features API).
+
+    Returns:
+        dict: GeoJSON feature of the nearest building.
+        str: Error message if no building found or request fails.
     """
     bbox = f"{x - BBOX_BUFFER_M},{y - BBOX_BUFFER_M},{x + BBOX_BUFFER_M},{y + BBOX_BUFFER_M}"
 
@@ -63,10 +86,28 @@ def get_building_height_from_uprn(
     places_api_key: str,
     ngd_api_key: str,
 ) -> dict | str:
-    """Get building height for a UPRN.
+    """Get building height, floor count, and area for a UPRN.
 
-    Returns a dict with height fields and metadata, or an error string.
-    Uses OS Places API (coordinates) -> NGD Buildings API (height).
+    Two-step lookup:
+      1. UPRN -> BNG coordinates via OS Places API
+      2. Coordinates -> nearest building via NGD Buildings API
+
+    Args:
+        uprn: The UPRN to look up (str or int).
+        places_api_key: OS Data Hub API key (Places API).
+        ngd_api_key: OS Data Hub API key (NGD Features API).
+
+    Returns:
+        dict: Building data with keys:
+            - uprn, address, x_coordinate, y_coordinate
+            - height_relativemax_m: Height from ground to the highest point
+            - height_relativeroofbase_m: Height from ground to roof base (eaves)
+            - height_absolutemax_m/min_m: Heights above sea level
+            - height_confidencelevel: Moderate / Good / Suspect
+            - numberoffloors: Estimated floor count (1-99, ~95% accurate for 1-2 storeys)
+            - geometry_area_m2: Building footprint area
+            - osid, description
+        str: Error message if lookup fails at any step.
     """
     # Step 1: UPRN -> BNG coordinates
     place = get_coordinates_from_uprn(uprn, places_api_key)
@@ -97,6 +138,8 @@ def get_building_height_from_uprn(
         "height_absolutemin_m": props.get("height_absolutemin_m"),
         "height_absoluteroofbase_m": props.get("height_absoluteroofbase_m"),
         "height_confidencelevel": props.get("height_confidencelevel"),
+        # Number of floors (from NGD Building Part)
+        "numberoffloors": props.get("numberoffloors"),
         # Bonus fields available on the building feature
         "geometry_area_m2": props.get("geometry_area_m2"),
         "osid": props.get("osid"),
@@ -124,6 +167,7 @@ if __name__ == "__main__":
             print(f"Height (max):        {result['height_relativemax_m']} m")
             print(f"Height (roof base):  {result['height_relativeroofbase_m']} m")
             print(f"Height confidence:   {result['height_confidencelevel']}")
+            print(f"Number of floors:   {result['numberoffloors']}")
             print(f"Building area:       {result['geometry_area_m2']} m²")
             print(f"OS ID:               {result['osid']}")
         else:
