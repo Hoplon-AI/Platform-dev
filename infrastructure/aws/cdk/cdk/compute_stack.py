@@ -1,6 +1,9 @@
 """
 Compute stack: ECS Fargate cluster, ALB, and service definitions.
 """
+import os
+from pathlib import Path
+
 from aws_cdk import (
     Stack,
     CfnOutput,
@@ -9,11 +12,15 @@ from aws_cdk import (
     aws_elasticloadbalancingv2 as elbv2,
     aws_iam as iam,
     aws_logs as logs,
+    aws_ecr_assets as ecr_assets,
     Duration,
     Tags,
     RemovalPolicy,
 )
 from constructs import Construct
+
+# Path to project root (where Dockerfile lives)
+PROJECT_ROOT = Path(__file__).parent.parent.parent.parent.parent
 
 
 class ComputeStack(Stack):
@@ -29,7 +36,10 @@ class ComputeStack(Stack):
         bronze_bucket,
         db_secret,
         secrets_key,
+        s3_key,
         database_security_group: ec2.ISecurityGroup,
+        database_host: str = "",
+        database_port: int = 5432,
         **kwargs
     ) -> None:
         super().__init__(scope, construct_id, **kwargs)
@@ -146,32 +156,43 @@ class ComputeStack(Stack):
         task_definition = ecs.FargateTaskDefinition(
             self,
             "BackendTaskDefinition",
-            memory_limit_mib=512,  # 512 MB for dev
-            cpu=256,  # 0.25 vCPU for dev
+            memory_limit_mib=1024,  # 1 GB for FastAPI + dependencies
+            cpu=512,  # 0.5 vCPU for dev
             execution_role=ecs_execution_role,
             task_role=ecs_task_role,
+        )
+
+        # Build Docker image from project root
+        backend_image = ecr_assets.DockerImageAsset(
+            self,
+            "BackendImage",
+            directory=str(PROJECT_ROOT),
+            platform=ecr_assets.Platform.LINUX_AMD64,
         )
 
         # Container definition
         container = task_definition.add_container(
             "BackendContainer",
-            image=ecs.ContainerImage.from_registry(
-                "nginx:latest"
-            ),  # Placeholder - replace with actual image
+            image=ecs.ContainerImage.from_docker_image_asset(backend_image),
             logging=ecs.LogDrivers.aws_logs(
                 stream_prefix="platform-backend",
                 log_group=log_group,
             ),
             environment={
                 "ENVIRONMENT": "dev",
-                "AWS_REGION": self.region,
+                "AWS_DEFAULT_REGION": self.region,
                 "BRONZE_BUCKET": bronze_bucket.bucket_name,
+                "S3_BUCKET_NAME": bronze_bucket.bucket_name,
+                "DB_SECRET_ARN": db_secret.secret_arn,
+                "DATABASE_HOST": database_host,
+                "DATABASE_PORT": str(database_port),
+                "DEV_MODE": "true",
             },
         )
 
         container.add_port_mappings(
             ecs.PortMapping(
-                container_port=8000,  # FastAPI default port
+                container_port=8000,  # FastAPI port
                 protocol=ecs.Protocol.TCP,
             )
         )
@@ -195,13 +216,13 @@ class ComputeStack(Stack):
         # Add target to ALB
         http_listener.add_targets(
             "BackendTargets",
-            port=8000,
+            port=8000,  # FastAPI port
             protocol=elbv2.ApplicationProtocol.HTTP,
             targets=[service],
             health_check=elbv2.HealthCheck(
-                path="/health",
+                path="/health",  # FastAPI health endpoint
                 interval=Duration.seconds(30),
-                timeout=Duration.seconds(5),
+                timeout=Duration.seconds(10),
                 healthy_threshold_count=2,
                 unhealthy_threshold_count=3,
             ),
@@ -220,7 +241,10 @@ class ComputeStack(Stack):
 
         # Grant S3 access to task role (least privilege)
         bronze_bucket.grant_read_write(ecs_task_role)
-        
+
+        # Grant KMS permissions for S3 encryption
+        s3_key.grant_encrypt_decrypt(ecs_task_role)
+
         # Also grant access to processed bucket if needed
         # processed_bucket.grant_read(ecs_task_role)  # Uncomment if needed
 

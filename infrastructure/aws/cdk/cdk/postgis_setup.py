@@ -76,7 +76,7 @@ def handler(event, context):
     }}
 """.format(
                     secret_arn=db_secret_arn,
-                    db_endpoint=database.instance_endpoint.hostname,
+                    db_endpoint=database.cluster_endpoint.hostname,
                 )
             ),
             vpc=vpc,

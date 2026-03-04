@@ -24,8 +24,11 @@ import pdfplumber
 
 
 PDF_TYPES = {
+    "fra",
     "fra_document",
+    "fraew",
     "fraew_document",
+    "scr",
     "scr_document",
 }
 
@@ -605,6 +608,365 @@ def extract_fra_features(text: str) -> Dict[str, Any]:
     }
 
 
+def extract_scr_features(text: str) -> Dict[str, Any]:
+    """
+    Extract SCR-specific features from PDF text content.
+
+    SCR documents (Safety Case Reports / Building Safety Case Reports) contain
+    comprehensive building safety information required under the Building Safety Act 2022
+    for Higher-Risk Residential Buildings (HRRBs - 18m+ or 7+ storeys).
+    """
+    text_lower = text.lower()
+
+    # Building identification
+    building_name = None
+    building_patterns = [
+        r"building\s+name[:\s]+([A-Za-z0-9\s,\-()]+?)(?:\n|address|uprn)",
+        r"block[:\s]+([A-Za-z0-9\s\-()]+(?:Court|House|Tower|Block))",
+        r"(?:crocodile|aura|tower|court)\s+(?:court|house|tower|block)\s*\(?([A-Za-z0-9\s]*)\)?",
+    ]
+    for pattern in building_patterns:
+        match = re.search(pattern, text, re.I)
+        if match:
+            building_name = match.group(1).strip() if match.group(1) else match.group(0).strip()
+            building_name = re.sub(r"([a-z])([A-Z])", r"\1 \2", building_name)
+            break
+
+    # Also try to find building name from "Building Safety Case Report for <name>"
+    if not building_name:
+        scr_title_match = re.search(r"safety\s+case\s+report\s+(?:for\s+)?([A-Za-z0-9\s,\-()]+?)(?:\n|address|version)", text, re.I)
+        if scr_title_match:
+            building_name = scr_title_match.group(1).strip()
+
+    # Building address
+    building_address = None
+    address_patterns = [
+        r"address[:\s]+([A-Za-z0-9\s,\-]+?(?:Road|Street|Lane|Avenue|Close|Drive|Way)[^.]*?[A-Z]{1,2}\d{1,2}[A-Z]?\s?\d[A-Z]{2})",
+        r"(\d+\s+[A-Za-z\s]+(?:Road|Street|Lane|Avenue),?\s*[A-Za-z\s]+,?\s*[A-Z]{1,2}\d{1,2}[A-Z]?\s?\d[A-Z]{2})",
+    ]
+    for pattern in address_patterns:
+        match = re.search(pattern, text, re.I)
+        if match:
+            building_address = match.group(1).strip()
+            break
+
+    # BSR Registration number (e.g., HRB12881N5H4)
+    bsr_registration = None
+    bsr_match = re.search(r"(?:bsr\s+registration|hrb)[:\s]*([A-Z0-9]{10,15})", text, re.I)
+    if bsr_match:
+        bsr_registration = bsr_match.group(1).upper()
+    else:
+        # Try pattern matching HRB numbers directly
+        hrb_match = re.search(r"\b(HRB[A-Z0-9]{8,12})\b", text)
+        if hrb_match:
+            bsr_registration = hrb_match.group(1)
+
+    # UPRN extraction - capture both labeled values and standard 12-digit UPRNs
+    # 1. Labeled UPRN field (whatever the document calls "UPRN")
+    uprn_labeled = None
+    uprn_label_match = re.search(r"UPRN[:\s]+([A-Z0-9]+)", text, re.I)
+    if uprn_label_match:
+        uprn_labeled = uprn_label_match.group(1)
+
+    # 2. Standard 12-digit UPRNs anywhere in the document
+    uprns = sorted(set(re.findall(r"\b\d{12}\b", text)))
+
+    # 3. Building reference (may be same as labeled UPRN if not a standard format)
+    building_reference = None
+    # If labeled UPRN is not a 12-digit number, it's likely a building reference
+    if uprn_labeled and not re.match(r"^\d{12}$", uprn_labeled):
+        building_reference = uprn_labeled
+    else:
+        # Try other building reference patterns
+        ref_match = re.search(r"(?:building\s+ref(?:erence)?|block\s+(?:id|code))[:\s]+([A-Z0-9]+)", text, re.I)
+        if ref_match:
+            building_reference = ref_match.group(1)
+
+    # Building height in metres
+    building_height = None
+    height_match = re.search(r"(?:building\s+)?height[:\s]+(\d+(?:\.\d+)?)\s*(?:m|metres?)", text, re.I)
+    if height_match:
+        building_height = float(height_match.group(1))
+
+    # Number of storeys
+    number_of_storeys = None
+    storeys_patterns = [
+        r"(\d+)\s+(?:storey|floor)s?(?:\s+building)?",
+        r"(?:number\s+of\s+)?(?:storey|floor)s?[:\s]+(\d+)",
+    ]
+    for pattern in storeys_patterns:
+        match = re.search(pattern, text, re.I)
+        if match:
+            number_of_storeys = int(match.group(1))
+            break
+
+    # Determine height category
+    height_category = None
+    if building_height and building_height >= 18:
+        height_category = "HIGH_RISE"
+    elif building_height and building_height >= 11:
+        height_category = "MEDIUM_RISE"
+    elif building_height:
+        height_category = "LOW_RISE"
+    elif number_of_storeys and number_of_storeys >= 7:
+        height_category = "HIGH_RISE"
+    elif number_of_storeys and number_of_storeys >= 4:
+        height_category = "MEDIUM_RISE"
+    elif number_of_storeys:
+        height_category = "LOW_RISE"
+
+    # Construction year
+    construction_year = None
+    year_match = re.search(r"(?:built|constructed|construction\s+year)[:\s]+(\d{4})", text, re.I)
+    if year_match:
+        construction_year = int(year_match.group(1))
+    else:
+        # Try finding a year in context of building completion
+        year_match = re.search(r"completed\s+(?:in\s+)?(\d{4})", text, re.I)
+        if year_match:
+            construction_year = int(year_match.group(1))
+
+    # Building type
+    building_type = None
+    if "higher-risk residential building" in text_lower or "hrrb" in text_lower:
+        building_type = "HRRB"
+    elif "residential" in text_lower:
+        building_type = "RESIDENTIAL"
+
+    # Total units
+    total_units = None
+    units_match = re.search(r"(\d+)\s+(?:units?|flats?|apartments?)", text, re.I)
+    if units_match:
+        total_units = int(units_match.group(1))
+
+    # Safety case metadata
+    safety_case_version = None
+    version_match = re.search(r"version[:\s]+([0-9.]+)", text, re.I)
+    if version_match:
+        safety_case_version = version_match.group(1)
+
+    safety_case_date = None
+    scr_date_patterns = [
+        r"(?:issue\s+date|document\s+date|date)[:\s]+(\d{2}[/-]\d{2}[/-]\d{4})",
+        r"dated[:\s]+(\d{2}[/-]\d{2}[/-]\d{4})",
+    ]
+    for pattern in scr_date_patterns:
+        match = re.search(pattern, text, re.I)
+        if match:
+            date_str = match.group(1)
+            safety_case_date = _convert_text_date_to_iso(date_str) or date_str
+            break
+
+    # Principal Accountable Person (PAP)
+    pap = None
+    pap_match = re.search(r"(?:principal\s+accountable\s+person|pap)[:\s]+([A-Za-z\s]+?)(?:\n|address|telephone)", text, re.I)
+    if pap_match:
+        pap = pap_match.group(1).strip()
+
+    # Building Safety Manager (BSM)
+    bsm = None
+    bsm_match = re.search(r"(?:building\s+safety\s+manager|bsm)[:\s]+([A-Za-z\s]+?)(?:\n|address|telephone)", text, re.I)
+    if bsm_match:
+        bsm = bsm_match.group(1).strip()
+
+    # Accountable person entity
+    accountable_entity = None
+    entity_patterns = [
+        r"(?:accountable\s+person|managing\s+agent)[:\s]+([A-Za-z0-9\s]+(?:Heart|Group|Limited|Ltd|Association))",
+        r"(Midland\s+Heart|Entity\s+Group|[A-Za-z]+\s+Housing)",
+    ]
+    for pattern in entity_patterns:
+        match = re.search(pattern, text, re.I)
+        if match:
+            accountable_entity = match.group(1).strip()
+            break
+
+    # FRA information
+    fra_type = None
+    fra_type_match = re.search(r"(?:fra\s+)?type[:\s]+(\d+)", text, re.I)
+    if fra_type_match:
+        fra_type = f"Type {fra_type_match.group(1)}"
+
+    fra_date = None
+    fra_date_match = re.search(r"(?:fra|fire\s+risk\s+assessment)\s+date[:\s]+(\d{2}[/-]\d{2}[/-]\d{4})", text, re.I)
+    if fra_date_match:
+        fra_date = _convert_text_date_to_iso(fra_date_match.group(1)) or fra_date_match.group(1)
+
+    fra_assessor = None
+    assessor_match = re.search(r"(?:fra\s+)?assessor[:\s]+([A-Za-z\s]+?)(?:\n|mifsm|credentials)", text, re.I)
+    if assessor_match:
+        fra_assessor = assessor_match.group(1).strip()
+
+    fra_credentials = None
+    creds_match = re.search(r"(MIFSM|AIFireE|MIFireE|FIFireE|GIFireE|TechIFireE|CMIOSH)[,\s]*(MIFSM|AIFireE|MIFireE|FIFireE|GIFireE|TechIFireE|CMIOSH)*", text)
+    if creds_match:
+        fra_credentials = " ".join(filter(None, creds_match.groups()))
+
+    fra_peer_reviewer = None
+    reviewer_match = re.search(r"(?:peer\s+)?reviewer[:\s]+([A-Za-z\s]+?)(?:\n|mifsm|credentials)", text, re.I)
+    if reviewer_match:
+        fra_peer_reviewer = reviewer_match.group(1).strip()
+
+    # Evacuation strategy
+    evacuation_strategy = None
+    if "full evacuation" in text_lower:
+        evacuation_strategy = "FULL_EVACUATION"
+    elif "stay put" in text_lower or "stay-put" in text_lower:
+        evacuation_strategy = "STAY_PUT"
+    elif "simultaneous evacuation" in text_lower:
+        evacuation_strategy = "SIMULTANEOUS"
+    elif "phased evacuation" in text_lower:
+        evacuation_strategy = "PHASED"
+    elif "defend in place" in text_lower:
+        evacuation_strategy = "DEFEND_IN_PLACE"
+
+    evacuation_description = None
+    evac_desc_match = re.search(r"evacuation\s+strategy[:\s]+([^.]+\.)", text, re.I)
+    if evac_desc_match:
+        evacuation_description = evac_desc_match.group(1).strip()
+
+    personal_evacuation_plans_required = "personal evacuation plan" in text_lower or "peep" in text_lower
+
+    # Fire safety systems
+    fire_alarm_type = None
+    alarm_match = re.search(r"(?:fire\s+alarm|bs\s*5839)[:\s]*(?:pt\s*1)?[:\s]*(l[0-5]|grade\s*[a-d])", text, re.I)
+    if alarm_match:
+        fire_alarm_type = f"BS 5839 pt1: {alarm_match.group(1).upper()}"
+
+    smoke_detection_type = None
+    smoke_match = re.search(r"(?:smoke\s+detection|bs\s*5839)[:\s]*(?:pt\s*6)?[:\s]*(l[0-5])", text, re.I)
+    if smoke_match:
+        smoke_detection_type = smoke_match.group(1).upper()
+
+    firefighters_lift = "firefighter" in text_lower and "lift" in text_lower
+    dry_riser = "dry riser" in text_lower
+    wet_riser = "wet riser" in text_lower
+    sprinklers = "sprinkler" in text_lower
+    aov = "aov" in text_lower or "automatic opening vent" in text_lower
+    emergency_lighting = "emergency lighting" in text_lower
+    fire_compartmentation = "compartmentation" in text_lower
+    premises_info_box = "premises information box" in text_lower or "pib" in text_lower
+
+    # Structural information
+    construction_type = None
+    const_patterns = [
+        r"(?:construction|structure)\s+type[:\s]+([A-Za-z\s]+?)(?:\n|floor|wall)",
+        r"(reinforced\s+concrete|masonry|steel\s+frame|timber\s+frame)",
+    ]
+    for pattern in const_patterns:
+        match = re.search(pattern, text, re.I)
+        if match:
+            construction_type = match.group(1).strip().title()
+            break
+
+    cladding_type = None
+    cladding_patterns = [
+        r"cladding\s+(?:type|material)[:\s]+([A-Za-z\s]+?)(?:\n|status|safe)",
+        r"(ACM|HPL|timber\s+cladding|brick\s+slip|render)",
+    ]
+    for pattern in cladding_patterns:
+        match = re.search(pattern, text, re.I)
+        if match:
+            cladding_type = match.group(1).strip().upper()
+            break
+
+    cladding_status = None
+    if "cladding safe" in text_lower or "no acm" in text_lower:
+        cladding_status = "safe"
+    elif "cladding removal" in text_lower or "remediation" in text_lower:
+        cladding_status = "remediation_required"
+
+    building_control_cert = "building control certificate" in text_lower or "completion certificate" in text_lower
+    gas_detectors = "gas detector" in text_lower or "gas monitor" in text_lower
+    lightning_protection = "lightning protection" in text_lower
+
+    # Structural issues
+    structural_issues = "structural issue" in text_lower or "structural concern" in text_lower or "structural defect" in text_lower
+
+    # BSA 2022 compliance
+    bsa_applicable = "building safety act" in text_lower or "bsa 2022" in text_lower
+    mor_in_place = "mandatory occurrence report" in text_lower or "mor" in text_lower
+    resident_engagement = "resident engagement" in text_lower or "customer engagement" in text_lower
+
+    # Key contacts extraction
+    key_contacts = []
+    contact_patterns = [
+        (r"fire\s+safety[^@]*?(\S+@\S+\.\S+)", "fire_safety"),
+        (r"building\s+safety[^@]*?(\S+@\S+\.\S+)", "building_safety"),
+        (r"emergency[^@]*?(\S+@\S+\.\S+)", "emergency"),
+    ]
+    for pattern, contact_type in contact_patterns:
+        match = re.search(pattern, text, re.I)
+        if match:
+            key_contacts.append({"type": contact_type, "email": match.group(1).lower()})
+
+    return {
+        # Building identification
+        "building_name": building_name,
+        "building_address": building_address,
+        "bsr_registration_number": bsr_registration,
+        "building_reference": building_reference,
+        "uprn_labeled": uprn_labeled,  # Whatever the document labels as "UPRN"
+        "uprns": uprns,  # Standard 12-digit UPRNs found in document
+
+        # Building characteristics
+        "building_height_metres": building_height,
+        "number_of_storeys": number_of_storeys,
+        "height_category": height_category,
+        "construction_year": construction_year,
+        "building_type": building_type,
+        "total_units": total_units,
+
+        # Safety case metadata
+        "safety_case_version": safety_case_version,
+        "safety_case_date": safety_case_date,
+        "principal_accountable_person": pap,
+        "building_safety_manager": bsm,
+        "accountable_person_entity": accountable_entity,
+
+        # FRA information
+        "fra_type": fra_type,
+        "fra_date": fra_date,
+        "fra_assessor": fra_assessor,
+        "fra_assessor_credentials": fra_credentials,
+        "fra_peer_reviewer": fra_peer_reviewer,
+
+        # Evacuation
+        "evacuation_strategy": evacuation_strategy,
+        "evacuation_strategy_description": evacuation_description,
+        "personal_evacuation_plans_required": personal_evacuation_plans_required,
+
+        # Fire safety systems
+        "fire_alarm_system_type": fire_alarm_type,
+        "smoke_detection_type": smoke_detection_type,
+        "firefighters_lift_present": firefighters_lift,
+        "dry_riser_present": dry_riser,
+        "wet_riser_present": wet_riser,
+        "sprinklers_present": sprinklers,
+        "aov_present": aov,
+        "emergency_lighting_present": emergency_lighting,
+        "fire_compartmentation_status": "present" if fire_compartmentation else None,
+        "premises_information_box_present": premises_info_box,
+
+        # Structural information
+        "construction_type": construction_type,
+        "cladding_type": cladding_type,
+        "cladding_status": cladding_status,
+        "building_control_certificate": building_control_cert,
+        "structural_issues_identified": structural_issues,
+        "gas_detectors_present": gas_detectors,
+        "lightning_protection_present": lightning_protection,
+
+        # BSA 2022 compliance
+        "bsa_2022_applicable": bsa_applicable,
+        "mandatory_occurrence_reporting_in_place": mor_in_place,
+        "resident_engagement_strategy_present": resident_engagement,
+
+        # Key contacts
+        "key_contacts": key_contacts if key_contacts else None,
+    }
+
+
 def _convert_text_date_to_iso(date_str: str) -> Optional[str]:
     """
     Convert text date format (e.g., '8th February 2023') to ISO format.
@@ -810,12 +1172,24 @@ def build_pdf_artifacts(
     features_core = extract_features_from_text(text_sample)
 
     # Add document-specific features based on file_type
-    if file_type == "fraew_document":
+    # Normalize file_type for consistency
+    file_type_normalized = file_type
+    if file_type == "fraew":
+        file_type_normalized = "fraew_document"
+    elif file_type == "fra":
+        file_type_normalized = "fra_document"
+    elif file_type == "scr":
+        file_type_normalized = "scr_document"
+
+    if file_type_normalized == "fraew_document":
         fraew_specific = extract_fraew_features(text_sample)
         features_core["fraew_specific"] = fraew_specific
-    elif file_type == "fra_document":
+    elif file_type_normalized == "fra_document":
         fra_specific = extract_fra_features(text_sample)
         features_core["fra_specific"] = fra_specific
+    elif file_type_normalized == "scr_document":
+        scr_specific = extract_scr_features(text_sample)
+        features_core["scr_specific"] = scr_specific
 
     extraction = {
         "schema_version": "pdf-extraction/v1",

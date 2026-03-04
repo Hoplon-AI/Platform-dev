@@ -75,7 +75,7 @@ async def list_portfolios(tenant: Tuple[str, str] = Depends(get_tenant_info)) ->
 
     query = f"""
         SELECT portfolio_id, ha_id, name, renewal_year, created_at, updated_at
-        FROM portfolios
+        FROM silver.portfolios
         {where_clause}
         ORDER BY created_at DESC
         LIMIT 100
@@ -182,12 +182,12 @@ async def get_portfolio_recent_activity(
     async with DatabasePool.acquire() as conn:
         if _is_dev_mode():
             portfolio_row = await conn.fetchrow(
-                "SELECT ha_id FROM portfolios WHERE portfolio_id = $1",
+                "SELECT ha_id FROM silver.portfolios WHERE portfolio_id = $1",
                 portfolio_id,
             )
         else:
             portfolio_row = await conn.fetchrow(
-                "SELECT ha_id FROM portfolios WHERE portfolio_id = $1 AND ha_id = $2",
+                "SELECT ha_id FROM silver.portfolios WHERE portfolio_id = $1 AND ha_id = $2",
                 portfolio_id,
                 ha_id,
             )

@@ -42,15 +42,15 @@ async def cleanup_tables(integration_db_pool):
     yield
     async with integration_db_pool.acquire() as conn:
         # Delete in order to respect foreign key constraints
-        await conn.execute("DELETE FROM fraew_features WHERE ha_id = 'test_ha_silver'")
-        await conn.execute("DELETE FROM fra_features WHERE ha_id = 'test_ha_silver'")
-        await conn.execute("DELETE FROM scr_features WHERE ha_id = 'test_ha_silver'")
-        await conn.execute("DELETE FROM frsa_features WHERE ha_id = 'test_ha_silver'")
-        await conn.execute("DELETE FROM document_features WHERE ha_id = 'test_ha_silver'")
+        await conn.execute("DELETE FROM silver.fraew_features WHERE ha_id = 'test_ha_silver'")
+        await conn.execute("DELETE FROM silver.fra_features WHERE ha_id = 'test_ha_silver'")
+        await conn.execute("DELETE FROM silver.scr_features WHERE ha_id = 'test_ha_silver'")
+        await conn.execute("DELETE FROM silver.frsa_features WHERE ha_id = 'test_ha_silver'")
+        await conn.execute("DELETE FROM silver.document_features WHERE ha_id = 'test_ha_silver'")
         await conn.execute("DELETE FROM processing_audit WHERE ha_id = 'test_ha_silver'")
         await conn.execute("DELETE FROM upload_audit WHERE ha_id = 'test_ha_silver'")
         # Only delete test HA if it exists and has no other references
-        await conn.execute("DELETE FROM housing_associations WHERE ha_id = 'test_ha_silver' AND NOT EXISTS (SELECT 1 FROM portfolios WHERE portfolios.ha_id = housing_associations.ha_id)")
+        await conn.execute("DELETE FROM housing_associations WHERE ha_id = 'test_ha_silver' AND NOT EXISTS (SELECT 1 FROM silver.portfolios WHERE silver.portfolios.ha_id = housing_associations.ha_id)")
 
 
 @pytest.fixture
@@ -214,24 +214,24 @@ async def test_process_fraew_features_to_silver(
     async with integration_db_pool.acquire() as conn:
         doc_feature = await conn.fetchrow(
             """
-            SELECT * FROM document_features
+            SELECT * FROM silver.document_features
             WHERE upload_id = $1 AND ha_id = $2
             """,
             upload_id,
             test_ha_id
         )
-        
+
         assert doc_feature is not None
         assert doc_feature["document_type"] == "fraew_document"
         assert doc_feature["building_name"] == "Test Building"
         assert doc_feature["address"] == "123 Test Street, London"
         assert doc_feature["uprn"] == "123456789012"
         assert doc_feature["postcode"] == "SW1A 1AA"
-        
+
         # Verify data in fraew_features table
         fraew_feature = await conn.fetchrow(
             """
-            SELECT * FROM fraew_features
+            SELECT * FROM silver.fraew_features
             WHERE upload_id = $1 AND ha_id = $2
             """,
             upload_id,
@@ -325,26 +325,26 @@ async def test_process_fra_features_to_silver(
     async with integration_db_pool.acquire() as conn:
         doc_feature = await conn.fetchrow(
             """
-            SELECT * FROM document_features
+            SELECT * FROM silver.document_features
             WHERE upload_id = $1 AND ha_id = $2
             """,
             upload_id,
             test_ha_id
         )
-        
+
         assert doc_feature is not None
         assert doc_feature["document_type"] == "fra_document"
-        
+
         # Verify data in fra_features table
         fra_feature = await conn.fetchrow(
             """
-            SELECT * FROM fra_features
+            SELECT * FROM silver.fra_features
             WHERE upload_id = $1 AND ha_id = $2
             """,
             upload_id,
             test_ha_id
         )
-        
+
         assert fra_feature is not None
 
 

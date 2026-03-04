@@ -21,6 +21,7 @@ Note: This module is designed to be used as either:
 from __future__ import annotations
 
 import asyncio
+import json
 import os
 import re
 import hashlib
@@ -41,6 +42,10 @@ from backend.core.pdf_extraction.pdf_pipeline import (
     PasswordProtectedPDFError,
     CorruptedPDFError,
     EmptyPDFError,
+)
+from backend.workers.sov_processor import (
+    process_sov_to_silver,
+    is_sov_type,
 )
 from infrastructure.storage.s3_config import S3Config
 from infrastructure.storage.upload_service import UploadService
@@ -142,15 +147,57 @@ async def _db_connect() -> asyncpg.Connection:
     )
 
 
+async def _ensure_upload_record(
+    conn: asyncpg.Connection,
+    upload_id: uuid.UUID,
+    ha_id: str,
+    s3_key: str,
+    file_type: str,
+) -> None:
+    """
+    Ensure housing_association and upload_audit records exist.
+    Creates them if missing (for direct S3 uploads in dev/test).
+    """
+    # Ensure housing_association exists
+    await conn.execute(
+        """
+        INSERT INTO housing_associations (ha_id, name, metadata)
+        VALUES ($1, $1, '{"auto_created": true}')
+        ON CONFLICT (ha_id) DO NOTHING
+        """,
+        ha_id,
+    )
+    # Ensure upload_audit record exists
+    filename = s3_key.split("/file=", 1)[-1] if "/file=" in s3_key else s3_key.split("/")[-1]
+    await conn.execute(
+        """
+        INSERT INTO upload_audit (
+            upload_id, ha_id, file_type, filename, s3_key,
+            checksum, file_size, user_id, status, processing_attempts
+        )
+        VALUES ($1, $2, $3, $4, $5, 'pending', 0, 'system', 'pending', 0)
+        ON CONFLICT (upload_id) DO NOTHING
+        """,
+        upload_id,
+        ha_id,
+        file_type,
+        filename,
+        s3_key,
+    )
+
+
 async def _mark_upload_processing(
     conn: asyncpg.Connection,
     upload_id: uuid.UUID,
     ha_id: str,
     execution_arn: Optional[str],
+    s3_key: str = "",
+    file_type: str = "unknown",
 ) -> int:
     """
     Increment attempts and mark status=processing.
     Returns updated attempts count.
+    Auto-creates records if they don't exist (for direct S3 uploads).
     """
     now = _utc_now().replace(tzinfo=None)
     row = await conn.fetchrow(
@@ -173,6 +220,29 @@ async def _mark_upload_processing(
         execution_arn,
     )
     if not row:
+        # Auto-create records for direct S3 uploads (dev/test mode)
+        await _ensure_upload_record(conn, upload_id, ha_id, s3_key, file_type)
+        # Retry the update
+        row = await conn.fetchrow(
+            """
+            UPDATE upload_audit
+            SET
+                status = 'processing',
+                processing_attempts = processing_attempts + 1,
+                processing_last_attempt_at = $3,
+                processing_started_at = COALESCE(processing_started_at, $3),
+                stepfn_execution_arn = COALESCE($4, stepfn_execution_arn),
+                processing_last_error = NULL,
+                processing_next_attempt_at = NULL
+            WHERE upload_id = $1 AND ha_id = $2
+            RETURNING processing_attempts
+            """,
+            upload_id,
+            ha_id,
+            now,
+            execution_arn,
+        )
+    if not row:
         raise ValueError("upload_audit record not found for upload_id/ha_id")
     return int(row["processing_attempts"])
 
@@ -185,6 +255,8 @@ async def _mark_upload_complete(
     metadata_patch: Dict[str, Any],
 ) -> None:
     now = _utc_now().replace(tzinfo=None)
+    # asyncpg requires JSONB values as JSON-serialized strings
+    metadata_json = json.dumps(metadata_patch)
     await conn.execute(
         """
         UPDATE upload_audit
@@ -200,7 +272,7 @@ async def _mark_upload_complete(
         ha_id,
         status,
         now,
-        metadata_patch,
+        metadata_json,
     )
 
 
@@ -240,6 +312,8 @@ async def _mark_upload_permanent_failure(
     Mark upload as permanently failed (non-retryable error like password-protected PDF).
     """
     now = _utc_now().replace(tzinfo=None)
+    # asyncpg requires JSONB values as JSON-serialized strings
+    metadata_json = json.dumps({"error_type": error_type, "retryable": False})
     await conn.execute(
         """
         UPDATE upload_audit
@@ -255,7 +329,7 @@ async def _mark_upload_permanent_failure(
         ha_id,
         error[:4000],
         now,
-        {"error_type": error_type, "retryable": False},
+        metadata_json,
     )
 
 
@@ -274,6 +348,8 @@ async def _insert_processing_audit(
 ) -> None:
     processing_id = uuid.uuid4()
     now = _utc_now().replace(tzinfo=None)
+    # asyncpg requires JSONB values as JSON-serialized strings
+    metadata_json = json.dumps(metadata)
     await conn.execute(
         """
         INSERT INTO processing_audit (
@@ -297,7 +373,7 @@ async def _insert_processing_audit(
         now,
         now if status in {"completed", "failed", "needs_review"} else None,
         status,
-        metadata,
+        metadata_json,
         attempt,
         max_attempts,
         (last_error or "")[:4000] if last_error else None,
@@ -319,6 +395,11 @@ async def process_s3_put(event: Dict[str, Any]) -> Dict[str, Any]:
     parsed = _parse_partitioned_key(key)
     upload_id_uuid = uuid.UUID(parsed.submission_id)
 
+    # Handle property schedule (SOV) files - CSV/Excel property data
+    if is_sov_type(file_type=parsed.dataset, filename=key):
+        # Process SOV file to Silver layer
+        return await process_sov_to_silver(event)
+
     # If it's not a PDF dataset, no-op for now
     if not is_pdf_type(file_type=parsed.dataset, filename=key):
         return {"status": "ignored", "reason": "not_pdf_dataset", "bucket": bucket, "key": key}
@@ -333,7 +414,10 @@ async def process_s3_put(event: Dict[str, Any]) -> Dict[str, Any]:
         # Ensure RLS policies (if enabled) allow tenant-scoped access.
         await conn.execute("SELECT set_config('app.current_ha_id', $1, true)", parsed.ha_id)
 
-        attempts = await _mark_upload_processing(conn, upload_id_uuid, parsed.ha_id, execution_arn)
+        attempts = await _mark_upload_processing(
+            conn, upload_id_uuid, parsed.ha_id, execution_arn,
+            s3_key=key, file_type=parsed.dataset
+        )
 
         file_bytes = upload_service.get_file(key)
 
@@ -342,6 +426,28 @@ async def process_s3_put(event: Dict[str, Any]) -> Dict[str, Any]:
             file_type=parsed.dataset,
             filename=key.split("/file=", 1)[1],
         )
+
+        # Optional: agentic extraction + merge (when USE_AGENTIC_EXTRACTION=true)
+        if os.getenv("USE_AGENTIC_EXTRACTION", "").lower() in ("1", "true", "yes"):
+            try:
+                from backend.core.agentic.extraction_agent import extract_features_agentic
+                from backend.core.agentic.comparison_engine import compare_extractions, merge_extractions
+
+                print(f"[AGENTIC] Starting agentic extraction for {parsed.dataset}")
+                agentic_result = extract_features_agentic(file_bytes, parsed.dataset)
+                print(f"[AGENTIC] Result keys: {list(agentic_result.keys()) if agentic_result else 'empty'}")
+                if agentic_result:
+                    comparison = compare_extractions(artifacts.features, agentic_result)
+                    merged = merge_extractions(artifacts.features, agentic_result, comparison)
+                    artifacts.features.clear()
+                    artifacts.features.update(merged)
+                    print(f"[AGENTIC] Merged successfully. Agreement score: {comparison.get('agreement_score')}")
+                else:
+                    print("[AGENTIC] Empty result returned from extract_features_agentic")
+            except Exception as e:
+                # Keep regex-only; record error for observability
+                print(f"[AGENTIC] Exception during extraction: {type(e).__name__}: {str(e)[:200]}")
+                artifacts.features["extraction_comparison_metadata"] = {"agentic_error": str(e)[:500]}
 
         extraction_key = f"{parsed.submission_prefix}extraction.json"
         features_key = f"{parsed.submission_prefix}features.json"
