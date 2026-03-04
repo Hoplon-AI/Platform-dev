@@ -1,0 +1,5 @@
+# Lambda layer dependencies for ingestion worker
+# These versions should match the main requirements.txt at the project root
+# to ensure consistency between backend and Lambda runtime environments.
+asyncpg==0.29.0
+pdfplumber==0.10.3

@@ -1,0 +1,1197 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://platform-dev/schemas/agentic-feature-definitions.json",
+  "title": "Agentic Feature Extraction Definitions",
+  "description": "Feature definitions for agentic extraction using AWS Bedrock and Claude models. Defines product-relevant features for ML/UI (Category A), compliance/workflow (Category B), and DocB/PlanB portfolio columns (Category C).",
+  "version": "1.0.0",
+  "extraction_metadata": {
+    "priority_categories": {
+      "A": "Relevant (post-MVP) and useful for ML + UI",
+      "B": "Relevant for UI (compliance/workflow) and some ML (secondary)",
+      "C": "PlanB/DocB portfolio columns (high-value property fields)"
+    },
+    "confidence_scoring": {
+      "explicit_mention": {
+        "range": [0.9, 1.0],
+        "description": "Field explicitly stated in document"
+      },
+      "strong_inference": {
+        "range": [0.7, 0.9],
+        "description": "Clear context suggests value"
+      },
+      "weak_inference": {
+        "range": [0.5, 0.7],
+        "description": "Some context but uncertain"
+      },
+      "not_found": {
+        "value": null,
+        "description": "No evidence found"
+      }
+    }
+  },
+  "feature_groups": {
+    "category_a_ml_ui": {
+      "category": "A",
+      "description": "Relevant (post-MVP) and useful for ML + UI - First-class structured outputs",
+      "features": {
+        "high_rise_indicators": {
+          "description": "High-rise building indicators - Strong segmentation feature for risk stratification and UI filtering",
+          "fields": {
+            "high_rise_building_mentioned": {
+              "type": "boolean",
+              "description": "Whether high-rise is mentioned",
+              "keywords": ["high rise", "high-rise", "tower block", "high rise building", "tall building"],
+              "priority": "high",
+              "ml_relevance": "Strong segmentation feature for risk stratification, cohorting, anomaly detection",
+              "ui_relevance": "Primary filter/facet for building portfolio views"
+            },
+            "building_height_category": {
+              "type": "string",
+              "enum": ["HIGH_RISE", "MEDIUM_RISE", "LOW_RISE", "NOT_SPECIFIED"],
+              "description": "Building height category. HIGH_RISE = 18m+ or 7+ storeys",
+              "priority": "high"
+            },
+            "number_of_storeys": {
+              "type": "integer",
+              "description": "Number of storeys/floors mentioned",
+              "minimum": 0,
+              "priority": "high",
+              "ml_relevance": "Numeric feature for risk models"
+            },
+            "building_height_metres": {
+              "type": "number",
+              "description": "Height in metres if specified",
+              "minimum": 0,
+              "priority": "medium"
+            },
+            "number_of_high_rise_buildings": {
+              "type": "integer",
+              "description": "If document mentions multiple buildings, count",
+              "minimum": 0,
+              "priority": "medium"
+            },
+            "high_rise_building_names": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Names of specific high-rise buildings mentioned",
+              "priority": "medium"
+            },
+            "high_rise_specific_measures": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "High-rise specific safety measures",
+              "examples": [
+                "Enhanced fire safety systems",
+                "Dedicated Property Safety Officers",
+                "Regular high-rise inspections",
+                "Block-specific Methods of Engagement",
+                "High Rise Month of Action"
+              ],
+              "priority": "low"
+            },
+            "building_safety_act_applicable": {
+              "type": "boolean",
+              "description": "Whether Building Safety Act 2022 applies (typically for 18m+ or 7+ storeys)",
+              "priority": "high"
+            }
+          }
+        },
+        "evacuation_strategy": {
+          "description": "Evacuation strategies - Directly tied to fire risk context and resident safety posture",
+          "fields": {
+            "evacuation_strategy_mentioned": {
+              "type": "boolean",
+              "description": "Whether evacuation strategy is discussed",
+              "keywords": ["evacuation strategy", "evacuation procedure", "evacuation plan", "stay put", "stay safe"],
+              "priority": "high"
+            },
+            "evacuation_strategy_type": {
+              "type": "string",
+              "enum": ["STAY_PUT", "STAY_SAFE", "SIMULTANEOUS", "PHASED", "DEFEND_IN_PLACE", "FULL_EVACUATION", "NOT_SPECIFIED"],
+              "description": "Evacuation strategy type. STAY_PUT and STAY_SAFE are typically the same",
+              "priority": "high",
+              "ml_relevance": "Predictive feature for risk models, clustering by safety posture",
+              "ui_relevance": "Clear summary chip/badge (e.g., 'Stay Put') with evidence snippets"
+            },
+            "evacuation_strategy_description": {
+              "type": "string",
+              "description": "Detailed description of what the strategy means",
+              "example": "If fire in your flat, leave. If fire elsewhere, remain in flat.",
+              "priority": "medium"
+            },
+            "evacuation_strategy_changed": {
+              "type": "boolean",
+              "description": "Whether strategy has changed or is subject to change",
+              "priority": "medium"
+            },
+            "evacuation_strategy_change_reason": {
+              "type": "string",
+              "description": "Why strategy changed (e.g., 'fire engineer recommendation', 'building safety risk identified')",
+              "priority": "low"
+            },
+            "evacuation_strategy_consultation_required": {
+              "type": "boolean",
+              "description": "Whether consultation is required before changing strategy. Note: Strategy changes may NOT require consultation if on fire engineer advice",
+              "priority": "low"
+            },
+            "evacuation_instructions": {
+              "type": "string",
+              "description": "Specific instructions provided to residents - what to do in different scenarios",
+              "priority": "medium"
+            },
+            "evacuation_assembly_points": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Location of assembly points if mentioned",
+              "priority": "medium"
+            },
+            "personal_evacuation_plans_mentioned": {
+              "type": "boolean",
+              "description": "Whether Personal Emergency Evacuation Plans (PEEPs) or Personal Centric Fire Risk Assessments (PCFRAs) are mentioned",
+              "priority": "medium"
+            },
+            "evacuation_support_required": {
+              "type": "boolean",
+              "description": "Whether residents need support to evacuate - related to disabilities or additional needs",
+              "priority": "medium"
+            },
+            "fire_service_evacuation_instructions": {
+              "type": "string",
+              "description": "Instructions about following fire service directions",
+              "example": "Always evacuate if asked by firefighters",
+              "priority": "low"
+            }
+          }
+        },
+        "fire_safety_measures": {
+          "description": "Fire safety measures (systems present/mentioned + key statuses) - Concrete, interpretable signals for insurers and asset managers",
+          "fields": {
+            "fire_safety_measures_mentioned": {
+              "type": "boolean",
+              "description": "Whether fire safety measures are discussed",
+              "priority": "high"
+            },
+            "fire_safety_systems": {
+              "type": "array",
+              "description": "Inventory of fire safety systems present",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "system_type": {
+                    "type": "string",
+                    "enum": [
+                      "FIRE_ALARM",
+                      "SMOKE_DETECTORS",
+                      "HEAT_DETECTORS",
+                      "SPRINKLERS",
+                      "FIRE_DOORS",
+                      "FIRE_EXTINGUISHERS",
+                      "FIRE_HOSES",
+                      "EMERGENCY_LIGHTING",
+                      "VENTILATION_SYSTEMS"
+                    ],
+                    "description": "Type of fire safety system"
+                  },
+                  "system_status": {
+                    "type": "string",
+                    "enum": ["OPERATIONAL", "UNDER_MAINTENANCE", "NEEDS_REPAIR", "NOT_SPECIFIED"],
+                    "description": "Current status of the system"
+                  },
+                  "inspection_frequency": {
+                    "type": "string",
+                    "description": "How often the system is checked (e.g., 'monthly', 'quarterly', 'annually')"
+                  },
+                  "last_inspection_date": {
+                    "type": "string",
+                    "format": "date",
+                    "description": "Date of last inspection in ISO format (YYYY-MM-DD)"
+                  },
+                  "location": {
+                    "type": "string",
+                    "description": "Where system is located (communal, individual flats, etc.)"
+                  }
+                },
+                "required": ["system_type"]
+              },
+              "priority": "high",
+              "ml_relevance": "Features for risk models, missingness as signal, document quality scoring",
+              "ui_relevance": "Systems inventory cards showing alarms/detectors/sprinklers/fire doors with maintenance flags"
+            },
+            "fire_doors_mentioned": {
+              "type": "boolean",
+              "description": "Whether fire doors are discussed",
+              "priority": "high"
+            },
+            "fire_doors_details": {
+              "type": "object",
+              "properties": {
+                "fire_doors_present": {
+                  "type": "boolean",
+                  "description": "Whether fire doors are present"
+                },
+                "fire_doors_locations": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "description": "Locations of fire doors",
+                  "examples": ["communal areas", "flat entrance doors", "stairwells"]
+                },
+                "fire_doors_self_closing": {
+                  "type": "boolean",
+                  "description": "Whether fire doors are self-closing"
+                },
+                "fire_doors_maintenance_required": {
+                  "type": "boolean",
+                  "description": "Whether fire door maintenance is required"
+                },
+                "fire_doors_tampering_warning": {
+                  "type": "boolean",
+                  "description": "Warnings about not propping open or tampering with fire doors"
+                }
+              },
+              "priority": "high"
+            },
+            "fire_alarm_systems": {
+              "type": "object",
+              "properties": {
+                "alarm_type": {
+                  "type": "string",
+                  "description": "Type of fire alarm system"
+                },
+                "alarm_testing_frequency": {
+                  "type": "string",
+                  "description": "How often alarms are tested"
+                },
+                "alarm_coverage": {
+                  "type": "string",
+                  "enum": ["communal only", "communal and flats", "full building"],
+                  "description": "Coverage area of alarm system"
+                }
+              },
+              "priority": "high"
+            },
+            "smoke_heat_detectors": {
+              "type": "object",
+              "properties": {
+                "detector_types": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "description": "Types of detectors",
+                  "examples": ["smoke detectors", "heat detectors"]
+                },
+                "detector_locations": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "description": "Locations of detectors",
+                  "examples": ["communal areas", "individual flats", "both"]
+                },
+                "testing_frequency": {
+                  "type": "string",
+                  "description": "How often detectors are tested"
+                },
+                "maintenance_required": {
+                  "type": "boolean",
+                  "description": "Whether detector maintenance is required"
+                }
+              },
+              "priority": "high"
+            },
+            "sprinkler_systems": {
+              "type": "object",
+              "properties": {
+                "sprinklers_present": {
+                  "type": "boolean",
+                  "description": "Whether sprinklers are present"
+                },
+                "sprinkler_coverage": {
+                  "type": "string",
+                  "enum": ["full building", "communal only", "partial"],
+                  "description": "Coverage area of sprinkler system"
+                },
+                "sprinkler_maintenance": {
+                  "type": "string",
+                  "description": "Sprinkler maintenance information"
+                }
+              },
+              "priority": "high"
+            },
+            "fire_safety_equipment_checks": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "equipment_type": {
+                    "type": "string",
+                    "description": "Type of equipment checked"
+                  },
+                  "check_frequency": {
+                    "type": "string",
+                    "description": "How often checks are performed"
+                  },
+                  "responsible_party": {
+                    "type": "string",
+                    "description": "Who performs the checks"
+                  }
+                },
+                "required": ["equipment_type"]
+              },
+              "description": "Regular checks mentioned for fire safety equipment",
+              "priority": "medium"
+            },
+            "fire_safety_notices": {
+              "type": "object",
+              "properties": {
+                "notices_present": {
+                  "type": "boolean",
+                  "description": "Whether fire safety notices are present"
+                },
+                "notice_locations": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "description": "Locations of notices",
+                  "examples": ["lobby areas", "communal areas", "each floor"]
+                },
+                "notice_content_types": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "description": "Types of content on notices",
+                  "examples": ["fire assembly points", "evacuation procedures", "fire safety instructions"]
+                }
+              },
+              "priority": "low"
+            },
+            "fire_safety_information_provided": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Types of fire safety information provided to residents",
+              "examples": [
+                "Home Safety Guide",
+                "Fire safety instructions",
+                "Evacuation procedures",
+                "Fire safety measures summary"
+              ],
+              "priority": "low"
+            },
+            "fire_safety_officers_mentioned": {
+              "type": "boolean",
+              "description": "Whether dedicated fire safety officers or Property Safety Officers are mentioned",
+              "priority": "medium"
+            },
+            "fire_safety_officer_details": {
+              "type": "object",
+              "properties": {
+                "officer_role": {
+                  "type": "string",
+                  "enum": ["Property Safety Officer", "Fire Safety Officer", "Building Safety Officer"],
+                  "description": "Role of the fire safety officer"
+                },
+                "officer_responsibilities": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "description": "Responsibilities of the officer"
+                },
+                "officer_contact": {
+                  "type": "object",
+                  "properties": {
+                    "email": {
+                      "type": "string",
+                      "format": "email"
+                    },
+                    "phone": {
+                      "type": "string"
+                    }
+                  }
+                }
+              },
+              "priority": "low"
+            }
+          }
+        },
+        "structural_integrity": {
+          "description": "Structural integrity mentions (assessments/risks/work) - Material to building safety and correlates with severity/claims",
+          "fields": {
+            "structural_integrity_mentioned": {
+              "type": "boolean",
+              "description": "Whether structural integrity or structural safety is discussed",
+              "keywords": ["structural integrity", "structural safety", "structural stability", "building structure", "structural soundness"],
+              "priority": "high"
+            },
+            "structural_assessments_mentioned": {
+              "type": "boolean",
+              "description": "Whether structural assessments or surveys are mentioned",
+              "priority": "high"
+            },
+            "structural_assessments": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "assessment_type": {
+                    "type": "string",
+                    "enum": [
+                      "Type 4 Risk Assessment",
+                      "Structural Survey",
+                      "Structural Inspection",
+                      "Building Safety Risk Assessment"
+                    ],
+                    "description": "Type of structural assessment"
+                  },
+                  "assessment_date": {
+                    "type": "string",
+                    "format": "date",
+                    "description": "Date of assessment in ISO format (YYYY-MM-DD)"
+                  },
+                  "assessor_company": {
+                    "type": "string",
+                    "description": "Company or organization that performed the assessment"
+                  },
+                  "assessment_findings": {
+                    "type": "string",
+                    "description": "Summary of assessment findings"
+                  },
+                  "structural_issues_identified": {
+                    "type": "boolean",
+                    "description": "Whether structural issues were identified"
+                  },
+                  "structural_issues_description": {
+                    "type": "string",
+                    "description": "Description of identified structural issues"
+                  }
+                },
+                "required": ["assessment_type"]
+              },
+              "priority": "high",
+              "ml_relevance": "Risk features, time-to-remediation proxies, topic signals",
+              "ui_relevance": "Structural assessments present + extracted issues/actions (high-level)"
+            },
+            "structural_risks_mentioned": {
+              "type": "boolean",
+              "description": "Whether structural risks are identified",
+              "priority": "high"
+            },
+            "structural_risks": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "risk_type": {
+                    "type": "string",
+                    "description": "Type of structural risk",
+                    "examples": ["foundation issues", "wall stability", "roof structure"]
+                  },
+                  "risk_severity": {
+                    "type": "string",
+                    "enum": ["HIGH", "MEDIUM", "LOW"],
+                    "description": "Severity level of the risk"
+                  },
+                  "risk_description": {
+                    "type": "string",
+                    "description": "Description of the structural risk"
+                  },
+                  "remediation_required": {
+                    "type": "boolean",
+                    "description": "Whether remediation is required"
+                  }
+                },
+                "required": ["risk_type"]
+              },
+              "priority": "high"
+            },
+            "structural_work_mentioned": {
+              "type": "boolean",
+              "description": "Whether structural work or remediation is mentioned",
+              "priority": "high"
+            },
+            "structural_work_details": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "work_type": {
+                    "type": "string",
+                    "enum": ["remediation", "strengthening", "repair", "replacement"],
+                    "description": "Type of structural work"
+                  },
+                  "work_description": {
+                    "type": "string",
+                    "description": "Description of the work"
+                  },
+                  "work_status": {
+                    "type": "string",
+                    "enum": ["PLANNED", "IN_PROGRESS", "COMPLETED"],
+                    "description": "Status of the work"
+                  },
+                  "work_date": {
+                    "type": "string",
+                    "format": "date",
+                    "description": "Date of work in ISO format (YYYY-MM-DD)"
+                  }
+                },
+                "required": ["work_type"]
+              },
+              "priority": "high"
+            },
+            "building_materials_mentioned": {
+              "type": "boolean",
+              "description": "Whether building materials affecting structure are mentioned",
+              "priority": "medium"
+            },
+            "building_materials": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Materials mentioned",
+              "examples": ["concrete", "steel", "masonry", "timber", "cladding", "external wall system"],
+              "priority": "medium"
+            },
+            "structural_maintenance_required": {
+              "type": "boolean",
+              "description": "Whether ongoing structural maintenance is mentioned",
+              "priority": "medium"
+            }
+          }
+        },
+        "maintenance_requirements": {
+          "description": "Maintenance requirements (schedules/audits/checks) - Operationally actionable, good for compliance and monitoring",
+          "fields": {
+            "maintenance_mentioned": {
+              "type": "boolean",
+              "description": "Whether maintenance is discussed",
+              "keywords": ["maintenance", "inspection", "repair", "upkeep", "servicing"],
+              "priority": "high"
+            },
+            "maintenance_schedules_mentioned": {
+              "type": "boolean",
+              "description": "Whether maintenance schedules are provided",
+              "priority": "high"
+            },
+            "maintenance_schedules": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "maintenance_type": {
+                    "type": "string",
+                    "enum": [
+                      "fire safety equipment",
+                      "structural",
+                      "communal areas",
+                      "ventilation",
+                      "electrical",
+                      "general building"
+                    ],
+                    "description": "Type of maintenance"
+                  },
+                  "frequency": {
+                    "type": "string",
+                    "enum": ["daily", "weekly", "monthly", "quarterly", "annually", "as required"],
+                    "description": "Frequency of maintenance"
+                  },
+                  "responsible_party": {
+                    "type": "string",
+                    "description": "Who performs the maintenance"
+                  },
+                  "last_maintenance_date": {
+                    "type": "string",
+                    "format": "date",
+                    "description": "Date of last maintenance in ISO format (YYYY-MM-DD)"
+                  },
+                  "next_maintenance_date": {
+                    "type": "string",
+                    "format": "date",
+                    "description": "Date of next scheduled maintenance in ISO format (YYYY-MM-DD)"
+                  }
+                },
+                "required": ["maintenance_type"]
+              },
+              "priority": "high",
+              "ml_relevance": "Predicts risk from maintenance maturity, prioritization models",
+              "ui_relevance": "Next checks due / recurring checks mentioned + compliance dashboard inputs"
+            },
+            "maintenance_checks_mentioned": {
+              "type": "boolean",
+              "description": "Whether specific maintenance checks are listed",
+              "priority": "high"
+            },
+            "maintenance_checks": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "check_type": {
+                    "type": "string",
+                    "description": "Type of maintenance check",
+                    "examples": [
+                      "smoke detector testing",
+                      "fire door inspection",
+                      "ventilation cleaning",
+                      "electrical socket check"
+                    ]
+                  },
+                  "check_frequency": {
+                    "type": "string",
+                    "description": "How often the check is performed"
+                  },
+                  "check_location": {
+                    "type": "string",
+                    "enum": ["communal", "individual flats", "both"],
+                    "description": "Where the check is performed"
+                  }
+                },
+                "required": ["check_type"]
+              },
+              "priority": "high"
+            },
+            "tenancy_audits_mentioned": {
+              "type": "boolean",
+              "description": "Whether tenancy audits or safety checks in individual properties are mentioned",
+              "priority": "high"
+            },
+            "tenancy_audit_details": {
+              "type": "object",
+              "properties": {
+                "audit_frequency": {
+                  "type": "string",
+                  "description": "How often tenancy audits are conducted"
+                },
+                "audit_scope": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "description": "Scope of tenancy audits",
+                  "examples": [
+                    "Testing smoke and heat detectors",
+                    "Checking windows and front door",
+                    "Checking ventilation systems",
+                    "Visual inspection of electrical sockets",
+                    "Contact details verification",
+                    "Evacuation capability assessment",
+                    "Fire safety information provision"
+                  ]
+                }
+              },
+              "priority": "high"
+            },
+            "communal_area_maintenance": {
+              "type": "object",
+              "properties": {
+                "communal_maintenance_mentioned": {
+                  "type": "boolean",
+                  "description": "Whether communal area maintenance is mentioned"
+                },
+                "communal_safety_audits": {
+                  "type": "boolean",
+                  "description": "Whether communal safety audits are performed"
+                },
+                "communal_clearance_requirements": {
+                  "type": "boolean",
+                  "description": "Requirements to keep communal areas clear"
+                },
+                "communal_fire_door_maintenance": {
+                  "type": "boolean",
+                  "description": "Whether communal fire door maintenance is mentioned"
+                }
+              },
+              "priority": "medium"
+            },
+            "maintenance_backlog_mentioned": {
+              "type": "boolean",
+              "description": "Whether maintenance backlog or outstanding repairs are mentioned",
+              "priority": "medium"
+            },
+            "maintenance_priorities": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Priority maintenance items or urgent repairs",
+              "priority": "medium"
+            },
+            "maintenance_budget_mentioned": {
+              "type": "boolean",
+              "description": "Whether maintenance budgets or investment programmes are mentioned",
+              "priority": "low"
+            }
+          }
+        }
+      }
+    },
+    "category_b_compliance_workflow": {
+      "category": "B",
+      "description": "Relevant for UI (compliance/workflow) and some ML (secondary) - Compliance/audit trail signals",
+      "features": {
+        "building_safety_act_2022": {
+          "description": "Building Safety Act 2022 compliance indicators - Helps explain why building/document matters, supports compliance narratives",
+          "fields": {
+            "building_safety_act_2022_mentioned": {
+              "type": "boolean",
+              "description": "Whether the Building Safety Act 2022 is explicitly mentioned",
+              "keywords": ["Building Safety Act 2022", "Building Safety Act", "BSA 2022"],
+              "priority": "high",
+              "ml_relevance": "Document classification / topic signals (weak/indirect)",
+              "ui_relevance": "Badge: 'BSA 2022 mentioned', 'Part 4 duties referenced', 'Safety Case Report referenced'"
+            },
+            "building_safety_act_compliance_status": {
+              "type": "string",
+              "enum": ["COMPLIANT", "NON_COMPLIANT", "PARTIALLY_COMPLIANT", "UNDER_REVIEW", "NOT_SPECIFIED"],
+              "description": "Compliance status extracted from explicit statements",
+              "priority": "high"
+            },
+            "part_4_duties_mentioned": {
+              "type": "boolean",
+              "description": "Whether Part 4 duties are mentioned (Part 4 covers Accountable Person duties)",
+              "keywords": ["Part 4", "Part 4 duties", "Part 4 of the Building Safety Act"],
+              "priority": "high"
+            },
+            "part_4_duties_list": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Specific Part 4 duties mentioned",
+              "examples": [
+                "Identifying and assessing building safety risks",
+                "Managing building safety risks",
+                "Providing building safety information",
+                "Engaging with customers",
+                "Managing complaints",
+                "Consultation with relevant persons",
+                "Decision making process documentation"
+              ],
+              "priority": "medium"
+            },
+            "building_safety_decisions_mentioned": {
+              "type": "boolean",
+              "description": "Whether building safety decisions are discussed (decisions relating to fire safety or structural management)",
+              "priority": "medium"
+            },
+            "building_safety_decisions_list": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "decision_type": {
+                    "type": "string",
+                    "description": "Type of decision",
+                    "examples": ["remediation work", "evacuation strategy change", "material alteration"]
+                  },
+                  "decision_date": {
+                    "type": "string",
+                    "format": "date",
+                    "description": "Date of decision in ISO format (YYYY-MM-DD)"
+                  },
+                  "decision_description": {
+                    "type": "string",
+                    "description": "Description of the decision"
+                  },
+                  "consultation_required": {
+                    "type": "boolean",
+                    "description": "Whether consultation is required for this decision"
+                  },
+                  "consultation_conducted": {
+                    "type": "boolean",
+                    "description": "Whether consultation was conducted"
+                  }
+                },
+                "required": ["decision_type", "consultation_required"]
+              },
+              "priority": "medium"
+            },
+            "building_safety_regulator_mentioned": {
+              "type": "boolean",
+              "description": "Whether Building Safety Regulator (BSR) is mentioned",
+              "keywords": ["Building Safety Regulator", "BSR", "regulator"],
+              "priority": "high"
+            },
+            "building_safety_case_report_mentioned": {
+              "type": "boolean",
+              "description": "Whether Building Safety Case Report is mentioned",
+              "keywords": ["Building Safety Case", "Safety Case Report", "BSR submission"],
+              "priority": "high"
+            },
+            "building_a_safer_future_charter": {
+              "type": "object",
+              "properties": {
+                "charter_mentioned": {
+                  "type": "boolean",
+                  "description": "Whether Building a Safer Future Charter is mentioned"
+                },
+                "charter_status": {
+                  "type": "string",
+                  "enum": ["CHAMPION", "MEMBER", "SIGNATORY", "NOT_MENTIONED"],
+                  "description": "Charter status"
+                },
+                "charter_date": {
+                  "type": "string",
+                  "format": "date",
+                  "description": "Date of charter status in ISO format (YYYY-MM-DD)"
+                }
+              },
+              "priority": "low"
+            }
+          }
+        },
+        "mandatory_occurrence_reports": {
+          "description": "Mandatory Occurrence Report (MOR) references - Excellent operational signal if reliably present",
+          "fields": {
+            "mandatory_occurrence_report_mentioned": {
+              "type": "boolean",
+              "description": "Whether MOR is mentioned",
+              "keywords": ["Mandatory Occurrence Report", "MOR", "occurrence report", "building safety concern report"],
+              "priority": "high",
+              "ml_relevance": "Strong label-like feature if captured with 'reported/resolved/ongoing' status",
+              "ui_relevance": "Timeline events and alerts: 'MOR referenced'"
+            },
+            "mandatory_occurrence_reports": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "report_id": {
+                    "type": "string",
+                    "description": "Reference number or identifier for the MOR"
+                  },
+                  "report_date": {
+                    "type": "string",
+                    "format": "date",
+                    "description": "Date of report in ISO format (YYYY-MM-DD)"
+                  },
+                  "report_type": {
+                    "type": "string",
+                    "description": "Type of safety concern reported"
+                  },
+                  "concern_description": {
+                    "type": "string",
+                    "description": "What was reported"
+                  },
+                  "status": {
+                    "type": "string",
+                    "enum": ["SUBMITTED", "INVESTIGATING", "RESOLVED", "ONGOING"],
+                    "description": "Status of the MOR"
+                  },
+                  "reported_by": {
+                    "type": "string",
+                    "description": "Who made the report (customer, employee, contractor)"
+                  },
+                  "building_affected": {
+                    "type": "string",
+                    "description": "Which building(s) affected"
+                  }
+                },
+                "required": ["status"]
+              },
+              "priority": "high"
+            },
+            "mandatory_occurrence_reporting_process_mentioned": {
+              "type": "boolean",
+              "description": "Whether the process for reporting is described",
+              "priority": "medium"
+            },
+            "mandatory_occurrence_reporting_channels": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Methods mentioned for reporting",
+              "examples": [
+                "Building Safety letter boxes",
+                "Email: buildingsafety@...",
+                "Phone: 0800...",
+                "Website form",
+                "In-person reporting"
+              ],
+              "priority": "low"
+            },
+            "mandatory_occurrence_report_triggers": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "What triggers an MOR",
+              "examples": [
+                "Poor installation or workmanship",
+                "Customer DIY causing damage",
+                "Safety feature damaged or not working",
+                "Significant building safety risk identified"
+              ],
+              "priority": "low"
+            }
+          }
+        },
+        "building_safety_regulator": {
+          "description": "Building Safety Regulator (BSR) interactions - Compliance workflow and auditability",
+          "fields": {
+            "building_safety_regulator_mentioned": {
+              "type": "boolean",
+              "description": "Whether BSR is mentioned",
+              "keywords": ["Building Safety Regulator", "BSR", "regulator", "Building Safety Regulator (BSR)"],
+              "priority": "high",
+              "ml_relevance": "Limited, but could support compliance-risk scoring",
+              "ui_relevance": "Audit trail: 'BSR submission/complaint referenced'"
+            },
+            "bsr_interactions": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "interaction_type": {
+                    "type": "string",
+                    "enum": ["SUBMISSION", "CONSULTATION", "NOTIFICATION", "COMPLAINT_APPEAL", "INFORMATION_REQUEST"],
+                    "description": "Type of interaction with BSR"
+                  },
+                  "interaction_date": {
+                    "type": "string",
+                    "format": "date",
+                    "description": "Date of interaction in ISO format (YYYY-MM-DD)"
+                  },
+                  "interaction_subject": {
+                    "type": "string",
+                    "description": "What the interaction was about"
+                  },
+                  "interaction_status": {
+                    "type": "string",
+                    "enum": ["PENDING", "COMPLETED", "UNDER_REVIEW"],
+                    "description": "Status of the interaction"
+                  }
+                },
+                "required": ["interaction_type"]
+              },
+              "priority": "high"
+            },
+            "bsr_submissions": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "submission_type": {
+                    "type": "string",
+                    "enum": [
+                      "Building Safety Case Report",
+                      "Mandatory Occurrence Report",
+                      "Safety Information",
+                      "Compliance Documentation"
+                    ],
+                    "description": "Type of submission to BSR"
+                  },
+                  "submission_date": {
+                    "type": "string",
+                    "format": "date",
+                    "description": "Date of submission in ISO format (YYYY-MM-DD)"
+                  },
+                  "submission_status": {
+                    "type": "string",
+                    "description": "Status of the submission"
+                  }
+                },
+                "required": ["submission_type"]
+              },
+              "priority": "high"
+            },
+            "bsr_complaint_appeals": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "appeal_date": {
+                    "type": "string",
+                    "format": "date",
+                    "description": "Date of appeal in ISO format (YYYY-MM-DD)"
+                  },
+                  "appeal_reason": {
+                    "type": "string",
+                    "description": "Reason for the appeal"
+                  },
+                  "appeal_status": {
+                    "type": "string",
+                    "description": "Status of the appeal"
+                  }
+                }
+              },
+              "priority": "medium"
+            },
+            "bsr_contact_information": {
+              "type": "object",
+              "properties": {
+                "website": {
+                  "type": "string",
+                  "description": "BSR website URL",
+                  "example": "www.gov.uk/guidance/contact-the-building-safety-regulator"
+                },
+                "email": {
+                  "type": "string",
+                  "format": "email"
+                },
+                "phone": {
+                  "type": "string"
+                }
+              },
+              "priority": "low"
+            }
+          }
+        }
+      }
+    },
+    "category_c_docb_planb": {
+      "category": "C",
+      "description": "PlanB/DocB portfolio columns (high-value property fields) - Required DocB outputs when present in documents",
+      "features": {
+        "docb_required_fields": {
+          "description": "Core DocB/PlanB fields from property-schema.json - High-value property details",
+          "fields": {
+            "claddingType": {
+              "type": "string",
+              "description": "Type of cladding material",
+              "priority": "high",
+              "source": "property-schema.json",
+              "extraction_hints": [
+                "Look for explicit cladding material mentions",
+                "Common types: ACM, HPL, timber, composite, etc.",
+                "May be in external wall system descriptions"
+              ]
+            },
+            "ewsStatus": {
+              "type": "string",
+              "description": "External Wall System (EWS) status",
+              "priority": "high",
+              "source": "property-schema.json",
+              "extraction_hints": [
+                "Look for EWS1 report references",
+                "EWS status ratings (A1, A2, A3, B1, B2)",
+                "External wall system assessment outcomes"
+              ]
+            },
+            "fireRiskManagementSummary": {
+              "type": "string",
+              "description": "Summary of fire risk management measures",
+              "priority": "high",
+              "source": "property-schema.json",
+              "extraction_hints": [
+                "Look for fire risk management sections",
+                "Summary statements about fire safety measures",
+                "May be in executive summaries or conclusions"
+              ]
+            },
+            "docBRef": {
+              "type": "string",
+              "description": "Document B reference (high value properties)",
+              "priority": "high",
+              "source": "property-schema.json",
+              "extraction_hints": [
+                "Look for 'Doc B' or 'Document B' references",
+                "May appear in headers, footers, or reference sections",
+                "Often includes reference numbers or codes"
+              ]
+            }
+          }
+        },
+        "docb_optional_context_fields": {
+          "description": "Optional related context fields if they appear in the same source docs",
+          "fields": {
+            "fireProtection": {
+              "type": "string",
+              "description": "Fire protection measures",
+              "priority": "medium",
+              "source": "property-schema.json",
+              "extraction_hints": [
+                "Look for fire protection system descriptions",
+                "May overlap with fire_safety_measures extraction"
+              ]
+            },
+            "alarms": {
+              "type": "string",
+              "description": "Alarm system type and classification",
+              "priority": "medium",
+              "source": "property-schema.json",
+              "extraction_hints": [
+                "Look for alarm system specifications",
+                "May overlap with fire_alarm_systems extraction"
+              ]
+            },
+            "evacuationStrategy": {
+              "type": "string",
+              "description": "Evacuation strategy for the property",
+              "priority": "medium",
+              "source": "property-schema.json",
+              "extraction_hints": [
+                "Look for evacuation strategy descriptions",
+                "May overlap with evacuation_strategy extraction from Category A"
+              ]
+            },
+            "floorsAboveGround": {
+              "type": "integer",
+              "description": "Number of floors above ground",
+              "minimum": 0,
+              "priority": "medium",
+              "source": "property-schema.json",
+              "extraction_hints": [
+                "Look for storey counts or floor numbers",
+                "May overlap with number_of_storeys from high_rise_indicators"
+              ]
+            },
+            "floorsBelowGround": {
+              "type": "integer",
+              "description": "Number of floors below ground",
+              "minimum": 0,
+              "priority": "medium",
+              "source": "property-schema.json",
+              "extraction_hints": [
+                "Look for basement or underground floor mentions",
+                "May be in building description sections"
+              ]
+            }
+          }
+        }
+      }
+    }
+  },
+  "extraction_guidance": {
+    "confidence_scoring": {
+      "explicit_mention": {
+        "range": [0.9, 1.0],
+        "description": "Field explicitly stated in document"
+      },
+      "strong_inference": {
+        "range": [0.7, 0.9],
+        "description": "Clear context suggests value"
+      },
+      "weak_inference": {
+        "range": [0.5, 0.7],
+        "description": "Some context but uncertain"
+      },
+      "not_found": {
+        "value": null,
+        "description": "No evidence found"
+      }
+    },
+    "extraction_priority": {
+      "high": "Extract with highest priority - critical for ML/UI",
+      "medium": "Extract if present - useful for context",
+      "low": "Extract if easily found - nice to have"
+    },
+    "evidence_requirements": {
+      "required": true,
+      "description": "Every extracted field should include: value, confidence (0-1), evidence (quoted snippet(s) and/or page refs when available)"
+    }
+  }
+}

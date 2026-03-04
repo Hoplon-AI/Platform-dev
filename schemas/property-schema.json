@@ -1,0 +1,388 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "$id": "https://platform-dev/schemas/property-schema.json",
+    "version": "1.0.0",
+    "title": "Property Data Schema",
+    "description": "Schema for property portfolio data used in the platform",
+    "type": "object",
+    "required": [
+        "id"
+    ],
+    "properties": {
+        "id": {
+            "type": "integer",
+            "description": "Unique property identifier"
+        },
+        "uprn": {
+            "type": [
+                "string",
+                "integer"
+            ],
+            "description": "Unique Property Reference Number (12-digit identifier)",
+            "pattern": "^[0-9]{12}$"
+        },
+        "address": {
+            "type": "string",
+            "description": "Full property address or street address"
+        },
+        "address1": {
+            "type": "string",
+            "description": "Primary address line"
+        },
+        "address2": {
+            "type": "string",
+            "description": "Secondary address line"
+        },
+        "address3": {
+            "type": "string",
+            "description": "Tertiary address line"
+        },
+        "city": {
+            "type": "string",
+            "description": "City or town name"
+        },
+        "region": {
+            "type": "string",
+            "description": "Region (e.g., Scotland, England, Wales, Northern Ireland)",
+            "enum": [
+                "Scotland",
+                "England",
+                "Wales",
+                "Northern Ireland",
+                "London",
+                "North East",
+                "North West",
+                "Yorkshire and the Humber",
+                "East Midlands",
+                "West Midlands",
+                "East of England",
+                "South East",
+                "South West"
+            ]
+        },
+        "postcode": {
+            "type": "string",
+            "description": "UK postcode",
+            "pattern": "^[A-Z]{1,2}[0-9]{1,2}[A-Z]?\\s*[0-9][A-Z]{2}$"
+        },
+        "lat": {
+            "type": "number",
+            "description": "Latitude coordinate (UK range: 49.0-61.0)",
+            "minimum": 49.0,
+            "maximum": 61.0
+        },
+        "lon": {
+            "type": "number",
+            "description": "Longitude coordinate (UK range: -8.0-2.0)",
+            "minimum": -8.0,
+            "maximum": 2.0
+        },
+        "buildYear": {
+            "type": "integer",
+            "description": "Year the property was built",
+            "minimum": 1800,
+            "maximum": 2100
+        },
+        "type": {
+            "type": "string",
+            "description": "Property type",
+            "enum": [
+                "Apartment",
+                "Terraced",
+                "Semi-Detached",
+                "Detached",
+                "High-Rise Flat",
+                "Tenement Flat",
+                "Terraced House",
+                "Semi-Detached House",
+                "Bungalow",
+                "Cottage",
+                "Maisonette",
+                "Duplex",
+                "Studio",
+                "Villa",
+                "Townhouse"
+            ]
+        },
+        "propertyType": {
+            "type": "string",
+            "description": "Detailed property type classification"
+        },
+        "tenure": {
+            "type": "string",
+            "description": "Property tenure type",
+            "enum": [
+                "Rented",
+                "Owner Occupied",
+                "Shared Ownership",
+                "Leasehold",
+                "Freehold",
+                "Private Rent",
+                "Student"
+            ]
+        },
+        "occupancyType": {
+            "type": "string",
+            "description": "Occupancy classification",
+            "enum": [
+                "Rented",
+                "Owner Occupied",
+                "Shared Ownership",
+                "Leasehold",
+                "Freehold",
+                "Private Rent",
+                "Student"
+            ]
+        },
+        "landlord": {
+            "type": "string",
+            "description": "Landlord or property owner name"
+        },
+        "clientName": {
+            "type": "string",
+            "description": "Client or housing association name"
+        },
+        "policyReference": {
+            "type": "string",
+            "description": "Insurance policy reference number"
+        },
+        "productType": {
+            "type": "string",
+            "description": "Insurance product type",
+            "enum": [
+                "Social Housing Property",
+                "High value student / mixed use",
+                "Residential Property"
+            ]
+        },
+        "propertyReference": {
+            "type": "string",
+            "description": "Internal property reference code"
+        },
+        "blockReference": {
+            "type": "string",
+            "description": "Block or building reference"
+        },
+        "epcRating": {
+            "type": "string",
+            "description": "Energy Performance Certificate rating",
+            "enum": [
+                "A",
+                "B",
+                "C",
+                "D",
+                "E",
+                "F",
+                "G"
+            ]
+        },
+        "lastClaimDate": {
+            "type": "string",
+            "description": "Date of last insurance claim",
+            "format": "date",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+        },
+        "claimFrequency": {
+            "type": "number",
+            "description": "Claim frequency rate",
+            "minimum": 0
+        },
+        "riskBand": {
+            "type": "string",
+            "description": "Risk classification band",
+            "enum": [
+                "Low",
+                "Medium",
+                "High",
+                "Very High",
+                ""
+            ]
+        },
+        "deprivationIndex": {
+            "type": "number",
+            "description": "Deprivation index score",
+            "minimum": 0,
+            "maximum": 10
+        },
+        "floodScore": {
+            "type": "number",
+            "description": "Flood risk score",
+            "minimum": 0,
+            "maximum": 1
+        },
+        "crimeIndex": {
+            "type": "number",
+            "description": "Crime index score",
+            "minimum": 0,
+            "maximum": 10
+        },
+        "expectedSeverity": {
+            "type": "number",
+            "description": "Expected claim severity",
+            "minimum": 0
+        },
+        "purePremium": {
+            "type": "number",
+            "description": "Pure premium calculation",
+            "minimum": 0
+        },
+        "maintenanceScore": {
+            "type": "number",
+            "description": "Maintenance condition score",
+            "minimum": 0,
+            "maximum": 10
+        },
+        "voidDaysLastYear": {
+            "type": "integer",
+            "description": "Number of void days in the last year",
+            "minimum": 0
+        },
+        "numberOfUnits": {
+            "type": "integer",
+            "description": "Number of units in the property",
+            "minimum": 1
+        },
+        "sumInsured": {
+            "type": "number",
+            "description": "Sum insured value",
+            "minimum": 0
+        },
+        "sumInsuredType": {
+            "type": "string",
+            "description": "Type of sum insured",
+            "enum": [
+                "Reinstatement",
+                "Declared value",
+                "Market value"
+            ]
+        },
+        "deductible": {
+            "type": "number",
+            "description": "Insurance deductible amount",
+            "minimum": 0
+        },
+        "floodDeductible": {
+            "type": "number",
+            "description": "Flood-specific deductible",
+            "minimum": 0
+        },
+        "stormDeductible": {
+            "type": "number",
+            "description": "Storm-specific deductible",
+            "minimum": 0
+        },
+        "deductibleBasis": {
+            "type": "string",
+            "description": "Basis for deductible application",
+            "enum": [
+                "Each and every loss",
+                "Per occurrence",
+                "Aggregate"
+            ]
+        },
+        "avidPropertyType": {
+            "type": "string",
+            "description": "AVID property type classification"
+        },
+        "wallConstruction": {
+            "type": "string",
+            "description": "Wall construction type"
+        },
+        "roofConstruction": {
+            "type": "string",
+            "description": "Roof construction type"
+        },
+        "floorConstruction": {
+            "type": "string",
+            "description": "Floor construction type"
+        },
+        "ageBanding": {
+            "type": "string",
+            "description": "Age band classification",
+            "pattern": "^\\d{4}-\\d{4}$"
+        },
+        "numberOfBedrooms": {
+            "type": "integer",
+            "description": "Number of bedrooms",
+            "minimum": 0
+        },
+        "numberOfStoreys": {
+            "type": "integer",
+            "description": "Number of storeys",
+            "minimum": 1
+        },
+        "basementLocation": {
+            "type": "string",
+            "description": "Basement location description"
+        },
+        "listedBuilding": {
+            "type": "string",
+            "description": "Listed building status",
+            "enum": [
+                "Not listed",
+                "Grade I",
+                "Grade II",
+                "Grade II*"
+            ]
+        },
+        "securityFeatures": {
+            "type": "string",
+            "description": "Security features description"
+        },
+        "fireProtection": {
+            "type": "string",
+            "description": "Fire protection measures"
+        },
+        "alarms": {
+            "type": "string",
+            "description": "Alarm system type and classification"
+        },
+        "floodInsured": {
+            "type": "boolean",
+            "description": "Whether flood is covered by insurance"
+        },
+        "stormInsured": {
+            "type": "boolean",
+            "description": "Whether storm is covered by insurance"
+        },
+        "docBRef": {
+            "type": "string",
+            "description": "Document B reference (high value properties)"
+        },
+        "singleLocationOrPortfolio": {
+            "type": "string",
+            "description": "Whether property is single location or part of portfolio",
+            "enum": [
+                "Single location within programme",
+                "Part of portfolio"
+            ]
+        },
+        "floorsAboveGround": {
+            "type": "integer",
+            "description": "Number of floors above ground",
+            "minimum": 0
+        },
+        "floorsBelowGround": {
+            "type": "integer",
+            "description": "Number of floors below ground",
+            "minimum": 0
+        },
+        "claddingType": {
+            "type": "string",
+            "description": "Type of cladding material"
+        },
+        "ewsStatus": {
+            "type": "string",
+            "description": "External Wall System (EWS) status"
+        },
+        "fireRiskManagementSummary": {
+            "type": "string",
+            "description": "Summary of fire risk management measures"
+        },
+        "evacuationStrategy": {
+            "type": "string",
+            "description": "Evacuation strategy for the property"
+        }
+    },
+    "additionalProperties": false
+}

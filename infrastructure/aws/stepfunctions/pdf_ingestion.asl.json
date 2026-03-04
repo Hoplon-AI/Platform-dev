@@ -1,0 +1,32 @@
+{
+  "Comment": "PDF ingestion pipeline (S3 PUT -> Step Functions).",
+  "StartAt": "ProcessPdf",
+  "States": {
+    "ProcessPdf": {
+      "Type": "Task",
+      "Comment": "Run PDF extraction worker (Lambda/ECS).",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "Parameters": {
+        "FunctionName": "${PDF_WORKER_LAMBDA_ARN}",
+        "Payload": {
+          "bucket.$": "$.bucket",
+          "key.$": "$.key",
+          "execution_arn.$": "$$.Execution.Id"
+        }
+      },
+      "Retry": [
+        {
+          "ErrorEquals": [
+            "States.ALL"
+          ],
+          "IntervalSeconds": 5,
+          "BackoffRate": 2.0,
+          "MaxAttempts": 5
+        }
+      ],
+      "End": true,
+      "OutputPath": "$.Payload"
+    }
+  }
+}
+

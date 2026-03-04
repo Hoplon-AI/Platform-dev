@@ -1,0 +1,36 @@
+# Local runtime deps (Python 3.13 compatible) for Week 3 development
+#
+# This avoids heavyweight / system-lib deps (dbt, weasyprint, psycopg2) and
+# uses versions with wheels for Python 3.13.
+
+# FastAPI and server
+fastapi>=0.115.0
+uvicorn[standard]>=0.30.0
+python-multipart>=0.0.9
+
+# Database (asyncpg expects Postgres)
+asyncpg>=0.30.0
+
+# Data processing (used by file_type_detector)
+numpy>=2.1.0
+pandas>=2.2.0
+openpyxl>=3.1.2
+
+# AWS/S3
+boto3>=1.34.0
+
+# Auth / validation
+python-jose[cryptography]>=3.3.0
+PyJWT>=2.9.0
+passlib[bcrypt]>=1.7.4
+pydantic>=2.5.0
+pydantic-settings>=2.1.0
+
+# PDF text extraction (used by file_type_detector)
+pdfplumber>=0.11.0
+
+# CDK (for AWS-first infrastructure)
+aws-cdk-lib==2.100.0
+constructs>=10.0.0,<11.0.0
+cdk-nag>=2.0.0
+

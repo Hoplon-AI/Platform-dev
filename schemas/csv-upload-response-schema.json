@@ -1,0 +1,58 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "$id": "https://platform-dev/schemas/csv-upload-response-schema.json",
+    "version": "1.0.0",
+    "title": "CSV Upload Response Schema",
+    "description": "Schema for the response from the /upload-csv API endpoint",
+    "type": "object",
+    "required": [
+        "success",
+        "message",
+        "columns",
+        "data",
+        "row_count"
+    ],
+    "properties": {
+        "success": {
+            "type": "boolean",
+            "description": "Whether the upload and processing was successful"
+        },
+        "message": {
+            "type": "string",
+            "description": "Human-readable message about the upload result"
+        },
+        "columns": {
+            "type": "array",
+            "description": "List of standardized column names after processing",
+            "items": {
+                "type": "string"
+            }
+        },
+        "data": {
+            "type": "array",
+            "description": "Array of processed data records",
+            "items": {
+                "type": "object",
+                "description": "A single data record with standardized column names",
+                "additionalProperties": true
+            }
+        },
+        "column_mapping": {
+            "type": "object",
+            "description": "Mapping of original column names to standardized names (only includes changed columns)",
+            "additionalProperties": {
+                "type": "string"
+            }
+        },
+        "row_count": {
+            "type": "integer",
+            "description": "Number of rows processed",
+            "minimum": 0
+        },
+        "original_filename": {
+            "type": "string",
+            "description": "Original filename of the uploaded CSV file"
+        }
+    },
+    "additionalProperties": false
+}
