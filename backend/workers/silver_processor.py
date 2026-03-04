@@ -246,48 +246,263 @@ async def _write_fraew_features(
     postcode: Optional[str] = None,
 ) -> None:
     """
-    Write FRAEW-specific features to fraew_features table.
-    
-    Args:
-        conn: Database connection
-        feature_id: Feature ID from document_features
-        ha_id: Housing association ID
-        upload_id: Upload ID
-        features_json: Full features JSON
-        uprn: UPRN (denormalized from document_features for query performance)
-        postcode: Postcode (denormalized from document_features for query performance)
+    Write FRAEW-specific features to silver.fraew_features (migration 015, 50 columns).
+
+    Reads from features_json.features.fraew_specific — the shape produced by the
+    updated agentic-feature-definitions.json fed to Bedrock.
+
+    The rag_status and is_in_date columns are derived here in Python using the
+    same logic as the normalize_fraew_risk_rating() SQL function so that the
+    silver processor does not need to make an extra DB round-trip.
+
+    All existing args and call signature preserved for compatibility.
     """
     features = features_json.get("features", {})
-    fraew_specific = features.get("fraew_specific", {})
-    
+    fs = features.get("fraew_specific", {})
+
+    # ------------------------------------------------------------------
+    # Derive rag_status from building_risk_rating (mirrors SQL function)
+    # ------------------------------------------------------------------
+    def _derive_fraew_rag(rating: Optional[str]) -> Optional[str]:
+        if not rating:
+            return None
+        lower = rating.lower().strip()
+        no_data = ("n/a", "not assessed", "unknown", "tbc", "tbd", "none")
+        if lower in no_data:
+            return None
+        if "no further action" in lower:
+            return "GREEN"
+        if "tolerable but" in lower or "tolerable with" in lower:
+            return "AMBER"
+        if "further action" in lower or "further assessment" in lower:
+            return "AMBER"
+        if "not acceptable" in lower:
+            return "RED"
+        if "broadly acceptable" in lower:
+            return "GREEN"
+        red_kw = ("high", "intolerable", "unacceptable", "extreme", "critical")
+        if any(kw in lower for kw in red_kw):
+            return "RED"
+        amber_kw = ("medium", "moderate", "significant")
+        if any(kw in lower for kw in amber_kw):
+            return "AMBER"
+        green_kw = ("low", "tolerable", "acceptable", "negligible")
+        if any(kw in lower for kw in green_kw):
+            return "GREEN"
+        return "AMBER"  # conservative fallback
+
+    # ------------------------------------------------------------------
+    # Derive is_in_date
+    # ------------------------------------------------------------------
+    def _derive_is_in_date(valid_until_str: Optional[str]) -> Optional[bool]:
+        if not valid_until_str:
+            return None
+        try:
+            from datetime import date as _date
+            valid_until = _date.fromisoformat(valid_until_str)
+            return valid_until >= _date.today()
+        except (ValueError, TypeError):
+            return None
+
+    # ------------------------------------------------------------------
+    # Derive material flags from wall_types array
+    # ------------------------------------------------------------------
+    wall_types = fs.get("wall_types") or []
+
+    def _any_insulation(t: str) -> bool:
+        return any(wt.get("insulation_type") == t for wt in wall_types)
+
+    def _any_render(t: str) -> bool:
+        return any(wt.get("render_type") == t for wt in wall_types)
+
+    has_combustible = None
+    if wall_types:
+        combustible_vals = [
+            wt.get("insulation_combustible") or wt.get("render_combustible")
+            for wt in wall_types
+            if wt.get("insulation_combustible") is not None
+            or wt.get("render_combustible") is not None
+        ]
+        has_combustible = any(combustible_vals) if combustible_vals else None
+
+    # ------------------------------------------------------------------
+    # Pull all fields from fraew_specific
+    # ------------------------------------------------------------------
+    building_risk_rating = fs.get("building_risk_rating")
+    rag_status           = _derive_fraew_rag(building_risk_rating)
+    is_in_date           = _derive_is_in_date(fs.get("assessment_valid_until"))
+
+    # Validate height_category against allowed values
+    valid_height_cats = ("under_11m", "11_to_18m", "18_to_30m", "over_30m", "unknown")
+    height_category = fs.get("building_height_category")
+    if height_category not in valid_height_cats:
+        height_category = None
+
+    # Validate adb_compliant
+    valid_adb = ("compliant", "non_compliant", "uncertain", "not_applicable")
+    adb_compliant = fs.get("adb_compliant")
+    if adb_compliant not in valid_adb:
+        adb_compliant = None
+
+    # Validate evacuation_strategy
+    valid_evac = ("stay_put", "simultaneous", "phased", "temporary_evacuation")
+    evacuation_strategy = fs.get("evacuation_strategy")
+    if evacuation_strategy not in valid_evac:
+        evacuation_strategy = None
+
+    now = _utc_now().replace(tzinfo=None)
+
     await conn.execute(
         """
         INSERT INTO silver.fraew_features (
             fraew_id, feature_id, ha_id, upload_id,
-            pas_9980_compliant, pas_9980_version,
-            building_risk_rating,
-            wall_types, has_interim_measures, has_remedial_actions,
+
+            report_reference, assessment_date, report_date,
+            assessment_valid_until, is_in_date,
+
+            assessor_name, assessor_company, assessor_qualification,
+            fire_engineer_name, fire_engineer_company, fire_engineer_qualification,
+            clause_14_applied,
+
+            building_height_m, building_height_category,
+            num_storeys, num_units, build_year,
+            construction_frame_type, external_wall_base_construction, retrofit_year,
+
+            pas_9980_version, pas_9980_compliant,
+            building_risk_rating, rag_status,
+
+            interim_measures_required, interim_measures_detail,
+            has_remedial_actions, remedial_actions,
+
+            wall_types,
+
+            has_combustible_cladding, eps_insulation_present,
+            mineral_wool_insulation_present, pir_insulation_present,
+            phenolic_insulation_present, acrylic_render_present,
+            cement_render_present,
+
+            cavity_barriers_present, cavity_barriers_windows, cavity_barriers_floors,
+            fire_breaks_floor_level, fire_breaks_party_walls,
+            dry_riser_present, wet_riser_present,
+            evacuation_strategy,
+
+            bs8414_test_evidence, br135_criteria_met, adb_compliant,
+
+            height_survey_recommended, fire_door_survey_recommended,
+            intrusive_investigation_recommended, asbestos_suspected,
+
+            extraction_confidence, fraew_features_json,
             uprn, postcode,
-            fraew_features_json, created_at, updated_at
+
+            created_at, updated_at
         )
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb, $9, $10, $11, $12, $13::jsonb, $14, $15)
+        VALUES (
+            $1,  $2,  $3,  $4,
+            $5,  $6,  $7,
+            $8,  $9,
+            $10, $11, $12,
+            $13, $14, $15,
+            $16,
+            $17, $18,
+            $19, $20, $21,
+            $22, $23, $24,
+            $25, $26,
+            $27, $28,
+            $29, $30,
+            $31, $32::jsonb,
+            $33::jsonb,
+            $34, $35,
+            $36, $37,
+            $38, $39,
+            $40,
+            $41, $42, $43,
+            $44, $45,
+            $46, $47,
+            $48,
+            $49, $50, $51,
+            $52, $53,
+            $54, $55,
+            $56, $57::jsonb,
+            $58, $59,
+            $60, $61
+        )
         """,
-        uuid.uuid4(),
-        feature_id,
-        ha_id,
-        upload_id,
-        fraew_specific.get("pas_9980_compliant", False),
-        fraew_specific.get("pas_9980_version"),
-        fraew_specific.get("building_risk_rating"),
-        json.dumps(fraew_specific.get("wall_types", [])),
-        fraew_specific.get("has_interim_measures", False),
-        fraew_specific.get("has_remedial_actions", False),
-        uprn,
-        postcode,
-        json.dumps(fraew_specific),
-        _utc_now().replace(tzinfo=None),
-        _utc_now().replace(tzinfo=None),
+        uuid.uuid4(),           # $1  fraew_id
+        feature_id,             # $2  feature_id
+        ha_id,                  # $3  ha_id
+        upload_id,              # $4  upload_id
+
+        fs.get("report_reference"),                                     # $5
+        fs.get("assessment_date"),                                      # $6  (date str, asyncpg casts)
+        fs.get("report_date"),                                          # $7
+        fs.get("assessment_valid_until"),                               # $8
+        is_in_date,                                                     # $9
+
+        fs.get("assessor_name"),                                        # $10
+        fs.get("assessor_company"),                                     # $11
+        fs.get("assessor_qualification"),                               # $12
+        fs.get("fire_engineer_name"),                                   # $13
+        fs.get("fire_engineer_company"),                                # $14
+        fs.get("fire_engineer_qualification"),                          # $15
+        bool(fs.get("clause_14_applied", False)),                       # $16
+
+        fs.get("building_height_m"),                                    # $17
+        height_category,                                                # $18
+        fs.get("num_storeys"),                                          # $19
+        fs.get("num_units"),                                            # $20
+        fs.get("build_year"),                                           # $21
+        fs.get("construction_frame_type"),                              # $22
+        fs.get("external_wall_base_construction"),                      # $23
+        fs.get("retrofit_year"),                                        # $24
+
+        fs.get("pas_9980_version", "2022"),                             # $25
+        fs.get("pas_9980_compliant"),                                   # $26
+        building_risk_rating,                                           # $27
+        rag_status,                                                     # $28
+
+        bool(fs.get("interim_measures_required", False)),               # $29
+        fs.get("interim_measures_detail"),                              # $30
+        bool(fs.get("has_remedial_actions", False)),                    # $31
+        json.dumps(fs.get("remedial_actions") or []),                   # $32 JSONB
+
+        json.dumps(wall_types),                                         # $33 JSONB
+
+        has_combustible,                                                # $34
+        _any_insulation("eps") if wall_types else None,                 # $35
+        _any_insulation("mineral_wool") if wall_types else None,        # $36
+        _any_insulation("pir") if wall_types else None,                 # $37
+        _any_insulation("phenolic") if wall_types else None,            # $38
+        _any_render("acrylic") if wall_types else None,                 # $39
+        _any_render("cement") if wall_types else None,                  # $40
+
+        fs.get("cavity_barriers_present"),                              # $41
+        fs.get("cavity_barriers_windows"),                              # $42
+        fs.get("cavity_barriers_floors"),                               # $43
+        fs.get("fire_breaks_floor_level"),                              # $44
+        fs.get("fire_breaks_party_walls"),                              # $45
+        fs.get("dry_riser_present"),                                    # $46
+        fs.get("wet_riser_present"),                                    # $47
+        evacuation_strategy,                                            # $48
+
+        fs.get("bs8414_test_evidence"),                                 # $49
+        fs.get("br135_criteria_met"),                                   # $50
+        adb_compliant,                                                  # $51
+
+        bool(fs.get("height_survey_recommended", False)),               # $52
+        bool(fs.get("fire_door_survey_recommended", False)),            # $53
+        bool(fs.get("intrusive_investigation_recommended", False)),     # $54
+        bool(fs.get("asbestos_suspected", False)),                      # $55
+
+        fs.get("extraction_confidence", 0.5),                           # $56
+        json.dumps(fs) if fs else json.dumps({}),                       # $57 fraew_features_json
+
+        uprn,                                                           # $58
+        postcode,                                                       # $59
+
+        now,                                                            # $60 created_at
+        now,                                                            # $61 updated_at
     )
+
 
 
 async def _write_fra_features(
@@ -298,216 +513,202 @@ async def _write_fra_features(
     upload_id: uuid.UUID,
     features_json: Dict[str, Any],
 ) -> None:
-    """Write FRA-specific features to fra_features table."""
+    """
+    Write FRA-specific features to silver.fra_features (migration 013, 43 columns).
+
+    Reads from features_json.features.fra_specific — the shape produced by the
+    updated agentic-feature-definitions.json fed to Bedrock.
+
+    The original function inserted only fra_id, feature_id, ha_id, upload_id, and
+    a raw JSON dump. This replacement populates all 43 columns from the new schema.
+
+    Call signature preserved for compatibility.
+    """
     features = features_json.get("features", {})
-    
+    fs = features.get("fra_specific", {})
+
+    # ------------------------------------------------------------------
+    # Derive rag_status (mirrors normalize_fra_rag_status() SQL function)
+    # ------------------------------------------------------------------
+    def _derive_fra_rag(rating: Optional[str]) -> Optional[str]:
+        if not rating:
+            return None
+        lower = rating.lower().strip()
+        no_data = ("n/a", "not assessed", "unknown", "tbc", "tbd", "none")
+        if lower in no_data:
+            return None
+        red_kw  = ("intolerable", "substantial", "high", "critical",
+                    "priority 1", "very high", "grade e", "grade d")
+        amber_kw = ("moderate", "medium", "significant", "tolerable but",
+                     "priority 2", "grade c")
+        green_kw = ("trivial", "low", "tolerable", "acceptable", "negligible",
+                     "priority 3", "grade a", "grade b")
+        if any(kw in lower for kw in red_kw):
+            return "RED"
+        if any(kw in lower for kw in amber_kw):
+            return "AMBER"
+        if any(kw in lower for kw in green_kw):
+            return "GREEN"
+        return "AMBER"  # conservative fallback
+
+    # ------------------------------------------------------------------
+    # Derive is_in_date
+    # ------------------------------------------------------------------
+    def _derive_is_in_date(valid_until_str: Optional[str]) -> Optional[bool]:
+        if not valid_until_str:
+            return None
+        try:
+            from datetime import date as _date
+            return _date.fromisoformat(valid_until_str) >= _date.today()
+        except (ValueError, TypeError):
+            return None
+
+    # ------------------------------------------------------------------
+    # Validate and count action items
+    # ------------------------------------------------------------------
+    action_items = fs.get("action_items") or []
+    valid_priority = ("advisory", "low", "medium", "high")
+    valid_status   = ("outstanding", "completed", "overdue")
+
+    # Sanitise each action item before storing
+    clean_actions = []
+    for a in action_items:
+        clean_actions.append({
+            "issue_ref":   a.get("issue_ref"),
+            "description": a.get("description", ""),
+            "hazard_type": a.get("hazard_type"),
+            "priority":    a.get("priority") if a.get("priority") in valid_priority else "low",
+            "due_date":    a.get("due_date"),
+            "status":      a.get("status") if a.get("status") in valid_status else "outstanding",
+            "responsible": a.get("responsible"),
+        })
+
+    total_count        = len(clean_actions)
+    high_priority_count = sum(1 for a in clean_actions if a["priority"] == "high")
+    overdue_count      = sum(1 for a in clean_actions if a["status"] == "overdue")
+    outstanding_count  = sum(1 for a in clean_actions
+                             if a["status"] in ("outstanding", "overdue"))
+    no_date_count      = sum(1 for a in clean_actions if not a.get("due_date"))
+
+    # ------------------------------------------------------------------
+    # Validate evacuation_strategy
+    # ------------------------------------------------------------------
+    valid_evac = ("stay_put", "simultaneous", "phased", "temporary_evacuation")
+    evacuation_strategy = fs.get("evacuation_strategy")
+    if evacuation_strategy not in valid_evac:
+        evacuation_strategy = None
+
+    risk_rating = fs.get("risk_rating")
+    rag_status  = _derive_fra_rag(risk_rating)
+    is_in_date  = _derive_is_in_date(fs.get("assessment_valid_until"))
+
+    now = _utc_now().replace(tzinfo=None)
+
     await conn.execute(
         """
         INSERT INTO silver.fra_features (
-            fra_id, feature_id, ha_id, upload_id,
-            fra_features_json, created_at, updated_at
-        )
-        VALUES ($1, $2, $3, $4, $5::jsonb, $6, $7)
-        """,
-        uuid.uuid4(),
-        feature_id,
-        ha_id,
-        upload_id,
-        json.dumps(features),
-        _utc_now().replace(tzinfo=None),
-        _utc_now().replace(tzinfo=None),
-    )
+            fra_id, feature_id, ha_id,
 
+            risk_rating, rag_status, fra_assessment_type,
+            assessment_date, assessment_valid_until, next_review_date,
+            is_in_date,
 
-async def _write_scr_features(
-    conn: asyncpg.Connection,
-    *,
-    feature_id: uuid.UUID,
-    ha_id: str,
-    upload_id: uuid.UUID,
-    features_json: Dict[str, Any],
-) -> None:
-    """Write SCR-specific features to scr_features table."""
-    features = features_json.get("features", {})
-    scr_specific = features.get("scr_specific", {})
+            assessor_name, assessor_company, assessor_qualification,
+            responsible_person,
 
-    # Extract building identification
-    building_name = scr_specific.get("building_name")
-    building_address = scr_specific.get("building_address")
-    bsr_registration = scr_specific.get("bsr_registration_number")
-    building_reference = scr_specific.get("building_reference")
-    uprn_labeled = scr_specific.get("uprn_labeled")
-    uprns = scr_specific.get("uprns") or []  # List of standard 12-digit UPRNs
+            evacuation_strategy, evacuation_strategy_changed,
+            evacuation_strategy_notes, has_accessibility_needs_noted,
 
-    # Extract building characteristics
-    building_height = scr_specific.get("building_height_metres")
-    storeys = scr_specific.get("number_of_storeys")
-    construction_year = scr_specific.get("construction_year")
-    building_type = scr_specific.get("building_type")
-    height_category = scr_specific.get("height_category")
-    total_units = scr_specific.get("total_units")
+            has_sprinkler_system, has_smoke_detection, has_fire_alarm_system,
+            has_fire_doors, has_compartmentation, has_emergency_lighting,
+            has_fire_extinguishers, has_firefighting_shaft,
+            has_dry_riser, has_wet_riser,
 
-    # Extract safety case metadata
-    safety_case_version = scr_specific.get("safety_case_version")
-    safety_case_date_str = scr_specific.get("safety_case_date")
-    safety_case_date = _normalize_date(safety_case_date_str).date() if safety_case_date_str and _normalize_date(safety_case_date_str) else None
-    report_author = scr_specific.get("report_author")
-    pap = scr_specific.get("principal_accountable_person")
-    bsm = scr_specific.get("building_safety_manager")
-    accountable_entity = scr_specific.get("accountable_person_entity")
+            action_items, significant_findings,
+            total_action_count, high_priority_action_count,
+            overdue_action_count, outstanding_action_count, no_date_action_count,
 
-    # Extract FRA information
-    fra_type = scr_specific.get("fra_type")
-    fra_date_str = scr_specific.get("fra_date")
-    fra_date = _normalize_date(fra_date_str).date() if fra_date_str and _normalize_date(fra_date_str) else None
-    fra_assessor = scr_specific.get("fra_assessor")
-    fra_credentials = scr_specific.get("fra_assessor_credentials")
-    fra_peer_reviewer = scr_specific.get("fra_peer_reviewer")
-    fra_outcome = scr_specific.get("fra_outcome")
+            bsa_2022_applicable, accountable_person_noted, mandatory_occurrence_noted,
 
-    # Extract evacuation strategy
-    evacuation_strategy = scr_specific.get("evacuation_strategy")
-    evacuation_description = scr_specific.get("evacuation_strategy_description")
-    peeps_required = scr_specific.get("personal_evacuation_plans_required", False)
+            extraction_confidence, raw_features,
 
-    # Extract fire safety systems
-    fire_alarm_type = scr_specific.get("fire_alarm_system_type")
-    fire_alarm_coverage = scr_specific.get("fire_alarm_coverage")
-    smoke_detection = scr_specific.get("smoke_detection_type")
-    firefighters_lift = scr_specific.get("firefighters_lift_present", False)
-    dry_riser = scr_specific.get("dry_riser_present", False)
-    wet_riser = scr_specific.get("wet_riser_present", False)
-    sprinklers = scr_specific.get("sprinklers_present", False)
-    aov = scr_specific.get("aov_present", False)
-    emergency_lighting = scr_specific.get("emergency_lighting_present", False)
-    compartmentation = scr_specific.get("fire_compartmentation_status")
-    pib = scr_specific.get("premises_information_box_present", False)
-
-    # Extract structural information
-    construction_type = scr_specific.get("construction_type")
-    cladding_type = scr_specific.get("cladding_type")
-    cladding_status = scr_specific.get("cladding_status")
-    bcc = scr_specific.get("building_control_certificate", False)
-    structural_issues = scr_specific.get("structural_issues_identified", False)
-    structural_issues_desc = scr_specific.get("structural_issues_description")
-    gas_detectors = scr_specific.get("gas_detectors_present", False)
-    lightning_protection = scr_specific.get("lightning_protection_present", False)
-
-    # Extract BSA 2022 compliance
-    bsa_applicable = scr_specific.get("bsa_2022_applicable", True)
-    part4_compliance = scr_specific.get("part_4_duties_compliance_status")
-    mor_in_place = scr_specific.get("mandatory_occurrence_reporting_in_place", False)
-    resident_engagement = scr_specific.get("resident_engagement_strategy_present", False)
-
-    # Key contacts
-    key_contacts = scr_specific.get("key_contacts")
-
-    # Extraction metadata
-    extraction_method = features_json.get("extraction_method", "regex")
-    agentic_confidence = scr_specific.get("agentic_confidence_score")
-    comparison_json = features_json.get("extraction_comparison_metadata")
-
-    # Determine safety_case_status from various fields
-    safety_case_status = scr_specific.get("safety_case_status", "active")
-
-    now = _utc_now().replace(tzinfo=None)
-    await conn.execute(
-        """
-        INSERT INTO silver.scr_features (
-            scr_id, feature_id, ha_id, upload_id,
-            safety_case_status,
-            building_name, building_address, bsr_registration_number, building_reference,
-            uprn_labeled, uprns,
-            building_height_metres, number_of_storeys, construction_year, building_type,
-            height_category, total_units,
-            safety_case_version, safety_case_date, report_author,
-            principal_accountable_person, building_safety_manager, accountable_person_entity,
-            fra_type, fra_date, fra_assessor, fra_assessor_credentials, fra_peer_reviewer, fra_outcome,
-            evacuation_strategy, evacuation_strategy_description, personal_evacuation_plans_required,
-            fire_alarm_system_type, fire_alarm_coverage, smoke_detection_type,
-            firefighters_lift_present, dry_riser_present, wet_riser_present,
-            sprinklers_present, aov_present, emergency_lighting_present,
-            fire_compartmentation_status, premises_information_box_present,
-            construction_type, cladding_type, cladding_status,
-            building_control_certificate, structural_issues_identified, structural_issues_description,
-            gas_detectors_present, lightning_protection_present,
-            bsa_2022_applicable, part_4_duties_compliance_status,
-            mandatory_occurrence_reporting_in_place, resident_engagement_strategy_present,
-            key_contacts_json,
-            extraction_method, agentic_confidence_score, extraction_comparison_json,
-            scr_features_json, created_at, updated_at
+            created_at, updated_at
         )
         VALUES (
-            $1, $2, $3, $4, $5, $6, $7, $8, $9, $10,
-            $11, $12, $13, $14, $15, $16, $17, $18, $19, $20,
-            $21, $22, $23, $24, $25, $26, $27, $28, $29, $30,
-            $31, $32, $33, $34, $35, $36, $37, $38, $39, $40,
-            $41, $42, $43, $44, $45, $46, $47, $48, $49, $50,
-            $51, $52, $53, $54, $55, $56::jsonb, $57, $58, $59::jsonb, $60::jsonb, $61, $62
+            $1,  $2,  $3,
+            $4,  $5,  $6,
+            $7,  $8,  $9,
+            $10,
+            $11, $12, $13,
+            $14,
+            $15, $16,
+            $17, $18,
+            $19, $20, $21,
+            $22, $23, $24,
+            $25, $26,
+            $27, $28,
+            $29::jsonb, $30::jsonb,
+            $31, $32,
+            $33, $34, $35,
+            $36, $37, $38,
+            $39, $40::jsonb,
+            $41, $42
         )
         """,
-        uuid.uuid4(),                      # $1 scr_id
-        feature_id,                        # $2 feature_id
-        ha_id,                             # $3 ha_id
-        upload_id,                         # $4 upload_id
-        safety_case_status,                # $5 safety_case_status
-        building_name,                     # $6
-        building_address,                  # $7
-        bsr_registration,                  # $8
-        building_reference,                # $9
-        uprn_labeled,                      # $10
-        uprns,                             # $11 (TEXT[] array)
-        building_height,                   # $12
-        storeys,                           # $13
-        construction_year,                 # $14
-        building_type,                     # $15
-        height_category,                   # $16
-        total_units,                       # $17
-        safety_case_version,               # $18
-        safety_case_date,                  # $19
-        report_author,                     # $20
-        pap,                               # $21
-        bsm,                               # $22
-        accountable_entity,                # $23
-        fra_type,                          # $24
-        fra_date,                          # $25
-        fra_assessor,                      # $26
-        fra_credentials,                   # $27
-        fra_peer_reviewer,                 # $28
-        fra_outcome,                       # $29
-        evacuation_strategy,               # $30
-        evacuation_description,            # $31
-        peeps_required,                    # $32
-        fire_alarm_type,                   # $33
-        fire_alarm_coverage,               # $34
-        smoke_detection,                   # $35
-        firefighters_lift,                 # $36
-        dry_riser,                         # $37
-        wet_riser,                         # $38
-        sprinklers,                        # $39
-        aov,                               # $40
-        emergency_lighting,                # $41
-        compartmentation,                  # $42
-        pib,                               # $43
-        construction_type,                 # $44
-        cladding_type,                     # $45
-        cladding_status,                   # $46
-        bcc,                               # $47
-        structural_issues,                 # $48
-        structural_issues_desc,            # $49
-        gas_detectors,                     # $50
-        lightning_protection,              # $51
-        bsa_applicable,                    # $52
-        part4_compliance,                  # $53
-        mor_in_place,                      # $54
-        resident_engagement,               # $55
-        json.dumps(key_contacts) if key_contacts else None,  # $56 key_contacts_json
-        extraction_method,                 # $57
-        agentic_confidence,                # $58
-        json.dumps(comparison_json) if comparison_json else None,  # $59 extraction_comparison_json
-        json.dumps(scr_specific) if scr_specific else json.dumps(features),  # $60 scr_features_json
-        now,                               # $61 created_at
-        now,                               # $62 updated_at
+        uuid.uuid4(),       # $1  fra_id
+        feature_id,         # $2  feature_id
+        ha_id,              # $3  ha_id
+        # NOTE: fra_features has no upload_id column in migration 013.
+        # If your schema has it, add $4 upload_id and shift remaining params.
+
+        risk_rating,                                                    # $4
+        rag_status,                                                     # $5
+        fs.get("fra_assessment_type"),                                  # $6
+
+        fs.get("assessment_date"),                                      # $7
+        fs.get("assessment_valid_until"),                               # $8
+        fs.get("next_review_date"),                                     # $9
+        is_in_date,                                                     # $10
+
+        fs.get("assessor_name"),                                        # $11
+        fs.get("assessor_company"),                                     # $12
+        fs.get("assessor_qualification"),                               # $13
+        fs.get("responsible_person"),                                   # $14
+
+        evacuation_strategy,                                            # $15
+        bool(fs.get("evacuation_strategy_changed", False)),             # $16
+        fs.get("evacuation_strategy_notes"),                            # $17
+        bool(fs.get("has_accessibility_needs_noted", False)),           # $18
+
+        fs.get("has_sprinkler_system"),                                 # $19
+        fs.get("has_smoke_detection"),                                  # $20
+        fs.get("has_fire_alarm_system"),                                # $21
+        fs.get("has_fire_doors"),                                       # $22
+        fs.get("has_compartmentation"),                                 # $23
+        fs.get("has_emergency_lighting"),                               # $24
+        fs.get("has_fire_extinguishers"),                               # $25
+        fs.get("has_firefighting_shaft"),                               # $26
+        fs.get("has_dry_riser"),                                        # $27
+        fs.get("has_wet_riser"),                                        # $28
+
+        json.dumps(clean_actions),                                      # $29 action_items
+        json.dumps(fs.get("significant_findings") or []),               # $30 significant_findings
+
+        total_count,                                                    # $31
+        high_priority_count,                                            # $32
+        overdue_count,                                                  # $33
+        outstanding_count,                                              # $34
+        no_date_count,                                                  # $35
+
+        bool(fs.get("bsa_2022_applicable", False)),                     # $36
+        bool(fs.get("accountable_person_noted", False)),                # $37
+        bool(fs.get("mandatory_occurrence_noted", False)),              # $38
+
+        float(fs.get("extraction_confidence", 0.5)),                    # $39
+        json.dumps(fs),                                                 # $40 raw_features
+
+        now,                                                            # $41 created_at
+        now,                                                            # $42 updated_at
     )
 
 
