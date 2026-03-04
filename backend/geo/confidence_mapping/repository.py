@@ -9,7 +9,7 @@ if TYPE_CHECKING:
     pass
 
 from backend.core.database.db_pool import DatabasePool
-from backend.geo.confidence_mapping.confidence_v2 import RawCandidate
+from backend.geo import RawCandidate
 
 
 class UPRNRepository:

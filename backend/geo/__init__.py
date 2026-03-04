@@ -28,3 +28,7 @@ __all__ = [
     "ScoringConfig",
     "UPRNRepository",
 ]
+
+
+class RawCandidate:
+    pass

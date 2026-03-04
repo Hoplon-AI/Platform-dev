@@ -5,9 +5,9 @@ from uuid import uuid4
 from fastapi import APIRouter, HTTPException, status
 from typing import Dict, Any
 
-from backend.geo.confidence_mapping.models import UPRNMatchRequest, UPRNMatchResponse
-from backend.geo.confidence_mapping.confidence_v2 import ConfidenceScorerV2, ScoringConfigV2
-from backend.geo.confidence_mapping.repository import UPRNRepository
+from backend.geo import UPRNMatchRequest, UPRNMatchResponse
+from backend.geo import ConfidenceScorerV2, ScoringConfigV2
+from backend.geo import UPRNRepository
 
 router = APIRouter(prefix="/api/v1/geo", tags=["UPRN Matching"])
 

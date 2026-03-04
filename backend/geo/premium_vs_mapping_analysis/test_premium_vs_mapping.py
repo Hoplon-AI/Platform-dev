@@ -1,6 +1,6 @@
 import requests
-from backend.geo.premium_vs_mapping_analysis.premium_uprn import get_uprn_from_address
-from backend.geo.premium_vs_mapping_analysis.addresses import addresses
+from backend.geo import get_uprn_from_address
+from backend.geo import addresses
 
 LOCAL_API_URL = "http://127.0.0.1:8000/api/v1/geo/uprn/match"
 

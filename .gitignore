@@ -272,7 +272,7 @@ os_datahub_credentials.json
 # *.rtf
 
 #analyze test
-analyze_scoring.py
+backend/geo/premium_vs_mapping_analysis/analyze_scoring.py
 
 #keys
 os_dh_fun_keys

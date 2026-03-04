@@ -1,4 +1,4 @@
-from backend.geo.confidence_mapping.confidence import ConfidenceScorer, RawCandidate
+from backend.geo import ConfidenceScorer, RawCandidate
 
 # Test 1: Confidence scoring (no database needed)
 print("=== Test 1: Confidence Scoring ===")
