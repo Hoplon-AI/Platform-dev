@@ -5,7 +5,6 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Project Overview
 
 Property portfolio management platform with document ingestion, feature extraction, and analytics dashboards. Uses Bronze → Silver → Gold medallion data architecture.
-
 **Stack:** React 18 + TypeScript + Vite | FastAPI + asyncpg | PostgreSQL (PostGIS) | AWS CDK
 
 ## Python Environment
@@ -42,6 +41,7 @@ DEV_MODE=true ./venv/bin/uvicorn backend.main:app --reload --port 8000
 # Run specific test
 ./venv/bin/pytest tests/test_silver_processor.py::TestParseS3KeyForMetadata -v
 ```
+API docs: http://127.0.0.1:8000/docs
 
 ### Frontend
 
@@ -53,10 +53,10 @@ npm test                       # Run tests once
 npm run test:watch             # Watch mode
 npm run build                  # Production build
 npm run lint                   # ESLint
+npm run dev -- --host 127.0.0.1 --port 3000
 ```
 
 ### Docker Services (Postgres + LocalStack)
-
 ```bash
 docker compose up -d           # Start services
 docker compose down            # Stop services
@@ -72,6 +72,13 @@ docker exec -i platform-dev-localstack awslocal s3 mb s3://platform-bronze
 
 # Seed test data
 docker exec -i platform-dev-postgres psql -U postgres -d platform_dev < database/seeds/week3_seed.sql
+```
+
+### Testing
+```bash
+pytest tests/                           # All tests
+pytest tests/test_file_type_detector.py -v  # Single file
+pytest tests/geo/                       # Geographic tests
 ```
 
 ### AWS CDK
@@ -171,6 +178,7 @@ Backend tests use moto for S3 mocking. Database tests require running Postgres.
 
 Frontend tests use Vitest + @testing-library/react with jsdom.
 
+
 ## Code Standards
 
 From `.cursor/rules.md`:
@@ -178,3 +186,10 @@ From `.cursor/rules.md`:
 - TypeScript: Strict mode, functional components only, API calls in services layer
 - SQL: Parameterized queries, explicit column selection, snake_case naming
 - AWS CDK: All resources via CDK, use cdk-nag for security validation
+
+## Key Files
+- `backend/api/ingestion/file_type_detector.py` - Auto-detects CSV/Excel/PDF file types
+- `backend/core/pdf_extraction/pdf_pipeline.py` - PDF processing pipeline
+- `backend/geo/confidence.py` - UPRN matching confidence scoring
+- `database/migrations/` - Schema migrations (apply in numerical order)
+- `.cursor/rules.md` - Detailed coding standards (409 lines)

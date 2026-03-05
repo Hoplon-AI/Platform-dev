@@ -270,3 +270,10 @@ os_datahub_credentials.json
 # RTF files (if they contain sensitive info)
 # Uncomment if needed:
 # *.rtf
+
+#analyze test
+backend/geo/premium_vs_mapping_analysis/analyze_scoring.py
+
+#keys
+os_dh_fun_keys
+epc_keys

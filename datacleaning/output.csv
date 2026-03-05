@@ -1,0 +1,1001 @@
+id,uprn,address,city,region,postcode,lat,lon,buildYear,type,tenure,landlord,epcRating,deprivationIndex,floodScore,crimeIndex,lastClaimDate,claimFrequency,expectedSeverity,purePremium,maintenanceScore,voidDaysLastYear,riskBand
+1,100081444916,194 Church Lane,Inverness,Northern Ireland,DD39 6GH,52.78,-0.33,1992,,Social Rent,Clyde Housing,E,8.18,0.03,8.58,2022-03-07,1.49,4448,1929,9.88,84,
+2,100067570678,119 Park Road,Aberdeen,Scotland,EH83 4CD,52.59,-2.56,2007,Semi-Detached,Social Rent,City Council,G,9.61,0.97,3.73,2025-11-12,1.21,4618,644,1.27,184,Low
+3,100063841664,86 High Street,Inverness,Northern Ireland,AB42 5AB,55.76,-3.43,1965,High-Rise Flat,Owner Occupied,,C,8.87,0.78,9.73,2023-05-21,1.97,1885,1930,6.7,194,Medium
+4,100080277067,91 Main Street,,Northern Ireland,G64 5EF,55.73,-4.56,2005,,Owner Occupied,Housing Association,B,5.63,0.61,7.51,2022-11-10,0.84,6009,918,5.66,154,Very High
+5,100067398243,184 Park Road,Manchester,Wales,G86 7CD,52.77,-2.92,1950,High-Rise Flat,,,E,5.94,0.06,6.51,2025-01-12,0.01,709,1471,8.19,277,
+6,100017394990,138 Park Road,,Northern Ireland,EH44 5EF,52.54,0.24,1997,Apartment,Owner Occupied,Private Landlord,F,4.21,0.86,8.69,2020-11-23,1.02,4909,1793,3.81,254,Very High
+7,100089814547,97 High Street,Dundee,Scotland,G1 6AB,58.84,-5.59,1954,High-Rise Flat,,Housing Association,B,8.3,0.96,7.98,2024-11-01,1.97,9306,1286,3.97,223,
+8,100038939586,95 Church Lane,London,England,EH1 6CD,52.33,-6.12,2020,Apartment,Owner Occupied,,A,3.52,0.65,7.11,2024-04-01,0.78,3128,638,5.93,329,Very Low
+9,100037245136,97 Station Road,Dundee,,EH29 7AB,57.17,-0.43,1975,,Owner Occupied,Private Landlord,G,8.6,0.08,7.11,2024-02-19,0.55,2022,876,7.01,146,
+10,100026845615,13 High Street,Cardiff,Northern Ireland,DD96 6EF,57.3,-5.71,1953,High-Rise Flat,Owner Occupied,Private Landlord,F,1.72,0.27,2.06,2021-08-08,0.74,891,615,9.28,31,Very Low
+11,100083123197,89 High Street,Belfast,England,AB26 4CD,52.16,-0.82,2019,Detached House,Owner Occupied,Housing Association,D,9.05,0.14,4.3,2025-04-02,1.59,3516,1058,9.8,77,Medium
+12,100060586677,33 Station Road,Inverness,Northern Ireland,G86 5AB,52.66,-7.95,2003,Bungalow,Private Rent,Clyde Housing,D,9.45,0.77,2.91,2022-02-10,1.74,3072,1113,3.73,182,Very High
+13,100092808926,60 Church Lane,Cardiff,Northern Ireland,AB34 6CD,52.52,-5.45,1961,Bungalow,Owner Occupied,,B,7.97,0.1,6.29,2021-12-15,1.25,6446,763,8.24,112,Low
+14,100037183860,168 Park Road,Cardiff,Wales,G17 5AB,52.28,-6.47,1985,Apartment,Private Rent,Clyde Housing,A,5.89,0.98,4.47,2022-11-14,0.67,6122,906,6.15,171,Medium
+15,100065826549,193 Church Lane,Aberdeen,Wales,EH73 4GH,58.42,-1.8,2007,Terraced,Private Rent,Clyde Housing,G,4.28,0.83,3.9,2025-05-05,1.79,8985,1351,6.09,274,Very Low
+16,100015936226,164 Park Road,Edinburgh,Northern Ireland,G87 1EF,50.53,0.0,1963,Bungalow,Owner Occupied,,B,6.51,0.45,1.03,2024-05-07,0.65,4721,1175,6.01,216,Low
+17,100042488022,161 Church Lane,London,Scotland,DD37 6EF,56.52,-7.91,2000,,Shared Ownership,,C,3.05,0.37,5.5,2022-09-12,1.25,6344,991,5.03,60,High
+18,100018268313,45 Main Street,Dundee,Northern Ireland,G40 8AB,53.47,-3.42,1977,Semi-Detached,Private Rent,Private Landlord,A,3.43,0.35,3.89,2021-11-05,0.85,8134,1873,6.53,138,Very Low
+19,100065463716,25 Station Road,Aberdeen,Scotland,G8 2CD,58.75,-1.71,2018,,Social Rent,Clyde Housing,F,9.53,0.42,2.3,2024-10-27,0.73,9236,377,8.98,340,Very Low
+20,100049633414,165 Park Road,London,Scotland,G90 5GH,56.28,-1.72,1976,Semi-Detached,Social Rent,,F,9.53,0.25,8.82,2023-03-12,0.39,928,742,8.14,347,
+21,100022311070,137 Park Road,Aberdeen,Wales,EH79 4GH,57.54,-2.07,2006,,Private Rent,,E,3.72,0.41,6.91,2022-01-14,0.57,7565,1663,9.41,242,Low
+22,100035056723,48 Main Street,Manchester,,G69 2AB,56.45,-1.44,2000,Apartment,Shared Ownership,Private Landlord,A,4.35,0.44,8.46,2024-03-22,1.66,9366,1944,7.28,304,Very Low
+23,100079700812,30 High Street,Belfast,Northern Ireland,G1 2GH,55.61,-4.01,1974,,Shared Ownership,City Council,D,8.24,0.66,2.8,2023-10-09,1.7,2174,942,8.02,130,Low
+24,100010293282,116 Main Street,Birmingham,Northern Ireland,G9 6AB,55.48,-0.62,1992,,Shared Ownership,,G,3.53,0.98,6.19,2025-08-17,0.95,9210,1555,6.1,34,Low
+25,100023593893,28 Main Street,Birmingham,Northern Ireland,DD87 8EF,58.94,1.56,2008,Terraced,Shared Ownership,City Council,A,5.31,0.32,4.89,2025-08-22,1.08,6400,697,8.71,347,Very Low
+26,100013003233,137 Main Street,Dundee,England,DD70 6EF,50.62,-4.85,1950,Apartment,Private Rent,Private Landlord,B,5.6,0.95,4.82,2024-04-06,1.96,4711,726,2.65,140,
+27,100037774596,15 Church Lane,Belfast,,G17 5CD,51.73,-7.6,1974,Semi-Detached,,Clyde Housing,E,5.66,0.75,2.83,2024-08-28,0.47,1497,402,6.94,268,
+28,100025470113,132 Station Road,Glasgow,,G75 2CD,54.74,-1.69,1959,Bungalow,,City Council,A,7.44,0.71,1.65,2022-10-01,1.48,1324,202,5.55,180,Very High
+29,100076741981,161 Church Lane,Cardiff,Scotland,DD83 2CD,56.05,-5.5,1955,Terraced,Owner Occupied,Private Landlord,C,9.82,0.24,6.43,2021-05-31,0.43,7291,1163,9.91,181,Very High
+30,100095878197,154 Church Lane,Aberdeen,England,EH18 6GH,51.49,-5.37,1976,,Social Rent,Private Landlord,E,5.27,0.57,1.87,2023-12-11,0.64,8535,1093,9.92,104,Medium
+31,100076806095,176 Station Road,Glasgow,Northern Ireland,DD51 2AB,52.58,-3.07,1985,Apartment,Shared Ownership,Private Landlord,E,1.04,0.74,6.63,2021-12-19,1.34,1197,1987,5.62,28,Medium
+32,100010693853,2 Main Street,Inverness,England,EH45 8AB,55.62,0.37,1977,Bungalow,Shared Ownership,Housing Association,B,2.6,0.97,6.63,2025-04-11,1.88,2089,1579,9.05,216,Very High
+33,100045756285,62 High Street,Belfast,Northern Ireland,DD46 6EF,58.02,-3.48,2020,Detached House,Shared Ownership,City Council,E,9.72,0.85,2.04,2024-08-13,0.08,4013,693,1.0,270,Very High
+34,100043957171,14 Park Road,London,Northern Ireland,EH86 7EF,55.55,-1.0,1973,Semi-Detached,,City Council,,4.2,0.79,8.15,2025-07-18,0.35,8484,1870,5.94,41,High
+35,100095048969,60 Main Street,Belfast,England,DD36 4GH,55.52,-4.54,1985,Detached House,Shared Ownership,,A,7.57,0.45,9.19,2023-05-15,0.07,7913,1714,6.23,348,High
+36,100081301781,120 Main Street,,Scotland,DD22 2GH,57.32,0.63,1962,Detached House,Social Rent,Housing Association,B,6.22,0.36,4.86,2024-08-16,1.7,8147,352,3.06,125,Very High
+37,100020717892,162 Park Road,Aberdeen,England,AB70 2GH,57.05,-3.05,1989,Terraced,Owner Occupied,Private Landlord,G,9.04,0.17,4.74,2024-04-12,0.55,4070,1667,1.72,47,
+38,100025798765,96 Church Lane,Aberdeen,Wales,DD65 2GH,54.97,-6.94,2019,Detached House,Shared Ownership,Housing Association,B,2.75,0.15,2.4,2021-12-20,1.29,6268,1801,5.72,194,Medium
+39,100034175847,121 Park Road,Manchester,England,AB34 2CD,54.61,-6.65,2011,Detached House,Social Rent,Housing Association,E,8.53,0.42,7.9,2022-01-23,1.36,1496,1363,9.73,256,Very High
+40,100035451756,71 High Street,Birmingham,Scotland,DD26 2GH,57.91,0.48,1959,Bungalow,,City Council,C,7.23,0.52,4.21,2021-03-24,0.24,7936,1600,4.52,154,Low
+41,100017904407,85 Main Street,Belfast,Scotland,DD70 4CD,53.73,1.55,1979,Bungalow,Private Rent,Housing Association,F,1.17,0.26,8.89,2020-11-27,1.42,8326,1795,4.82,1,Very Low
+42,100055860064,176 Park Road,Cardiff,Wales,EH93 2GH,51.18,-1.51,1968,Detached House,Social Rent,,D,4.32,0.92,5.79,2024-03-04,0.7,5136,1736,1.57,304,Medium
+43,100023644213,103 Church Lane,Edinburgh,Scotland,EH82 2CD,55.11,-1.38,1960,Semi-Detached,Private Rent,Private Landlord,F,1.56,0.12,2.54,2025-11-04,1.62,862,1667,4.3,77,Medium
+44,100016187893,199 Station Road,Belfast,England,AB27 3EF,51.28,-5.98,2002,,Owner Occupied,Housing Association,D,7.95,0.75,4.03,2025-09-12,1.47,523,1886,1.94,301,High
+45,100041745376,51 Main Street,Glasgow,Northern Ireland,AB18 6CD,58.51,-5.59,1993,Semi-Detached,Shared Ownership,Clyde Housing,C,2.51,0.58,6.15,2023-05-20,0.7,6575,1517,7.02,241,Very High
+46,100024189478,141 Park Road,Cardiff,Northern Ireland,EH97 8GH,51.88,-6.4,1988,High-Rise Flat,,Housing Association,C,5.06,0.31,1.94,2023-03-05,0.18,6612,1404,9.32,343,Low
+47,100088474142,70 Main Street,Aberdeen,Northern Ireland,G98 6EF,53.1,-2.02,1974,Semi-Detached,Shared Ownership,,A,2.1,0.23,9.46,2021-07-02,0.06,7651,1811,3.13,357,Very High
+48,100082118875,92 Church Lane,Dundee,Northern Ireland,EH12 6CD,50.22,-2.12,1958,Terraced,Social Rent,Clyde Housing,B,3.46,0.29,9.1,2024-12-22,1.43,2219,476,3.95,69,Very Low
+49,100089651367,124 High Street,Aberdeen,Wales,EH82 6GH,57.93,-5.83,1984,Bungalow,Social Rent,Clyde Housing,C,5.86,0.63,6.52,2024-04-01,1.08,1567,502,7.03,132,Very Low
+50,100068022340,45 Church Lane,Aberdeen,,AB88 4EF,53.18,-7.69,2002,Bungalow,Social Rent,Private Landlord,F,2.78,0.06,4.89,2023-02-27,0.95,5015,1310,3.6,135,High
+51,100051658648,71 Park Road,Cardiff,England,AB18 2AB,50.73,-3.56,1982,Semi-Detached,Shared Ownership,Private Landlord,B,3.13,0.67,9.88,2024-01-07,0.22,9282,1520,3.49,181,Very High
+52,100078202209,71 Park Road,Edinburgh,Scotland,G44 6AB,56.77,-1.05,1950,Terraced,Private Rent,City Council,D,8.85,0.94,5.78,2021-04-20,0.86,7243,786,5.23,245,Low
+53,100024448982,89 Station Road,,Scotland,EH31 6EF,52.94,-3.64,1984,Detached House,Shared Ownership,Clyde Housing,A,1.8,0.63,4.52,2021-10-03,1.34,7412,855,7.56,339,Medium
+54,100096918105,27 Station Road,Dundee,Northern Ireland,EH50 3AB,51.44,-5.37,1967,Bungalow,Owner Occupied,Housing Association,F,7.59,0.4,2.76,2021-07-03,1.36,1411,1449,7.38,300,High
+55,100097055128,130 Main Street,Cardiff,Northern Ireland,DD77 3EF,56.25,0.89,1975,,Owner Occupied,Clyde Housing,,1.6,0.62,9.14,2023-04-24,0.31,8684,1334,3.89,231,
+56,100013191708,154 Church Lane,Cardiff,Wales,DD3 6AB,58.03,-0.39,2010,Apartment,Owner Occupied,Housing Association,G,4.26,0.97,8.28,2025-10-17,1.04,6438,1353,5.42,11,High
+57,100063512654,73 Main Street,Aberdeen,Northern Ireland,EH94 8CD,57.79,-0.62,1982,Terraced,,City Council,D,7.28,0.32,6.28,2021-07-06,1.23,8566,1743,8.0,224,High
+58,100044595133,131 Station Road,Inverness,Scotland,G31 2CD,52.5,-7.01,1984,,,Private Landlord,E,3.21,0.44,8.02,2024-08-07,1.59,6897,1672,9.79,61,Very Low
+59,100048230658,154 High Street,Dundee,,AB18 4CD,53.6,-5.75,2024,Detached House,Owner Occupied,Housing Association,D,7.31,0.19,1.61,2021-07-15,1.53,4228,1959,7.45,7,
+60,100091337715,86 High Street,Dundee,Northern Ireland,AB98 4AB,55.75,1.0,1985,High-Rise Flat,,Private Landlord,D,4.47,0.77,3.53,2024-09-22,1.27,6509,1152,7.85,257,High
+61,100055403936,160 High Street,London,Northern Ireland,EH38 2AB,52.56,-3.2,1967,High-Rise Flat,Social Rent,Clyde Housing,F,9.62,0.8,3.31,2022-06-16,0.72,4035,454,4.41,197,Very High
+62,100047533993,90 Park Road,Edinburgh,Wales,DD57 4GH,54.96,1.62,1963,Bungalow,,,B,5.92,0.87,1.93,2021-06-12,1.06,742,526,7.42,304,Very Low
+63,100040145272,197 Church Lane,Cardiff,Northern Ireland,AB31 7AB,52.4,-7.47,1968,Apartment,,Private Landlord,E,1.41,0.44,6.76,2024-05-05,1.43,6495,1890,4.29,156,Very High
+64,100015638105,134 Main Street,London,England,G69 2AB,53.14,-5.09,1972,Detached House,Private Rent,Private Landlord,G,7.02,0.46,9.5,2022-12-10,0.88,9179,926,9.07,266,
+65,100060142337,2 Church Lane,Belfast,Scotland,AB7 3CD,52.84,1.48,1955,,Social Rent,Clyde Housing,B,5.32,0.89,6.99,2024-05-30,1.38,6562,1532,5.69,110,Medium
+66,100062555912,126 Church Lane,Aberdeen,Scotland,EH16 8CD,51.77,-6.63,1963,Semi-Detached,,Housing Association,C,7.84,0.48,9.15,2022-11-23,1.4,7519,1569,6.92,328,Very Low
+67,100027256560,31 Church Lane,Manchester,England,G4 4GH,57.49,-0.4,2011,Apartment,Owner Occupied,Clyde Housing,E,4.48,0.38,2.37,2025-01-29,0.6,1705,315,6.08,317,Very High
+68,100067055747,98 Station Road,Birmingham,,G52 2GH,57.05,-4.96,2007,,Private Rent,,A,9.66,0.49,4.92,2021-04-02,1.12,3187,1029,4.57,32,Low
+69,100068580989,150 Station Road,,Northern Ireland,AB50 3AB,57.14,-2.17,1959,Bungalow,Owner Occupied,Clyde Housing,A,3.75,0.92,3.78,2022-06-19,0.62,4432,420,3.49,178,Very High
+70,100088447211,152 High Street,Edinburgh,Wales,G3 1AB,52.16,-4.73,1987,Detached House,,Housing Association,C,5.42,0.79,8.94,2025-04-07,1.92,6827,112,4.74,153,High
+71,100056180754,105 Park Road,Glasgow,,AB61 8EF,55.64,-1.93,2009,Detached House,Social Rent,,,1.61,0.9,5.53,2025-10-07,0.23,5289,282,7.37,177,High
+72,100019649551,15 Park Road,Cardiff,Scotland,EH29 5CD,54.84,-1.49,1966,Apartment,Private Rent,,G,1.05,0.47,8.85,2024-09-18,1.23,9552,888,2.56,202,Very High
+73,100053982582,170 Park Road,Edinburgh,Scotland,EH3 6CD,51.73,-2.25,1950,Terraced,Private Rent,City Council,F,1.74,0.73,2.61,2025-06-16,0.56,6840,1145,8.13,229,Very High
+74,100078211577,144 Station Road,Birmingham,Wales,EH14 2EF,57.87,1.4,2007,,,Housing Association,,5.01,0.49,7.5,2022-05-02,0.96,9001,816,6.01,222,Medium
+75,100032206599,141 Park Road,Belfast,Wales,G44 1CD,57.3,-5.58,1984,,,,B,4.82,0.13,3.28,2022-02-28,0.26,8497,1235,4.19,78,Very High
+76,100068636591,8 Park Road,Inverness,Scotland,DD24 7EF,54.16,-3.99,1992,High-Rise Flat,Social Rent,Clyde Housing,A,5.83,0.58,1.75,2022-03-10,1.59,2910,1695,4.9,80,Low
+77,100071190837,27 Main Street,Aberdeen,,G34 6GH,56.15,-7.65,1997,Apartment,Private Rent,Private Landlord,,1.52,0.03,2.79,2025-07-11,0.7,6375,865,7.94,232,High
+78,100023757919,4 Station Road,Edinburgh,Northern Ireland,AB62 1AB,56.27,-1.56,1999,Detached House,Social Rent,,D,6.12,0.57,1.42,2025-05-07,0.96,4867,1208,7.15,349,Very Low
+79,100086233371,87 Church Lane,Inverness,Northern Ireland,AB47 3EF,54.87,0.33,2006,Terraced,,Private Landlord,G,2.11,0.77,9.38,2024-11-11,1.31,1729,1180,4.58,188,High
+80,100013475509,78 Park Road,Cardiff,Northern Ireland,DD54 5GH,51.76,-4.38,1985,Bungalow,Social Rent,Housing Association,A,3.74,0.39,1.29,2025-10-11,1.98,5260,775,9.72,81,High
+81,100077385889,34 Church Lane,Belfast,England,AB31 6CD,56.38,-7.76,1955,High-Rise Flat,Social Rent,Housing Association,,2.09,0.83,9.35,2022-12-17,0.73,2035,889,3.69,186,Very Low
+82,100074139296,4 High Street,Belfast,Wales,EH97 3GH,56.73,-1.76,2008,Apartment,Shared Ownership,Housing Association,G,3.56,0.25,3.09,2025-06-09,0.87,817,183,1.08,34,Low
+83,100026896462,131 Station Road,Manchester,England,AB58 2GH,51.98,-0.62,2011,Semi-Detached,Private Rent,Clyde Housing,F,7.53,0.02,1.35,2023-06-23,0.41,9194,452,5.5,231,High
+84,100014800100,126 Church Lane,,Wales,EH88 2GH,54.41,-4.57,2006,Apartment,Shared Ownership,Clyde Housing,G,5.87,0.28,5.14,2025-08-04,1.66,7239,1721,5.44,109,High
+85,100023441859,134 Main Street,London,,DD9 5AB,56.67,-5.31,1997,Semi-Detached,Private Rent,City Council,F,5.25,0.7,2.29,2025-03-25,1.95,7972,1564,7.96,294,Low
+86,100027216655,24 Main Street,Aberdeen,England,G40 4GH,51.59,-2.19,1979,Detached House,Owner Occupied,,,2.83,0.01,4.83,2021-06-25,0.46,2483,236,1.45,162,Medium
+87,100066825509,78 Park Road,Aberdeen,Wales,DD51 7AB,52.72,0.99,1954,Apartment,,City Council,D,1.46,0.54,5.35,2025-10-04,0.62,3507,1797,9.96,346,Low
+88,100030966332,119 Park Road,Cardiff,Scotland,DD77 8CD,55.91,1.74,1986,Terraced,Private Rent,Clyde Housing,G,7.67,0.61,9.58,2024-12-24,1.13,3906,1402,5.3,132,Very High
+89,100034702921,188 Church Lane,Edinburgh,England,DD75 6AB,51.64,-1.89,2013,Terraced,Social Rent,,F,1.38,0.7,9.07,2023-02-03,1.75,6686,457,3.1,261,High
+90,100070376830,182 High Street,,Wales,DD25 3CD,52.88,-0.64,1954,Terraced,,Housing Association,G,5.06,0.32,5.25,2021-05-20,1.21,4396,1654,7.87,129,Very High
+91,100059230955,123 High Street,London,England,AB50 7GH,58.08,-0.43,1951,,Shared Ownership,Clyde Housing,,2.01,0.23,5.36,2023-01-12,0.46,7548,1365,6.94,167,Very Low
+92,100029462577,73 High Street,Aberdeen,,G1 5EF,52.97,1.1,1983,Bungalow,Owner Occupied,Private Landlord,B,7.84,0.46,6.28,2023-04-02,0.0,1324,1775,6.78,219,
+93,100050769006,134 Main Street,Aberdeen,England,EH17 3AB,52.52,-0.89,1996,High-Rise Flat,Owner Occupied,City Council,B,6.37,0.72,5.47,2024-01-06,0.9,3344,893,5.82,282,Medium
+94,100030872500,59 Church Lane,Cardiff,Wales,G43 5EF,52.76,-7.01,2018,Bungalow,,,C,5.65,0.13,8.94,2024-09-23,0.85,8288,1985,6.8,230,Low
+95,100085406480,164 Station Road,Edinburgh,,G40 8EF,50.84,-0.23,1959,Detached House,Shared Ownership,Housing Association,,8.84,0.46,8.3,2024-07-24,1.98,7000,1235,5.76,146,High
+96,100049164376,111 Station Road,Birmingham,Northern Ireland,EH46 5CD,51.23,-1.24,2015,Terraced,Shared Ownership,City Council,C,1.8,0.22,7.69,2022-12-17,0.2,1775,1414,9.77,240,Very Low
+97,100074887618,62 Main Street,Aberdeen,England,AB73 3CD,54.8,-0.11,1973,,Private Rent,City Council,A,8.92,0.6,8.25,2021-12-06,1.67,562,206,5.86,295,Very High
+98,100023896391,7 Station Road,Edinburgh,Northern Ireland,EH87 7EF,57.07,-7.06,2001,Terraced,Private Rent,Housing Association,B,5.69,0.74,6.26,2023-07-14,1.39,3250,983,1.4,193,Medium
+99,100088171590,78 Station Road,Aberdeen,,EH96 5AB,51.94,0.53,2015,Semi-Detached,Private Rent,,,2.35,0.44,1.55,2020-12-31,0.05,2130,1599,2.95,81,
+100,100065033676,124 High Street,Birmingham,Scotland,AB28 4GH,53.96,-0.79,1956,Terraced,Shared Ownership,Housing Association,E,1.7,0.3,2.25,2025-05-18,1.99,4371,1703,5.22,88,Medium
+101,100061821143,118 Station Road,Birmingham,Scotland,AB43 8CD,50.2,-6.34,1990,Detached House,Social Rent,Private Landlord,B,8.5,0.68,9.6,2022-02-17,1.51,3357,948,1.08,329,Very Low
+102,100065946946,39 Church Lane,Edinburgh,Northern Ireland,EH21 6AB,56.98,-4.06,1994,Bungalow,,Housing Association,G,8.46,0.61,7.04,2023-12-25,0.35,2132,1407,9.79,310,High
+103,100024522031,131 Station Road,Inverness,Scotland,EH23 3AB,52.82,-1.88,1982,Semi-Detached,,Private Landlord,F,2.71,0.46,3.65,2021-07-13,1.08,619,268,5.95,82,Very High
+104,100061969803,3 Station Road,Manchester,England,DD58 6GH,53.75,-0.3,1959,Apartment,Shared Ownership,Private Landlord,B,5.68,0.85,1.65,2025-07-29,0.34,1399,897,4.32,289,
+105,100014090708,109 Station Road,Aberdeen,Wales,G44 1EF,57.16,-4.8,1978,Apartment,,Housing Association,E,6.12,0.28,3.52,2023-08-24,1.01,6540,491,5.71,343,High
+106,100081641617,15 Church Lane,Dundee,,AB13 7GH,54.45,-2.36,1951,Detached House,Shared Ownership,,A,5.39,0.69,9.97,2021-05-14,0.79,1681,1495,8.86,180,
+107,100040173097,59 Main Street,,,DD24 8CD,57.58,-3.45,1971,,Private Rent,Housing Association,,8.31,0.39,2.89,2024-05-13,1.0,1388,1752,1.6,131,Low
+108,100095181753,111 Station Road,Edinburgh,England,DD16 8CD,50.97,-0.71,1977,Bungalow,Shared Ownership,Clyde Housing,G,4.07,0.29,9.12,2022-07-18,1.01,2218,1292,2.24,227,Medium
+109,100017825942,102 Park Road,Glasgow,Wales,AB90 1CD,50.08,-5.09,1963,Detached House,Social Rent,Clyde Housing,E,2.53,0.46,2.1,2025-09-02,1.08,3643,101,9.83,113,
+110,100055489609,199 Station Road,Birmingham,,EH75 7AB,55.41,-2.1,1998,Terraced,Private Rent,,C,7.4,0.95,2.57,2021-01-11,0.22,6365,359,7.08,348,High
+111,100025207124,186 Church Lane,Edinburgh,England,G70 4AB,52.78,-6.46,1995,,,City Council,E,3.84,0.58,5.98,2025-01-31,0.56,2456,307,7.2,32,
+112,100017711862,62 High Street,Cardiff,England,G73 8AB,54.44,1.48,2008,Bungalow,Shared Ownership,Private Landlord,C,6.51,0.42,6.07,2025-02-03,0.99,2050,129,6.21,145,Very Low
+113,100064425494,167 Park Road,Glasgow,Wales,G4 6EF,56.66,-6.21,2006,Terraced,Social Rent,,C,4.39,0.21,6.66,2023-01-19,1.6,5018,1668,1.11,289,Low
+114,100018019522,165 Station Road,Cardiff,Northern Ireland,EH57 4EF,56.68,-4.07,1981,Detached House,Owner Occupied,City Council,G,1.56,0.89,9.43,2021-10-23,1.95,7179,1655,4.51,110,High
+115,100077563295,138 Park Road,Aberdeen,England,AB8 6EF,56.64,-2.82,2015,Semi-Detached,Owner Occupied,Clyde Housing,C,4.11,0.96,5.05,2025-05-25,1.44,2550,1451,7.97,196,Medium
+116,100096667060,66 Station Road,Inverness,Scotland,G96 6EF,50.34,-2.12,1976,Terraced,Social Rent,Clyde Housing,D,7.4,0.0,9.26,2023-10-23,1.2,4121,670,1.12,109,Very Low
+117,100017532735,1 Main Street,Aberdeen,Scotland,EH64 1EF,53.39,-0.34,1980,Semi-Detached,Private Rent,,,9.71,0.39,8.68,2021-03-28,0.79,7446,860,2.91,325,
+118,100046421663,161 Church Lane,Manchester,Northern Ireland,EH12 1CD,52.73,1.02,2006,Terraced,Social Rent,Private Landlord,G,9.08,0.49,6.32,2024-05-08,1.17,7023,758,3.75,43,Medium
+119,100056714617,116 Church Lane,London,Scotland,EH5 7GH,57.0,-3.05,1970,Apartment,Social Rent,,E,6.95,0.32,2.0,2022-04-01,0.12,4860,1126,7.51,296,Very Low
+120,100086140715,48 Main Street,Birmingham,,AB96 4EF,56.34,-4.4,1994,Apartment,Private Rent,Clyde Housing,G,4.06,0.72,5.81,2025-01-10,1.93,3876,521,5.51,151,Very Low
+121,100011706658,133 Church Lane,Dundee,Northern Ireland,EH64 7AB,54.82,-0.69,1981,Bungalow,Shared Ownership,Private Landlord,B,6.98,0.46,7.92,2023-08-07,1.3,7836,704,3.83,266,
+122,100042451051,12 Park Road,Birmingham,England,AB24 1AB,51.07,-4.22,2012,,Private Rent,Private Landlord,F,2.2,0.58,3.06,2022-02-08,0.22,4644,1497,6.19,43,Very Low
+123,100056533903,191 Main Street,Edinburgh,Wales,DD50 1CD,51.75,-1.68,1957,Terraced,,City Council,D,3.41,0.44,1.15,2025-09-22,1.17,4683,1675,1.44,53,Very Low
+124,100050817626,19 Church Lane,London,Wales,G81 8GH,53.44,-2.87,1979,High-Rise Flat,,Clyde Housing,B,1.74,0.47,9.58,2025-06-08,1.74,7222,459,2.85,43,Medium
+125,100060445260,45 High Street,Belfast,England,AB78 1EF,55.17,-4.37,2009,Semi-Detached,Shared Ownership,City Council,F,7.73,0.64,6.65,2024-12-03,1.71,7464,423,3.25,91,Low
+126,100014700151,177 Main Street,Aberdeen,Scotland,AB21 3CD,58.95,-4.35,1996,,Owner Occupied,Private Landlord,F,9.51,0.52,3.56,2024-04-08,1.49,2746,763,9.21,109,Very High
+127,100079376289,58 Park Road,Edinburgh,Wales,EH59 5CD,52.12,-7.64,1956,Detached House,Shared Ownership,Private Landlord,,3.63,0.83,9.69,2023-07-13,1.36,4768,1582,6.43,282,High
+128,100045649559,81 Church Lane,Manchester,Scotland,AB41 3GH,50.47,0.53,1955,Detached House,,,D,6.56,0.99,1.24,2025-02-14,1.65,4865,620,5.85,70,Very Low
+129,100041524539,77 Main Street,Birmingham,,G4 2EF,51.88,-3.42,2009,Semi-Detached,,Clyde Housing,F,8.36,0.03,2.9,2025-07-31,0.07,8399,511,1.68,320,High
+130,100046121982,11 Main Street,Inverness,,DD20 1AB,51.5,-1.52,2007,Detached House,,Housing Association,D,7.72,0.04,8.25,2022-08-22,0.11,4682,108,6.12,127,Medium
+131,100069987581,114 Station Road,Dundee,England,DD86 1CD,52.87,0.03,1998,High-Rise Flat,Shared Ownership,Clyde Housing,,5.66,0.13,4.73,2022-11-25,1.6,3657,1776,7.69,307,Medium
+132,100097798035,95 Church Lane,,Wales,EH70 4AB,51.77,0.55,2024,Detached House,Shared Ownership,Private Landlord,E,3.31,0.79,5.11,2022-02-22,1.66,8085,1105,9.01,324,High
+133,100067092127,54 Main Street,Belfast,,AB40 2AB,52.62,1.08,2024,Bungalow,,Private Landlord,B,4.99,0.17,2.23,2022-12-03,1.93,4045,252,8.3,195,Low
+134,100072667452,85 Park Road,Cardiff,Wales,EH88 1GH,57.12,-3.32,1977,Detached House,Private Rent,Clyde Housing,F,8.89,0.15,9.34,2022-11-16,0.87,1716,783,9.8,68,Medium
+135,100093200820,162 Main Street,Manchester,Northern Ireland,G9 4CD,54.33,-0.44,1953,Bungalow,Shared Ownership,,B,9.97,0.75,3.07,2023-09-19,1.78,2916,1643,3.02,331,Medium
+136,100010519362,150 Church Lane,Belfast,,DD20 3EF,54.94,-4.32,2024,Apartment,,Clyde Housing,C,8.53,0.97,3.21,2024-01-10,1.69,6433,1965,8.78,308,Very Low
+137,100015441321,183 High Street,Inverness,England,G38 4AB,54.81,-1.58,1950,Apartment,Shared Ownership,Clyde Housing,A,8.08,0.4,7.55,2021-02-01,0.85,6091,1048,5.5,309,Very Low
+138,100044353966,116 Church Lane,Manchester,,EH35 2GH,55.77,-3.87,1993,,Shared Ownership,,B,9.43,0.08,2.32,2023-04-21,0.07,1643,974,3.69,42,Medium
+139,100093751365,49 Main Street,,Northern Ireland,EH41 6EF,50.95,0.89,2010,Detached House,Private Rent,,C,7.63,0.81,1.99,2025-10-18,1.39,3939,1730,5.61,98,Very High
+140,100017808327,23 Park Road,Cardiff,,EH40 1CD,53.11,-2.86,1951,Apartment,Social Rent,Housing Association,B,6.72,0.84,3.8,2024-10-15,0.65,7136,450,7.36,208,High
+141,100040221799,1 Park Road,Belfast,Northern Ireland,AB27 6GH,58.96,-7.73,1989,High-Rise Flat,Private Rent,Private Landlord,,6.89,0.88,5.9,2022-09-17,0.45,3895,1310,3.31,160,Very High
+142,100037204768,116 Church Lane,Aberdeen,Wales,AB55 3AB,57.64,-0.01,1984,Detached House,,Private Landlord,D,8.48,0.65,6.91,2021-12-17,0.98,6953,1133,8.12,338,Low
+143,100079631914,193 Church Lane,Belfast,Wales,G3 4AB,57.7,-0.24,1998,High-Rise Flat,Social Rent,City Council,G,4.42,0.78,9.51,2021-05-15,0.88,7078,200,2.95,123,Very High
+144,100012459235,84 Church Lane,Aberdeen,Wales,EH53 8AB,51.29,-1.63,1969,Apartment,,Private Landlord,E,4.05,0.96,5.3,2022-07-11,0.79,8202,1897,9.94,101,
+145,100049462246,3 Station Road,Manchester,Scotland,G16 2GH,57.1,-4.81,2000,,,Clyde Housing,,7.59,0.67,6.53,2023-10-22,0.4,8592,1649,5.8,326,High
+146,100042573693,58 High Street,Edinburgh,Wales,G74 8EF,54.23,-5.28,1971,Semi-Detached,Shared Ownership,Housing Association,E,2.1,0.89,1.71,2022-06-02,1.89,7488,1142,1.42,2,Very High
+147,100074686380,124 High Street,Manchester,Wales,AB91 8AB,57.61,0.66,1953,,Shared Ownership,Housing Association,C,4.88,0.94,1.31,2023-12-07,1.44,955,436,8.12,249,Very Low
+148,100051209538,9 High Street,London,Wales,EH3 2GH,52.08,-2.92,2003,Bungalow,,Clyde Housing,D,2.0,0.66,7.61,2022-03-05,1.23,5911,415,3.47,246,Very Low
+149,100040194527,130 Main Street,Belfast,Northern Ireland,EH55 1EF,56.35,-3.85,1951,Semi-Detached,Shared Ownership,Housing Association,,4.72,0.96,8.96,2021-05-21,0.38,2503,425,1.65,62,Medium
+150,100049412607,27 Church Lane,London,Northern Ireland,EH3 1AB,57.34,1.27,1999,Detached House,,Private Landlord,A,1.8,0.8,9.0,2022-04-27,0.68,4647,1082,2.77,30,Very Low
+151,100036990030,164 Main Street,,Scotland,EH68 3EF,51.57,-2.53,1975,High-Rise Flat,Private Rent,Clyde Housing,B,4.99,0.67,3.74,2021-04-02,1.84,9922,1101,9.1,257,Very High
+152,100098463788,11 High Street,Belfast,Northern Ireland,EH41 7GH,54.19,-2.23,2003,Terraced,Social Rent,Housing Association,B,7.21,0.97,6.61,2021-01-05,0.82,3731,852,1.71,274,Very Low
+153,100012312882,78 Park Road,Edinburgh,Wales,AB2 5CD,53.27,-1.87,2016,Bungalow,Owner Occupied,City Council,C,9.4,0.62,5.44,2022-01-03,0.2,9413,827,8.96,146,Medium
+154,100058597138,198 Station Road,Aberdeen,Northern Ireland,G9 2AB,55.52,-2.42,1962,Semi-Detached,Social Rent,City Council,E,2.91,0.56,7.59,2023-10-22,1.81,9542,494,1.38,263,
+155,100098721993,1 Main Street,,Scotland,G45 2AB,56.33,-2.85,2007,High-Rise Flat,Shared Ownership,City Council,G,4.69,0.69,9.42,2021-08-18,0.38,2961,1772,9.04,117,Medium
+156,100062245648,41 Station Road,Birmingham,,DD79 8AB,58.98,-4.26,1956,Detached House,Shared Ownership,City Council,G,3.45,0.07,1.39,2024-01-08,0.26,641,1015,8.74,36,Very High
+157,100019956539,49 Park Road,Cardiff,,G53 8GH,58.39,0.73,1970,Apartment,Shared Ownership,,,2.61,0.05,1.19,2025-02-14,0.66,6775,1671,4.14,272,Very High
+158,100087501804,74 Station Road,,,AB12 2GH,52.23,-0.39,2002,Terraced,Owner Occupied,Housing Association,E,3.62,0.72,2.91,2025-03-24,0.74,6008,1391,7.45,190,Low
+159,100023269992,124 Church Lane,Birmingham,England,G80 1GH,56.05,-3.21,2011,Semi-Detached,Private Rent,Housing Association,G,3.77,0.98,2.97,2022-08-04,1.09,1739,1118,8.4,122,
+160,100086033267,106 Park Road,Cardiff,Wales,AB10 5AB,58.4,-4.7,1982,,Social Rent,Private Landlord,G,7.88,0.65,9.6,2024-10-26,1.91,4680,1988,4.35,62,
+161,100052103552,185 Park Road,Cardiff,,EH40 2EF,57.67,-4.55,2016,Bungalow,Private Rent,Housing Association,A,4.01,0.62,3.58,2023-04-20,1.53,3582,336,7.5,210,
+162,100018072082,16 Main Street,Inverness,,G51 8AB,55.12,-5.04,1950,High-Rise Flat,Social Rent,Clyde Housing,E,3.9,0.74,6.62,2022-01-24,1.53,6014,346,5.74,99,Low
+163,100086647052,175 Station Road,Cardiff,Wales,G27 1GH,58.69,-7.59,1964,Semi-Detached,Shared Ownership,Clyde Housing,B,7.66,0.12,8.12,2023-10-22,1.11,4884,1939,1.82,362,Very Low
+164,100052142582,165 Station Road,London,Scotland,G21 8CD,52.25,-6.99,1984,Detached House,,City Council,F,6.17,0.13,9.33,2020-12-28,1.9,6929,868,5.17,194,High
+165,100085109604,129 Church Lane,Glasgow,,EH34 7CD,51.99,-5.3,1975,Bungalow,Shared Ownership,Housing Association,A,3.82,0.19,7.71,2023-07-03,1.29,8640,1263,6.59,354,High
+166,100036720313,161 Church Lane,Aberdeen,Northern Ireland,EH29 4EF,51.2,-4.23,1995,,Owner Occupied,Housing Association,C,3.19,0.36,3.16,2021-04-14,1.72,5339,793,6.81,112,Very High
+167,100078603925,84 Church Lane,Cardiff,England,EH76 8EF,56.04,0.74,2013,,Shared Ownership,Housing Association,D,8.82,0.33,1.1,2024-11-18,1.44,3276,1365,2.09,178,High
+168,100091065514,196 Main Street,Manchester,England,EH47 5GH,52.6,-5.09,1966,Semi-Detached,Owner Occupied,Housing Association,E,4.26,0.86,2.17,2021-09-27,0.23,9237,1501,1.66,199,Very High
+169,100091339379,10 High Street,Manchester,Northern Ireland,EH67 8AB,53.36,-6.53,1954,Detached House,Owner Occupied,Clyde Housing,D,1.06,0.95,8.97,2021-08-13,0.53,5029,1146,9.39,187,High
+170,100059846837,196 Main Street,London,,G41 4AB,52.68,1.3,1957,High-Rise Flat,Social Rent,Clyde Housing,A,5.81,0.36,2.96,2023-08-01,0.67,9246,677,5.57,86,High
+171,100055071186,30 Station Road,Manchester,England,DD63 7AB,56.2,-5.32,1984,High-Rise Flat,Shared Ownership,Clyde Housing,,6.08,0.38,7.68,2021-04-19,0.19,657,639,8.39,57,High
+172,100055916009,190 Church Lane,Glasgow,Northern Ireland,DD67 5GH,55.2,-5.6,1991,Bungalow,Private Rent,Clyde Housing,A,7.94,0.3,9.07,2024-07-31,0.07,2321,1145,2.83,354,Medium
+173,100019762796,79 Station Road,Dundee,Wales,G66 1EF,54.39,-6.53,2010,Semi-Detached,Shared Ownership,,D,1.67,0.46,3.77,2023-12-21,1.17,6200,1055,8.46,222,Medium
+174,100031724458,59 Church Lane,Belfast,,AB70 1CD,57.1,-6.69,2010,,Shared Ownership,Private Landlord,F,2.37,0.58,7.05,2024-05-27,0.47,7967,1561,4.48,278,Very Low
+175,100028364759,167 Main Street,Edinburgh,Scotland,AB78 3EF,52.31,-6.19,2018,High-Rise Flat,Social Rent,Private Landlord,G,9.25,0.05,9.14,2020-12-30,0.52,2489,926,5.88,53,
+176,100060230644,147 Main Street,Manchester,Wales,EH49 2CD,54.05,1.86,1952,High-Rise Flat,Shared Ownership,Clyde Housing,E,6.88,0.58,7.39,2023-01-04,0.31,7899,724,8.88,4,Very Low
+177,100089387450,57 Church Lane,Cardiff,Northern Ireland,EH23 6AB,52.28,-3.9,1985,,Private Rent,City Council,B,6.3,0.48,6.6,2022-05-20,1.46,5028,1771,5.54,116,Very High
+178,100017606280,7 Park Road,Birmingham,Scotland,EH25 3AB,56.03,-5.62,2007,High-Rise Flat,Social Rent,Private Landlord,F,7.23,0.88,1.26,2021-12-06,0.64,7018,599,2.35,292,Low
+179,100051156194,101 Station Road,Manchester,Northern Ireland,G70 3EF,57.42,1.23,1969,,Owner Occupied,Clyde Housing,C,5.21,0.79,1.69,2024-09-27,0.02,7821,1092,1.22,265,
+180,100045058142,28 Main Street,Birmingham,England,DD53 3AB,58.02,-2.07,1992,Terraced,Social Rent,Private Landlord,C,1.54,0.94,7.89,2022-01-02,0.05,7468,1825,6.83,179,Medium
+181,100017660408,58 Church Lane,Dundee,England,DD18 3CD,57.89,-0.31,1995,Semi-Detached,Private Rent,Housing Association,A,1.23,0.39,9.72,2021-10-10,0.37,3703,1075,4.7,240,Very High
+182,100022505647,54 Main Street,Manchester,England,EH2 4GH,51.5,0.17,2002,Apartment,Private Rent,Clyde Housing,,3.02,0.84,2.24,2021-09-18,1.01,2825,436,6.19,117,Medium
+183,100050234330,30 Station Road,Aberdeen,,EH50 4CD,58.04,-0.57,2008,,Owner Occupied,City Council,E,3.33,0.51,9.03,2021-12-24,1.38,6039,1143,2.23,346,Very Low
+184,100064804090,107 Station Road,Inverness,,EH48 2GH,56.82,0.45,1980,Semi-Detached,Shared Ownership,City Council,B,4.02,0.5,7.9,2021-12-09,0.53,4091,1124,5.04,244,Very Low
+185,100040424095,101 High Street,Belfast,Wales,EH51 4CD,51.73,-6.46,1980,,Private Rent,,C,5.88,0.78,4.15,2021-07-10,0.45,9042,620,4.88,111,Very High
+186,100095478354,78 Park Road,Inverness,England,AB47 6EF,56.65,-3.54,1999,Semi-Detached,Shared Ownership,Private Landlord,G,6.04,0.97,4.83,2022-03-07,0.15,8329,124,3.39,14,
+187,100068589360,66 Church Lane,Inverness,Scotland,DD40 8EF,58.81,-2.31,1977,Bungalow,Private Rent,Private Landlord,B,3.8,0.79,3.81,2023-03-09,0.65,5811,1092,5.59,350,
+188,100011245749,174 High Street,London,Wales,DD16 7CD,58.89,-4.44,1954,Apartment,Private Rent,Clyde Housing,D,7.3,0.7,8.63,2025-11-07,0.89,7008,1172,9.15,103,Very High
+189,100085540328,197 High Street,Birmingham,,G82 3GH,50.46,0.92,2004,Bungalow,Private Rent,Clyde Housing,F,3.03,0.7,4.08,2021-06-13,0.49,8544,1650,5.61,42,Medium
+190,100086229492,187 Station Road,London,England,G87 1CD,57.21,-1.17,1984,Semi-Detached,,Clyde Housing,G,5.68,0.55,2.73,2023-05-17,1.64,4673,1880,2.95,219,Very Low
+191,100033737957,1 Station Road,Manchester,Scotland,G82 8AB,55.25,0.49,1993,Terraced,,Private Landlord,E,6.5,0.74,5.08,2022-07-17,1.5,2283,1514,3.76,180,Medium
+192,100059590712,66 Station Road,Inverness,Scotland,G67 6AB,56.72,-0.15,1955,Terraced,,Private Landlord,C,2.91,0.21,1.31,2022-02-09,0.03,8773,1650,6.28,5,Medium
+193,100027597024,18 Church Lane,Glasgow,,DD16 4CD,53.47,1.15,1955,Semi-Detached,Private Rent,Private Landlord,B,1.39,0.85,7.56,2024-12-18,1.59,4019,1004,3.45,198,Low
+194,100037602856,123 High Street,Inverness,Wales,G92 4GH,57.48,-6.89,1978,Bungalow,Social Rent,City Council,E,1.27,0.19,4.58,2024-10-21,1.48,2268,407,4.63,281,Very Low
+195,100068290665,83 High Street,,Scotland,AB21 7GH,58.32,0.08,2020,Detached House,Private Rent,,G,8.29,0.04,8.11,2024-09-02,1.8,6834,1270,8.35,310,
+196,100062369013,192 Main Street,Birmingham,England,AB20 3AB,53.0,-2.49,1983,High-Rise Flat,Shared Ownership,City Council,D,3.98,0.8,9.96,2021-12-02,1.18,5569,1664,2.31,79,
+197,100012932134,27 Main Street,Manchester,Scotland,DD57 1CD,54.45,-7.38,1964,,Owner Occupied,Housing Association,B,4.82,0.02,4.66,2024-12-04,0.4,6831,766,3.34,272,Very Low
+198,100028870888,67 High Street,Dundee,England,EH26 1EF,54.82,-0.5,1969,,Social Rent,Private Landlord,F,6.43,0.24,1.17,2025-06-05,0.66,3979,243,3.6,329,Very Low
+199,100014616285,112 Park Road,Glasgow,Scotland,EH57 4AB,54.51,-0.72,1975,Terraced,Owner Occupied,Housing Association,C,1.08,0.91,7.47,2022-08-17,1.47,503,701,6.87,4,Low
+200,100031565375,115 Main Street,Cardiff,Wales,G61 3CD,56.07,-1.72,1990,,Shared Ownership,City Council,G,6.74,0.95,6.27,2021-05-21,0.79,8574,1768,7.69,289,High
+201,100057071419,129 Church Lane,,,DD53 3GH,57.38,-5.69,1971,Terraced,,Clyde Housing,A,4.91,0.2,9.59,2022-09-24,1.58,1553,1386,9.73,14,Medium
+202,100053588535,175 Park Road,,,DD41 3EF,58.38,-7.35,2017,Detached House,Shared Ownership,Housing Association,C,6.88,0.82,7.95,2025-02-13,0.16,2899,784,7.12,39,Low
+203,100094842544,188 Station Road,Glasgow,,G98 4GH,51.63,-0.94,1997,Terraced,Social Rent,Private Landlord,G,2.75,0.18,7.41,2021-01-07,1.58,3529,1725,1.01,161,High
+204,100040991502,94 Church Lane,Cardiff,,EH56 5CD,53.66,-2.39,1954,Terraced,Owner Occupied,City Council,F,5.94,0.49,2.91,2023-10-27,1.32,7672,1595,5.96,242,Low
+205,100072706003,191 Station Road,,Northern Ireland,DD22 8GH,50.72,-3.33,2014,High-Rise Flat,Social Rent,Clyde Housing,G,9.49,0.22,9.71,2025-02-19,1.36,1449,1429,9.19,124,Medium
+206,100096007130,43 Station Road,,,DD36 8AB,54.01,-5.34,2008,,Owner Occupied,Clyde Housing,F,2.27,0.37,9.38,2023-11-28,1.86,6413,986,6.63,49,Very Low
+207,100020615829,10 Station Road,,Scotland,AB14 2GH,58.12,-4.08,1989,Apartment,Shared Ownership,Housing Association,C,4.05,0.75,9.82,2020-12-16,1.26,2801,327,4.13,110,Low
+208,100052398456,105 Main Street,Dundee,,DD87 7EF,53.3,-3.12,1953,Apartment,Social Rent,Housing Association,D,3.43,0.74,1.34,2021-09-24,1.5,4677,489,5.12,44,Very Low
+209,100066310987,8 Park Road,Aberdeen,England,EH9 8AB,55.51,1.46,1984,Detached House,Owner Occupied,,D,5.88,0.5,3.67,2022-02-04,0.47,8938,449,9.24,255,
+210,100021661291,133 Station Road,Dundee,Scotland,EH60 4GH,56.91,-7.46,1951,Terraced,Shared Ownership,Housing Association,,7.41,0.05,1.4,2023-11-13,1.03,4325,264,5.42,97,Very Low
+211,100038182710,126 Church Lane,Dundee,Northern Ireland,EH83 4EF,52.6,-7.21,2018,Bungalow,Owner Occupied,City Council,C,5.19,0.03,7.78,2022-07-27,0.77,7843,1839,6.4,172,High
+212,100078710101,96 Church Lane,Birmingham,,G47 2CD,53.37,-5.75,1965,Semi-Detached,Shared Ownership,City Council,B,9.56,0.56,1.94,2021-02-11,0.01,8840,489,6.27,27,Very High
+213,100037700407,149 High Street,,England,DD91 5EF,53.89,-2.15,1950,Apartment,Social Rent,City Council,F,2.62,0.16,4.0,2025-04-15,0.4,6100,1649,4.35,216,Medium
+214,100050552644,116 High Street,Aberdeen,Scotland,AB29 5CD,53.28,0.18,1960,Semi-Detached,Shared Ownership,,E,6.69,0.82,6.03,2025-04-07,1.73,6046,1798,4.55,316,Low
+215,100029219954,34 Station Road,,Scotland,DD1 6GH,52.29,0.67,1955,High-Rise Flat,Social Rent,Clyde Housing,G,6.21,0.89,5.72,2024-06-26,0.56,6058,547,4.64,144,Low
+216,100020128855,178 Park Road,Belfast,,DD15 4EF,55.99,-7.48,1994,,,,E,6.48,0.37,7.96,2021-10-25,1.34,7354,1669,7.3,326,Medium
+217,100018081115,123 Church Lane,Glasgow,Northern Ireland,EH33 4EF,57.18,-3.43,2020,High-Rise Flat,Private Rent,Housing Association,F,7.59,0.48,5.75,2025-01-10,1.95,3173,1402,5.59,178,
+218,100098803939,159 Church Lane,Glasgow,,AB71 4GH,55.23,-0.14,1998,Semi-Detached,Social Rent,,,9.12,0.07,8.53,2025-09-25,1.02,1051,1004,1.05,363,Very High
+219,100045065302,196 Main Street,Cardiff,England,DD45 5EF,52.3,-7.53,2021,Terraced,,,E,5.59,0.06,2.92,2022-06-11,0.7,1282,946,7.23,295,High
+220,100080547502,4 High Street,Aberdeen,Scotland,AB74 4AB,56.89,-5.24,1969,Terraced,Social Rent,Clyde Housing,D,8.87,0.61,8.31,2021-07-11,1.98,4520,954,7.55,208,Medium
+221,100015121725,12 Main Street,Cardiff,Scotland,G39 8GH,54.6,-3.35,1989,Semi-Detached,Social Rent,Clyde Housing,D,6.57,0.68,7.22,2022-08-05,1.4,3089,1775,3.16,196,High
+222,100014292799,173 Park Road,,Northern Ireland,EH36 7CD,58.4,-3.14,2009,Semi-Detached,Private Rent,Clyde Housing,A,6.25,0.92,3.71,2022-01-06,1.5,1449,744,1.22,63,Very Low
+223,100057674552,95 Church Lane,Edinburgh,Scotland,EH89 7GH,55.82,0.67,1995,High-Rise Flat,Private Rent,City Council,G,9.85,0.94,1.68,2021-09-16,0.77,1125,557,6.09,128,Low
+224,100086315376,46 Park Road,Aberdeen,Northern Ireland,AB6 5GH,58.21,0.89,1971,Bungalow,,Private Landlord,D,5.76,0.77,6.33,2021-07-30,1.68,691,1671,9.58,4,Medium
+225,100063155706,188 Station Road,Cardiff,,G41 5GH,58.49,-2.1,2021,High-Rise Flat,Private Rent,,,9.36,0.07,3.12,2023-09-29,1.39,7432,1939,1.66,141,High
+226,100026386255,134 Station Road,Glasgow,Northern Ireland,EH20 7EF,54.77,-2.94,1970,Terraced,,Private Landlord,,7.11,0.3,1.49,2023-09-14,1.26,2858,530,8.98,82,Low
+227,100024190135,112 Main Street,London,England,DD5 5GH,58.15,-1.81,1985,Bungalow,Owner Occupied,,,7.84,0.96,1.36,2022-03-19,0.22,7912,619,9.97,208,
+228,100032988713,132 Station Road,Dundee,,EH53 1GH,54.27,0.98,1996,,Private Rent,Private Landlord,E,4.55,0.79,8.76,2022-05-19,0.2,9180,556,4.3,270,
+229,100089639912,86 Station Road,Dundee,Scotland,AB42 5GH,56.95,1.27,2017,Semi-Detached,Social Rent,Housing Association,G,1.25,0.65,5.57,2020-11-22,1.86,1961,155,5.94,351,Very Low
+230,100030300312,68 Park Road,Cardiff,Scotland,EH57 2CD,56.42,-5.81,2014,,Private Rent,Private Landlord,D,8.77,0.89,8.73,2023-06-15,1.39,3709,1261,1.23,239,
+231,100023080372,193 Park Road,Glasgow,Scotland,DD35 1GH,50.76,-6.49,1974,High-Rise Flat,Private Rent,City Council,C,3.83,0.86,2.63,2021-12-12,1.12,5068,612,7.3,110,Very High
+232,100084167160,185 Church Lane,Manchester,,DD72 1GH,58.71,-3.82,1995,Apartment,,City Council,G,7.08,1.0,1.9,2024-09-28,1.09,6479,686,5.03,337,Low
+233,100026002068,81 Main Street,Birmingham,England,AB29 5GH,53.77,-2.97,1974,,Social Rent,City Council,B,4.42,0.29,5.92,2025-02-07,0.07,684,1662,4.48,299,High
+234,100012210809,184 Station Road,Birmingham,Wales,AB10 8CD,50.53,-7.09,1952,High-Rise Flat,Social Rent,Private Landlord,G,7.32,0.18,7.78,2021-10-11,1.79,8361,1463,6.5,199,Very Low
+235,100053850420,121 High Street,Edinburgh,Scotland,DD63 2CD,56.97,-6.84,2015,Detached House,Owner Occupied,,D,8.67,0.08,4.88,2024-08-14,0.66,7933,807,4.76,283,Very Low
+236,100058741935,199 Park Road,Cardiff,England,G24 7CD,58.7,-6.35,1953,High-Rise Flat,Shared Ownership,Clyde Housing,,3.57,0.43,4.51,2024-01-18,0.82,8317,1632,2.72,240,
+237,100074255734,35 Station Road,Cardiff,Northern Ireland,AB91 1EF,51.58,1.19,1970,Semi-Detached,,Clyde Housing,D,1.02,0.16,9.19,2022-08-04,0.5,7567,1365,1.6,39,Medium
+238,100025280098,107 High Street,Glasgow,,DD54 1CD,52.23,-2.02,1979,,Shared Ownership,,B,1.33,0.6,4.33,2021-10-18,1.01,587,1632,1.74,237,Very High
+239,100063317464,71 Station Road,Belfast,England,DD59 7EF,55.9,-6.94,1957,,Social Rent,Clyde Housing,F,8.21,0.56,4.32,2021-05-11,1.73,696,791,9.0,8,High
+240,100086471270,149 High Street,London,Wales,EH34 1CD,51.31,-7.52,1988,Apartment,,Housing Association,E,5.71,0.98,8.27,2021-09-17,1.77,7238,1681,2.95,199,Very High
+241,100034141518,45 Park Road,Edinburgh,,DD37 3CD,57.98,-1.11,1995,Bungalow,Shared Ownership,Clyde Housing,A,2.64,0.89,9.64,2022-02-05,1.61,7067,1170,9.08,162,High
+242,100011648832,106 Park Road,Cardiff,Wales,G30 1CD,51.02,-5.54,1991,Detached House,Owner Occupied,Housing Association,G,7.42,0.44,7.25,2023-10-29,0.79,1464,1794,2.58,64,Very High
+243,100046291392,17 Park Road,London,,DD94 3CD,52.66,-1.79,2005,Apartment,Private Rent,,F,5.22,0.5,4.27,2023-06-28,0.86,5737,525,9.77,183,High
+244,100052451447,81 High Street,Manchester,England,G16 3GH,53.41,-6.74,1965,Semi-Detached,Private Rent,City Council,E,5.13,0.27,3.35,2023-01-19,0.14,5432,1555,8.27,39,Medium
+245,100044959041,27 Main Street,London,England,AB5 2GH,55.04,0.13,1960,Semi-Detached,Social Rent,Private Landlord,A,5.01,0.42,3.62,2023-06-10,0.02,3784,1395,5.2,285,Very High
+246,100089651697,47 Station Road,London,Wales,DD95 6AB,56.29,-0.13,1995,Bungalow,Owner Occupied,Clyde Housing,D,4.65,0.26,4.77,2024-08-26,0.61,3379,1609,1.61,57,Medium
+247,100032950353,189 High Street,London,England,EH54 3CD,55.99,-2.91,1963,Detached House,Private Rent,Private Landlord,,4.96,0.22,5.33,2022-06-02,0.91,3852,448,4.44,333,
+248,100098330934,29 Park Road,Dundee,Wales,AB71 3CD,55.8,-1.48,1959,,Owner Occupied,Housing Association,A,7.69,0.31,9.65,2024-01-18,0.59,8783,294,7.04,174,Very Low
+249,100013943364,66 High Street,Cardiff,Northern Ireland,G60 3CD,57.79,-3.1,1974,Terraced,Social Rent,Private Landlord,C,5.87,0.42,1.56,2025-09-21,0.06,931,251,7.6,132,Very High
+250,100083098089,45 Main Street,Manchester,Northern Ireland,DD5 8GH,57.46,-0.9,1968,Terraced,Private Rent,Clyde Housing,G,6.2,0.87,2.15,2023-06-16,1.25,1817,148,4.77,287,Very Low
+251,100044677177,22 Station Road,Dundee,Scotland,G30 5GH,51.09,-0.95,2015,,Shared Ownership,City Council,D,6.17,0.22,3.66,2024-07-10,0.83,2078,1980,8.35,100,
+252,100085056180,92 Main Street,London,Wales,G28 5GH,58.49,-7.34,1971,High-Rise Flat,Shared Ownership,Housing Association,C,9.45,0.12,9.46,2021-02-28,1.81,6988,1053,3.12,173,High
+253,100083306627,27 Main Street,Aberdeen,Scotland,DD76 3GH,54.07,0.48,1993,Semi-Detached,,City Council,C,1.94,0.74,6.25,2023-08-14,0.67,5703,224,3.09,93,High
+254,100018517282,163 Main Street,Cardiff,Wales,AB31 3GH,58.78,-6.72,1960,Bungalow,,City Council,B,9.94,0.28,7.03,2022-11-15,1.9,9753,933,9.97,106,Low
+255,100081538158,153 Main Street,Manchester,Wales,G75 4EF,55.81,-6.23,1984,Terraced,Social Rent,Clyde Housing,G,1.09,0.79,1.15,2022-12-22,1.84,7563,1483,5.12,346,High
+256,100080046679,83 Park Road,Belfast,Wales,DD42 2GH,53.56,-0.68,1957,Terraced,,Private Landlord,B,8.65,0.16,4.14,2020-12-14,1.65,7871,317,3.52,340,Very High
+257,100061759869,67 Church Lane,,Northern Ireland,G45 5GH,55.71,0.77,1962,Detached House,Owner Occupied,Private Landlord,E,9.47,0.41,1.63,2021-12-25,1.0,1028,148,7.26,89,High
+258,100056384879,98 Church Lane,Glasgow,,G94 1AB,52.86,-7.26,1970,Apartment,Shared Ownership,City Council,E,7.78,0.03,1.3,2023-07-13,1.63,8429,1027,8.42,68,Medium
+259,100051539166,55 Main Street,Manchester,Wales,G68 8CD,58.25,-7.91,1976,Detached House,Private Rent,Private Landlord,,5.55,0.23,8.87,2021-12-13,0.75,6054,568,2.75,304,Very Low
+260,100068676230,86 High Street,London,,EH17 6EF,55.23,-5.58,2014,Bungalow,,,C,8.51,0.03,2.17,2023-04-24,0.8,6835,1373,9.15,176,Low
+261,100099904851,89 Station Road,Cardiff,,AB50 2GH,57.26,-0.75,1990,Semi-Detached,Owner Occupied,,A,9.56,0.51,4.18,2025-03-09,0.43,2377,1104,9.14,105,Very High
+262,100012338503,112 Main Street,Glasgow,,DD36 1EF,52.58,-2.02,2015,Terraced,Social Rent,Clyde Housing,E,5.28,0.72,1.86,2021-05-19,0.68,8167,1700,3.77,130,Medium
+263,100016449259,99 Church Lane,,England,EH76 7EF,53.72,-4.51,1976,Semi-Detached,Social Rent,,,6.54,0.63,8.7,2023-01-18,1.94,5389,871,5.23,229,
+264,100010504265,183 Church Lane,Inverness,Scotland,DD18 7EF,50.53,-0.65,1963,Detached House,Shared Ownership,,A,2.97,0.1,2.98,2025-07-02,1.47,7494,1220,9.31,268,Very High
+265,100015925567,47 Station Road,Dundee,Scotland,AB93 4CD,52.66,-2.89,1959,,Social Rent,Clyde Housing,E,9.95,0.1,1.86,2021-04-03,1.54,8703,1220,2.77,251,Low
+266,100075698659,161 Main Street,Cardiff,Wales,G68 7EF,52.05,-7.28,1971,Bungalow,Private Rent,,A,5.07,0.01,6.88,2024-01-26,1.35,5128,175,7.4,212,Medium
+267,100021993119,196 Main Street,Dundee,England,EH2 1AB,54.73,-3.5,1957,Apartment,Social Rent,Private Landlord,F,5.92,0.24,8.92,2022-08-19,1.52,3211,1602,3.28,214,High
+268,100012671054,28 Church Lane,,Wales,AB71 4GH,55.85,-3.33,1987,,Private Rent,Private Landlord,D,5.3,0.62,3.59,2025-02-07,1.55,3777,1938,3.25,131,Low
+269,100064214375,86 Station Road,Cardiff,Scotland,EH52 1CD,52.02,-0.65,1961,Semi-Detached,Social Rent,Housing Association,F,1.76,0.25,8.35,2023-07-26,0.1,3941,1469,2.18,187,Very Low
+270,100077001310,115 High Street,Manchester,Scotland,AB60 6CD,57.66,-1.01,1989,Terraced,,Housing Association,,6.91,0.83,9.4,2025-01-22,0.94,5070,1815,3.13,118,Medium
+271,100072050214,103 Station Road,,Wales,AB3 8EF,53.66,-0.53,2003,Detached House,Owner Occupied,Private Landlord,B,7.72,0.63,8.99,2021-07-10,0.48,8623,1968,5.03,55,High
+272,100097951890,135 High Street,London,Northern Ireland,DD86 4EF,52.01,-5.88,1998,Detached House,Shared Ownership,City Council,A,5.61,0.68,4.06,2023-03-26,0.13,875,1686,5.97,281,
+273,100027948636,173 Park Road,Belfast,Northern Ireland,AB8 6AB,51.25,-7.7,2019,Apartment,,Private Landlord,D,8.32,0.57,3.73,2025-01-18,0.85,6833,943,9.63,153,Very Low
+274,100081069422,64 Main Street,Inverness,England,G92 2CD,55.72,-7.69,1990,Semi-Detached,Social Rent,,F,7.83,0.86,8.61,2022-10-04,0.7,7109,1709,3.45,255,
+275,100071563976,186 Church Lane,Edinburgh,Scotland,EH67 3GH,51.22,1.62,1996,Semi-Detached,,Private Landlord,E,9.88,0.56,4.15,2023-02-25,1.5,3539,214,1.58,195,High
+276,100059797801,128 Main Street,Manchester,Northern Ireland,DD82 1AB,53.9,-6.64,2008,Semi-Detached,Owner Occupied,Housing Association,F,4.87,0.47,8.12,2021-08-29,1.31,8325,843,8.7,233,Medium
+277,100050974240,30 Park Road,London,Wales,EH35 8EF,53.27,-0.84,1970,Bungalow,Owner Occupied,Clyde Housing,D,6.48,0.29,1.45,2025-04-21,0.84,4532,467,1.59,49,Low
+278,100024452402,151 Main Street,,,AB86 3EF,50.04,-2.43,2020,,,Private Landlord,,5.97,0.98,5.8,2021-02-26,1.57,1385,1716,8.78,333,High
+279,100076384103,59 Church Lane,Birmingham,Northern Ireland,G64 2CD,50.01,-5.97,1963,Bungalow,Owner Occupied,,E,3.64,0.52,9.3,2021-10-24,1.28,4139,852,5.48,249,Very Low
+280,100027965118,193 Park Road,Inverness,England,DD30 2AB,55.08,0.26,1957,Detached House,,Clyde Housing,C,6.61,0.93,2.61,2023-08-21,1.31,8572,1575,3.99,170,Very High
+281,100088296265,142 Church Lane,Birmingham,England,EH93 2GH,50.93,1.32,1977,High-Rise Flat,Private Rent,,D,4.82,0.56,8.44,2023-05-20,0.2,9224,174,8.04,353,
+282,100074082826,41 High Street,Birmingham,Scotland,AB43 2EF,55.43,-5.27,1980,,Shared Ownership,Private Landlord,D,2.15,0.77,3.36,2025-10-07,0.36,4624,305,8.02,208,High
+283,100076891124,186 Church Lane,Dundee,Wales,G92 6GH,51.18,-1.67,2000,High-Rise Flat,,,D,7.22,0.63,6.78,2023-07-24,0.6,5503,733,3.61,24,Low
+284,100057019040,65 Church Lane,Edinburgh,Scotland,EH64 2AB,53.91,-5.38,2023,Terraced,Private Rent,City Council,B,3.49,0.24,9.52,2021-02-25,1.42,6671,759,4.01,290,
+285,100052159677,40 Station Road,Manchester,Northern Ireland,G71 3EF,50.77,-3.3,1982,Terraced,Private Rent,Private Landlord,F,2.05,0.21,8.5,2020-12-15,0.97,4752,1345,9.22,200,
+286,100016002282,138 Station Road,,Scotland,G19 4EF,55.28,-6.56,1980,Detached House,Owner Occupied,,A,4.09,0.53,4.78,2025-05-08,0.32,2084,469,3.28,344,Very Low
+287,100072084732,114 Church Lane,Cardiff,,G46 7EF,51.37,-4.83,1965,Terraced,Owner Occupied,Clyde Housing,G,5.67,0.6,7.24,2023-11-26,0.89,3571,338,6.63,84,Medium
+288,100077751419,37 Park Road,Manchester,Wales,AB74 6EF,56.86,-6.44,1971,Semi-Detached,Shared Ownership,Clyde Housing,C,8.4,0.8,7.78,2024-05-24,0.13,9484,1519,9.98,270,High
+289,100028042318,27 Station Road,Glasgow,,EH46 7EF,53.17,-5.86,1999,,Social Rent,Clyde Housing,,7.48,0.82,3.12,2025-04-21,0.09,5481,1515,9.99,225,Low
+290,100055623370,165 Church Lane,Dundee,Northern Ireland,G41 4EF,58.57,-3.55,1953,High-Rise Flat,,Private Landlord,F,4.21,0.85,4.46,2022-01-08,1.04,7150,801,7.22,259,
+291,100011951108,47 Station Road,London,Northern Ireland,G43 2AB,56.12,0.47,1962,,Owner Occupied,Private Landlord,A,7.57,0.53,8.46,2023-12-03,1.95,7869,1387,4.63,216,Medium
+292,100097367347,86 Church Lane,,,AB66 8GH,52.96,-3.87,2008,Apartment,Private Rent,Housing Association,C,1.03,0.4,7.14,2024-01-19,0.57,4305,1740,5.94,74,Very High
+293,100038025012,30 Station Road,Cardiff,,G57 8EF,56.57,-2.91,1978,Apartment,Private Rent,Private Landlord,A,4.26,0.16,2.78,2025-02-04,1.84,594,476,1.98,79,High
+294,100025551553,109 Main Street,Dundee,Wales,AB79 2EF,54.96,1.3,2019,Terraced,Social Rent,Clyde Housing,E,5.01,0.59,3.31,2025-04-22,0.26,4698,1945,9.91,36,
+295,100028757562,121 Main Street,Inverness,Scotland,EH40 1GH,56.45,-6.46,1966,Apartment,Owner Occupied,Clyde Housing,E,3.85,0.14,1.22,2023-05-17,1.37,6952,1557,5.37,191,Very Low
+296,100067676191,159 Church Lane,Birmingham,,DD92 6CD,53.63,-5.77,1961,High-Rise Flat,Shared Ownership,Private Landlord,B,3.36,0.7,2.33,2023-09-03,0.59,7221,1514,1.56,196,
+297,100053133283,55 Church Lane,Inverness,,EH62 2EF,58.19,-1.62,1958,High-Rise Flat,Owner Occupied,Private Landlord,,5.68,0.83,9.6,2025-03-18,0.45,5032,1925,4.36,51,Very Low
+298,100080371842,140 Station Road,London,Wales,AB18 7CD,50.07,-3.58,2014,Apartment,,,B,6.46,0.22,1.74,2024-06-23,1.66,4490,285,3.69,200,Low
+299,100010703262,179 High Street,,England,AB38 8CD,56.38,-4.02,1994,Semi-Detached,Owner Occupied,Private Landlord,E,4.04,0.19,1.67,2021-01-06,0.78,8878,495,6.37,41,Medium
+300,100046497050,165 Church Lane,London,,EH72 2AB,55.11,-2.11,1966,,Social Rent,Housing Association,A,4.93,0.44,3.91,2022-07-24,0.2,8763,986,7.4,129,High
+301,100080636190,18 High Street,,Scotland,EH51 2AB,55.97,-6.11,1982,Terraced,Shared Ownership,Clyde Housing,B,5.3,0.41,9.2,2025-01-09,0.07,546,448,6.16,146,Medium
+302,100032161043,29 Park Road,,Northern Ireland,G72 7GH,57.34,1.94,1955,Semi-Detached,,Housing Association,D,5.83,0.04,7.92,2023-02-20,0.5,1166,390,7.92,269,
+303,100094169161,49 Park Road,Birmingham,,DD83 7CD,55.41,-4.05,2009,Detached House,Social Rent,Private Landlord,F,4.08,0.62,1.0,2022-04-09,1.82,4289,542,3.8,288,Low
+304,100017091024,6 High Street,Birmingham,England,G68 5EF,56.01,-7.85,1982,,Owner Occupied,Private Landlord,A,1.79,0.87,7.16,2021-07-01,1.13,1935,329,7.49,163,Very Low
+305,100089254468,16 Main Street,Edinburgh,Wales,DD2 4GH,53.01,-3.28,1974,Apartment,Private Rent,Housing Association,C,4.73,0.05,5.07,2024-05-04,0.99,3875,1620,3.15,129,Medium
+306,100054557137,74 High Street,Glasgow,England,AB3 1CD,58.45,-7.85,1994,Terraced,Shared Ownership,,D,3.94,0.19,3.69,2025-04-07,0.82,9863,819,5.75,231,Medium
+307,100017132334,98 Main Street,Aberdeen,England,AB37 3AB,58.2,-1.59,1963,Detached House,Social Rent,,B,4.62,0.46,7.72,2024-07-18,0.05,1269,1558,1.41,290,Medium
+308,100075529038,4 Station Road,Edinburgh,Wales,DD5 5AB,54.52,-2.99,1978,Detached House,Shared Ownership,,C,9.86,0.24,6.33,2022-03-02,0.1,2279,1057,2.14,182,
+309,100094956930,22 High Street,Glasgow,Scotland,G81 4CD,57.94,-5.02,1980,Bungalow,Shared Ownership,City Council,E,8.2,0.82,1.59,2024-08-01,1.74,3976,655,6.39,19,Medium
+310,100035819775,106 Main Street,London,Scotland,AB78 3EF,57.12,-4.5,2004,Detached House,Shared Ownership,Private Landlord,B,1.09,0.41,1.55,2024-06-19,0.92,4104,1350,1.12,239,Very High
+311,100045735730,104 Main Street,Inverness,England,AB90 2GH,50.81,-0.73,1953,Detached House,Private Rent,Housing Association,D,5.69,0.02,9.15,2025-03-11,1.43,973,1042,5.12,176,Low
+312,100029189271,170 Park Road,London,England,DD79 5AB,56.15,0.61,2013,Detached House,,Private Landlord,A,2.69,0.86,4.97,2023-01-11,0.31,9528,651,8.07,122,Low
+313,100032749062,29 Station Road,Edinburgh,Scotland,DD16 6GH,57.62,-3.59,1993,Semi-Detached,Shared Ownership,Private Landlord,G,5.44,0.62,3.7,2024-03-23,1.01,4134,633,1.48,328,Very Low
+314,100068767722,24 Church Lane,Manchester,Northern Ireland,DD27 3GH,55.91,-4.83,1965,Terraced,,Clyde Housing,A,4.54,0.07,3.8,2021-10-07,0.81,4796,609,6.41,0,
+315,100020055645,25 Station Road,Aberdeen,Scotland,AB53 7AB,55.01,1.34,1970,Bungalow,Owner Occupied,,E,7.52,0.79,1.31,2025-11-04,1.51,4285,1450,4.53,249,Low
+316,100071978487,121 Park Road,Edinburgh,,EH5 4CD,54.97,0.53,1956,Bungalow,Social Rent,Clyde Housing,A,6.23,0.61,7.2,2021-03-03,0.11,9729,950,2.09,21,Very High
+317,100012073349,44 Park Road,Dundee,Wales,AB17 1CD,55.86,0.98,1958,Apartment,Shared Ownership,Private Landlord,,4.32,0.75,1.76,2023-05-06,0.27,4254,134,4.27,185,High
+318,100060288375,41 Park Road,Aberdeen,,AB40 7EF,51.14,-0.44,1997,Terraced,Private Rent,Clyde Housing,A,1.5,0.0,7.57,2022-06-04,0.94,1271,1479,8.4,102,
+319,100013612321,19 Church Lane,Glasgow,England,G28 3CD,52.34,-4.1,1953,High-Rise Flat,Social Rent,Private Landlord,A,5.15,0.65,4.74,2022-03-26,1.8,2276,1382,2.71,317,Very High
+320,100041897433,125 Park Road,Glasgow,England,AB24 8AB,54.04,-5.53,1998,Apartment,,Clyde Housing,D,2.51,0.61,9.23,2023-05-14,1.01,5678,753,4.84,299,Medium
+321,100079825221,158 Main Street,Birmingham,Wales,AB88 6GH,55.43,-6.18,1996,Detached House,Owner Occupied,Housing Association,,8.54,0.95,1.54,2025-11-13,0.91,9373,949,5.26,36,
+322,100096307108,79 Station Road,Birmingham,England,DD83 2CD,58.43,-3.07,1988,Terraced,Social Rent,City Council,E,5.5,0.56,6.55,2022-11-28,0.55,2124,430,7.28,259,Medium
+323,100040172188,59 Church Lane,Aberdeen,,EH67 4CD,54.8,-4.51,2021,Terraced,Private Rent,City Council,B,5.67,0.24,4.45,2025-10-21,1.37,4812,547,9.34,42,Low
+324,100059812932,77 Park Road,Edinburgh,Scotland,G83 8GH,51.91,-1.85,2024,Detached House,Social Rent,Housing Association,E,2.36,0.0,9.9,2021-11-20,1.87,5966,875,2.49,364,
+325,100029250611,192 Main Street,Glasgow,,G42 6EF,50.55,-7.74,2008,Bungalow,Private Rent,Private Landlord,C,4.17,0.15,7.34,2021-01-30,0.75,3346,426,7.06,324,Very Low
+326,100022748208,33 Station Road,Inverness,,EH48 1AB,54.59,-5.2,1964,Apartment,Private Rent,,,8.64,0.14,3.48,2025-07-07,1.33,3427,891,6.45,337,Very Low
+327,100028369857,12 Church Lane,Cardiff,England,EH15 1EF,55.54,-1.57,2002,Terraced,,Clyde Housing,C,8.64,0.01,3.41,2021-07-30,0.84,3506,1030,4.95,202,Low
+328,100099748244,41 High Street,London,Northern Ireland,G29 7AB,56.88,-7.5,2019,Bungalow,Shared Ownership,Clyde Housing,A,6.2,0.93,4.97,2021-07-23,0.71,2800,1542,6.62,150,Very Low
+329,100028734943,161 Station Road,,Wales,EH63 7CD,53.61,-6.25,2024,Bungalow,Social Rent,Private Landlord,C,8.6,0.88,7.53,2024-08-08,0.01,2977,1962,5.03,45,Medium
+330,100083839005,116 Park Road,London,England,G49 3CD,56.17,-7.3,2003,,,Housing Association,G,2.04,0.94,7.16,2022-01-20,1.61,7808,942,6.58,143,
+331,100089351007,26 High Street,Glasgow,Northern Ireland,DD43 3CD,55.58,-5.51,2014,Apartment,Owner Occupied,,G,1.6,0.82,5.46,2025-09-17,0.75,960,1887,8.17,107,Medium
+332,100029084512,40 Station Road,Dundee,Wales,DD43 8EF,57.11,0.28,2023,Apartment,,Clyde Housing,,4.15,0.01,5.81,2024-12-28,0.12,5792,1957,4.65,347,Very Low
+333,100099163729,79 Station Road,London,Wales,EH68 4AB,54.71,-7.69,1985,Semi-Detached,Social Rent,Clyde Housing,,7.92,0.79,2.9,2022-03-29,1.46,655,1026,4.42,214,
+334,100056678094,134 Church Lane,London,England,AB19 6GH,52.47,0.74,1992,Detached House,Shared Ownership,Housing Association,D,4.11,0.09,8.61,2024-06-30,0.39,8683,1623,4.71,216,
+335,100066776636,40 Station Road,Manchester,England,DD84 1CD,51.67,-7.75,1959,Semi-Detached,Private Rent,Private Landlord,D,5.31,0.41,7.88,2025-02-19,1.62,4366,452,9.52,266,
+336,100019058073,105 Main Street,Belfast,Northern Ireland,EH51 3AB,50.98,-6.67,1992,Semi-Detached,Shared Ownership,Housing Association,D,8.3,0.56,7.54,2021-08-08,0.49,9734,106,4.03,154,Very High
+337,100096968715,7 Park Road,,Scotland,EH56 2GH,54.24,-3.69,1962,High-Rise Flat,Shared Ownership,Clyde Housing,C,3.23,0.07,8.76,2025-10-20,1.97,9581,1464,7.94,178,
+338,100081750468,116 High Street,Belfast,Wales,G82 7CD,52.99,-1.74,1952,Apartment,Shared Ownership,Clyde Housing,F,8.53,0.58,5.96,2024-02-07,1.45,8601,1141,8.95,204,Medium
+339,100089457697,71 Church Lane,Glasgow,Northern Ireland,G27 8CD,50.74,1.6,1958,High-Rise Flat,Owner Occupied,Private Landlord,C,7.94,0.54,8.55,2022-08-27,1.02,5752,1013,1.13,260,Very Low
+340,100086405186,59 Main Street,Aberdeen,Scotland,EH15 8GH,53.96,-7.3,1959,High-Rise Flat,,Housing Association,F,3.82,0.42,9.4,2024-02-10,1.1,8370,983,2.12,79,High
+341,100047342529,154 High Street,Edinburgh,Northern Ireland,DD1 8CD,57.66,-4.02,2001,Semi-Detached,Shared Ownership,Clyde Housing,C,4.61,0.87,1.26,2024-06-26,1.67,4213,819,1.42,213,Medium
+342,100094810266,101 Church Lane,Glasgow,Wales,EH36 4EF,52.37,-0.33,2004,Apartment,Social Rent,Housing Association,D,9.18,0.11,4.08,2022-08-10,0.63,6051,1188,8.68,297,Low
+343,100081904510,119 High Street,Manchester,,G10 7EF,51.47,-2.15,1956,Apartment,Social Rent,,E,8.9,0.81,1.01,2021-03-15,0.61,6282,765,9.97,206,Low
+344,100077596471,45 Park Road,Cardiff,Scotland,DD14 5GH,54.11,1.2,2010,Apartment,Owner Occupied,Housing Association,C,1.65,0.55,6.92,2024-11-05,0.84,6397,733,2.54,63,High
+345,100033287471,72 High Street,Birmingham,,G16 4AB,56.34,-5.65,1987,Semi-Detached,,Housing Association,A,5.13,0.14,9.35,2021-09-06,1.07,3087,695,9.74,181,Very High
+346,100012772549,132 Station Road,Birmingham,Northern Ireland,G97 4EF,55.76,-1.54,2004,Semi-Detached,Social Rent,Clyde Housing,C,2.98,0.36,3.55,2024-10-29,0.8,6050,1198,7.29,268,Low
+347,100078251203,193 Main Street,London,Wales,AB69 5EF,50.18,-4.63,1956,Detached House,Shared Ownership,Private Landlord,C,3.84,0.68,7.94,2021-12-25,1.47,2555,1180,1.0,176,High
+348,100095774631,97 Church Lane,Belfast,Northern Ireland,EH71 1EF,55.01,-2.18,1988,Bungalow,,Private Landlord,B,1.88,0.15,1.04,2024-05-27,1.37,3035,672,3.33,257,High
+349,100060408157,39 Park Road,Birmingham,Scotland,DD31 6CD,50.64,-5.27,1962,,Private Rent,City Council,G,6.26,0.83,5.5,2021-10-22,0.63,2373,1468,6.51,165,High
+350,100010418082,47 Station Road,London,England,EH65 1GH,52.43,-3.08,1995,Apartment,,Housing Association,G,1.43,0.38,9.48,2021-08-18,1.55,8091,1639,3.14,344,Low
+351,100080131179,199 Station Road,Manchester,,AB91 2GH,58.68,-3.15,1999,Terraced,Social Rent,Private Landlord,,1.42,0.46,1.71,2022-08-23,0.49,7128,1065,3.61,245,Low
+352,100052849168,134 High Street,Glasgow,Scotland,AB52 4AB,50.51,1.1,1962,,Social Rent,,E,6.36,0.77,4.1,2020-12-19,0.61,3885,873,6.12,255,Low
+353,100094503876,118 High Street,Inverness,Wales,EH1 3CD,57.73,-2.4,1981,Apartment,Social Rent,Housing Association,A,6.63,0.26,1.27,2024-02-02,0.91,642,738,4.88,46,Medium
+354,100061696402,64 Park Road,Glasgow,Northern Ireland,G27 8EF,52.51,-6.31,2024,Semi-Detached,Social Rent,Private Landlord,E,5.96,0.09,7.76,2025-08-05,0.67,9523,578,7.2,53,
+355,100087967171,105 High Street,Edinburgh,Wales,G3 1EF,54.08,1.32,2008,Detached House,Social Rent,Clyde Housing,B,7.3,0.8,6.93,2022-04-20,0.1,9281,129,3.63,146,Medium
+356,100023434023,121 High Street,Manchester,Scotland,EH69 6EF,58.78,0.53,1950,Bungalow,,City Council,A,1.17,0.94,7.31,2021-12-04,0.6,879,876,7.46,10,Very Low
+357,100087794862,5 High Street,Edinburgh,England,AB45 2CD,57.1,-7.77,1962,,,Private Landlord,D,9.28,0.3,9.09,2021-01-17,0.71,1861,666,7.12,246,Low
+358,100091193652,73 High Street,Cardiff,Northern Ireland,AB25 6CD,52.69,-7.27,2019,High-Rise Flat,Owner Occupied,Housing Association,F,4.42,0.45,4.46,2023-09-24,1.56,569,1225,4.11,295,Very High
+359,100037991734,51 Church Lane,Cardiff,England,DD65 5AB,55.91,-4.7,2022,,Private Rent,City Council,,5.64,0.73,5.95,2025-07-21,1.69,6626,748,6.18,282,Very Low
+360,100082637840,50 Park Road,Belfast,,DD86 6EF,54.54,-0.33,2022,Apartment,Owner Occupied,City Council,D,9.1,0.04,1.41,2024-06-08,1.28,7920,1550,8.37,23,Very Low
+361,100014207968,163 Main Street,,,G36 5EF,55.67,-1.43,1972,Detached House,Social Rent,Private Landlord,B,4.47,0.19,4.83,2021-12-14,0.23,5627,595,2.81,175,Medium
+362,100090082932,12 Main Street,Aberdeen,Wales,EH45 4EF,55.1,-2.12,1993,Semi-Detached,Private Rent,Clyde Housing,A,4.59,0.86,9.21,2025-03-07,0.19,3852,1729,9.68,325,Very High
+363,100021957638,35 High Street,Aberdeen,England,EH56 7CD,54.57,0.28,2005,Apartment,Social Rent,City Council,B,8.61,0.25,3.28,2025-04-02,0.32,504,1795,7.72,248,Medium
+364,100026200389,119 Park Road,Dundee,Wales,AB10 8EF,58.02,-5.44,2010,Bungalow,Private Rent,,A,1.17,0.01,9.59,2024-09-07,0.15,6707,1235,5.43,2,
+365,100017402459,83 Church Lane,Cardiff,England,AB71 2EF,57.9,-2.03,1976,High-Rise Flat,Shared Ownership,Private Landlord,C,5.15,0.75,4.03,2024-06-13,0.84,3448,1240,5.44,161,High
+366,100021767873,85 Main Street,Edinburgh,Wales,DD78 5EF,51.44,-5.59,2009,Semi-Detached,Shared Ownership,City Council,C,4.31,0.76,6.62,2022-01-19,1.4,3655,1792,1.92,117,
+367,100014487404,30 High Street,London,England,DD42 4CD,55.82,-6.08,1976,Bungalow,Owner Occupied,Private Landlord,D,8.95,0.77,6.35,2024-02-05,0.93,9643,1488,2.76,184,
+368,100057559750,71 Park Road,London,,DD33 7GH,52.99,-1.91,1998,High-Rise Flat,Shared Ownership,Clyde Housing,A,1.31,0.22,8.69,2020-11-26,0.74,1098,1419,8.5,213,Medium
+369,100020715489,48 Main Street,Dundee,Scotland,G26 8EF,58.42,1.01,1961,Semi-Detached,Shared Ownership,Clyde Housing,,2.19,0.09,3.99,2023-05-22,1.55,6748,1864,5.28,148,Low
+370,100087043016,98 Station Road,,Wales,G32 3CD,54.45,-5.6,1973,,Social Rent,Clyde Housing,E,8.86,0.68,9.5,2023-08-22,0.38,9158,1503,9.86,303,Low
+371,100031303763,28 Main Street,Glasgow,England,AB49 5AB,54.78,-2.86,1954,Apartment,Shared Ownership,Clyde Housing,,5.28,0.51,6.75,2022-03-16,1.99,644,1920,7.46,80,Very High
+372,100068266859,35 Station Road,Aberdeen,,AB29 1EF,52.04,-1.63,1994,Detached House,Shared Ownership,Private Landlord,B,1.83,0.61,2.34,2023-09-12,1.43,5037,1917,3.02,153,High
+373,100076703885,181 Main Street,Birmingham,England,DD83 4GH,56.71,-0.65,1987,High-Rise Flat,Owner Occupied,,B,8.73,0.38,1.81,2022-11-24,1.24,675,1478,1.58,259,Very Low
+374,100066997920,40 High Street,Manchester,Northern Ireland,G60 8AB,55.63,-6.21,1959,High-Rise Flat,Shared Ownership,Private Landlord,C,9.54,0.77,6.36,2023-08-21,0.17,9668,1615,1.92,124,Low
+375,100027164322,150 Church Lane,Dundee,Wales,AB96 5EF,56.62,-5.42,2010,Apartment,Private Rent,Housing Association,C,8.09,0.58,6.93,2023-12-23,1.0,5126,1882,4.35,303,Low
+376,100016431327,26 Park Road,Birmingham,England,G16 8AB,55.96,-3.36,1953,Semi-Detached,Private Rent,Housing Association,G,6.53,0.71,3.43,2024-04-15,0.33,2739,813,3.32,150,Very High
+377,100063724343,57 High Street,Cardiff,Scotland,EH69 5CD,52.05,-0.8,2019,Semi-Detached,Private Rent,Clyde Housing,C,3.18,0.66,9.27,2025-02-04,0.47,802,756,8.76,229,Medium
+378,100054942699,154 High Street,Glasgow,Northern Ireland,G72 8EF,55.2,-3.97,1989,Detached House,Private Rent,Clyde Housing,,7.42,0.35,4.44,2025-06-01,0.33,3859,646,4.28,235,Low
+379,100077910493,48 Main Street,Manchester,England,G47 1GH,56.13,1.37,1963,Bungalow,Shared Ownership,Housing Association,E,9.85,0.43,2.79,2021-09-28,1.29,5086,917,1.06,321,Low
+380,100095518080,123 Station Road,Aberdeen,Wales,EH18 1GH,51.72,0.7,1980,,,,B,7.52,0.19,4.95,2024-11-18,0.65,9696,604,4.38,108,Very Low
+381,100037576018,162 Station Road,London,England,DD49 1EF,53.05,-0.42,1982,,Social Rent,City Council,,6.02,0.94,8.28,2022-04-26,1.35,4456,789,7.51,15,
+382,100099581059,197 High Street,Edinburgh,,EH51 7CD,51.42,-7.12,1974,Detached House,Owner Occupied,City Council,D,3.45,0.4,2.19,2020-11-24,1.16,2193,1807,9.82,362,High
+383,100013502356,103 Station Road,Belfast,England,G17 8CD,52.88,-1.51,2000,Detached House,Owner Occupied,Private Landlord,A,9.09,0.35,7.34,2021-11-30,1.97,6739,186,5.41,153,
+384,100085270931,71 Park Road,Inverness,Wales,AB73 3AB,54.74,0.26,1994,,Private Rent,City Council,B,6.92,0.05,2.3,2023-10-02,1.04,7995,1861,8.07,222,Medium
+385,100036694119,91 Main Street,Belfast,Scotland,EH88 6CD,53.85,-3.79,1972,Bungalow,,,C,7.72,0.35,1.24,2022-02-11,1.02,7311,626,7.07,318,
+386,100078198337,129 High Street,,Wales,AB87 6EF,55.87,-2.08,1955,Bungalow,Owner Occupied,Housing Association,G,3.52,0.91,9.11,2022-06-15,1.2,9823,1533,5.22,38,
+387,100044696893,95 Church Lane,Inverness,Scotland,DD5 1GH,53.1,-5.69,1961,Semi-Detached,Shared Ownership,Housing Association,B,5.46,0.81,9.57,2025-04-09,0.66,2123,568,5.63,301,Medium
+388,100095890305,46 Park Road,Belfast,Scotland,EH19 4EF,58.45,0.48,1971,,Owner Occupied,City Council,D,4.11,0.95,5.73,2025-06-30,1.29,6096,278,6.58,239,Low
+389,100020297215,185 Station Road,Dundee,,EH34 7AB,55.75,-5.83,1970,Detached House,,,E,4.45,0.12,9.66,2021-12-10,1.17,2065,516,5.91,7,High
+390,100053592939,71 Station Road,Aberdeen,Scotland,EH90 5AB,55.72,1.13,1958,Terraced,Private Rent,City Council,D,8.69,0.83,9.91,2021-10-26,1.39,3425,1926,2.02,171,Medium
+391,100027533664,20 Main Street,Inverness,Northern Ireland,DD10 1GH,57.82,-0.72,1979,Terraced,,Clyde Housing,,8.65,0.99,4.13,2025-02-22,0.84,764,1532,8.28,114,Very High
+392,100095249821,151 Station Road,Glasgow,Scotland,DD94 7GH,55.95,-3.28,1993,High-Rise Flat,Social Rent,,A,1.83,0.75,6.47,2025-02-08,1.55,4140,1536,7.38,209,Very Low
+393,100013110951,28 High Street,,,DD37 1CD,50.4,-0.45,1965,Apartment,Owner Occupied,City Council,D,7.48,0.33,4.6,2024-03-16,1.65,3942,1146,6.85,362,Very Low
+394,100049216740,180 High Street,Aberdeen,Wales,G19 6AB,52.45,0.42,2012,Apartment,Shared Ownership,,C,9.81,0.87,4.33,2021-04-05,1.29,8770,1379,8.94,260,Very High
+395,100099972774,112 Main Street,Belfast,Wales,DD15 1AB,51.4,-2.07,2012,Terraced,Private Rent,Private Landlord,E,4.98,0.41,9.56,2023-04-23,0.08,3405,434,9.76,256,Low
+396,100030768668,39 Park Road,Aberdeen,,AB43 5AB,55.44,-7.59,2003,Detached House,Shared Ownership,Private Landlord,A,9.46,0.26,4.15,2021-12-03,1.92,807,614,7.6,51,High
+397,100065048209,78 Main Street,Manchester,Wales,DD91 4EF,54.09,-0.47,1974,Detached House,Owner Occupied,Private Landlord,G,2.77,0.65,9.02,2022-04-21,1.1,4472,694,4.36,282,Low
+398,100046703211,140 Station Road,Manchester,,AB88 7EF,54.43,-5.06,1998,Semi-Detached,Shared Ownership,City Council,F,9.54,0.13,9.81,2021-03-18,0.67,2827,110,3.79,41,Low
+399,100047056992,186 High Street,,Scotland,G48 1EF,54.9,-2.97,1998,High-Rise Flat,Shared Ownership,,D,7.86,0.62,9.67,2025-04-16,1.02,9126,1904,5.96,218,
+400,100020813005,184 Station Road,Birmingham,Scotland,G98 5AB,52.73,-7.78,1979,Terraced,Private Rent,,A,2.46,0.42,7.73,2022-06-19,0.78,9798,1048,5.83,267,Very High
+401,100042374854,79 High Street,Birmingham,Scotland,DD51 4EF,58.47,1.96,1962,Detached House,Owner Occupied,Housing Association,,8.31,0.62,5.04,2024-12-08,0.87,1274,1547,2.8,98,High
+402,100016014091,84 Church Lane,Aberdeen,Wales,DD15 3GH,57.55,-4.29,1988,Semi-Detached,Private Rent,Private Landlord,G,7.53,0.17,2.48,2021-05-14,0.11,4832,154,1.37,7,Very Low
+403,100090893197,5 High Street,Birmingham,Wales,AB67 7AB,51.96,-0.08,1996,,Shared Ownership,Housing Association,G,7.19,0.93,2.68,2021-07-12,0.93,8843,1954,9.12,65,Medium
+404,100096077832,180 Main Street,Glasgow,,G35 4GH,58.02,-2.01,1956,High-Rise Flat,Private Rent,Housing Association,D,1.92,0.92,6.54,2021-08-01,1.61,6426,540,6.62,22,Very Low
+405,100058803664,184 Station Road,Cardiff,England,DD92 3GH,56.48,-4.95,1975,Semi-Detached,Owner Occupied,Clyde Housing,,7.82,0.59,1.35,2024-01-25,0.11,8383,389,8.21,137,Medium
+406,100081495347,164 Station Road,Edinburgh,Scotland,AB90 5AB,55.53,0.89,1955,Apartment,Owner Occupied,,D,2.32,0.77,5.01,2023-03-10,0.58,8070,663,5.36,273,Medium
+407,100050198781,184 Station Road,Edinburgh,Wales,EH97 4EF,58.24,-0.01,2001,,Social Rent,City Council,G,6.52,0.77,2.61,2021-08-11,1.14,2214,1865,9.0,356,
+408,100098844009,71 High Street,Dundee,,EH4 2CD,58.81,-7.19,1971,High-Rise Flat,Owner Occupied,,C,5.02,0.7,1.11,2021-01-21,0.83,8747,912,2.4,59,Very Low
+409,100080709958,180 Main Street,Inverness,Wales,EH4 8AB,51.02,-1.68,1968,High-Rise Flat,,Clyde Housing,G,4.1,0.75,3.86,2021-07-13,1.73,9450,1585,6.73,46,High
+410,100044523845,55 Church Lane,Belfast,,AB7 5GH,52.32,-0.48,2001,Detached House,Private Rent,Housing Association,B,3.03,0.56,5.22,2024-04-18,1.76,5978,1377,3.4,32,High
+411,100017562553,27 Park Road,Birmingham,Northern Ireland,DD39 8EF,50.97,-6.06,1984,,,City Council,C,3.23,0.42,5.94,2020-12-04,1.24,1422,1626,9.93,224,Very High
+412,100093829908,199 Church Lane,Glasgow,Northern Ireland,EH29 4AB,52.71,-4.71,1991,Detached House,Private Rent,Housing Association,F,7.77,0.03,8.7,2021-03-28,1.91,8339,245,2.99,296,
+413,100048320705,197 High Street,Inverness,Wales,EH51 8GH,55.01,-5.54,1984,Semi-Detached,Shared Ownership,Private Landlord,D,6.29,0.45,3.18,2021-03-13,1.52,5976,1951,1.78,233,Very Low
+414,100091156031,114 Station Road,Inverness,,EH48 1EF,54.26,-7.71,1988,Terraced,Shared Ownership,,D,6.04,0.44,5.91,2021-12-14,0.51,2605,811,9.83,30,Very Low
+415,100046304886,116 High Street,Cardiff,Northern Ireland,EH51 4AB,58.12,-6.88,1996,Terraced,Social Rent,City Council,D,9.86,0.94,6.56,2022-11-12,0.6,7500,561,3.1,225,
+416,100050082043,111 Church Lane,Belfast,Wales,DD39 4GH,56.0,-2.65,1962,Apartment,Shared Ownership,Clyde Housing,F,6.55,0.13,8.21,2024-05-31,1.89,7474,1699,7.0,182,Very High
+417,100029468056,71 Park Road,Birmingham,Northern Ireland,G61 6CD,57.57,-2.29,1958,Detached House,,Private Landlord,E,6.17,0.16,4.67,2022-02-13,0.91,7818,1704,4.1,117,Very High
+418,100084121074,86 Station Road,Birmingham,Scotland,AB93 1AB,51.63,-7.23,1978,Bungalow,Private Rent,Private Landlord,D,1.15,0.32,5.91,2023-09-19,0.32,811,1985,4.74,353,Medium
+419,100045129405,33 High Street,Belfast,Wales,DD56 2CD,53.4,-2.0,1991,Apartment,,Private Landlord,,7.51,1.0,5.38,2022-09-12,1.46,1255,1686,4.78,17,Low
+420,100018618611,91 High Street,Edinburgh,Wales,DD10 8CD,57.03,0.94,1974,Apartment,Shared Ownership,Private Landlord,B,4.58,0.57,7.87,2024-06-18,1.56,8116,1045,7.18,201,High
+421,100048189250,31 Church Lane,Glasgow,Wales,AB5 1GH,54.47,1.99,1969,High-Rise Flat,Shared Ownership,City Council,E,8.31,1.0,5.81,2025-06-14,1.56,7325,1902,3.81,304,Very Low
+422,100076258190,150 Station Road,Manchester,Northern Ireland,G39 6AB,55.89,0.36,1960,Semi-Detached,Private Rent,Private Landlord,E,6.42,0.03,7.88,2021-12-13,0.31,7444,166,5.44,283,Low
+423,100023186286,38 High Street,Inverness,Wales,EH40 2GH,51.16,-3.16,2024,Terraced,,Private Landlord,F,3.61,0.61,2.37,2022-04-27,1.75,5969,234,5.17,255,Very High
+424,100029753124,47 High Street,Manchester,Northern Ireland,G17 5EF,50.17,-1.05,1963,Terraced,Social Rent,Private Landlord,B,5.91,0.21,9.15,2021-01-21,0.44,1644,253,9.6,206,High
+425,100017127448,141 High Street,Dundee,England,AB62 3EF,52.09,-1.5,1951,Apartment,Private Rent,City Council,D,8.09,0.66,3.35,2024-11-26,1.73,2801,310,4.09,204,Very Low
+426,100068971755,38 High Street,Manchester,,EH52 4CD,55.94,0.32,1977,High-Rise Flat,,,D,9.35,0.35,5.42,2021-08-30,1.58,503,833,1.98,161,Very High
+427,100033410984,188 Main Street,Birmingham,England,AB62 1AB,58.86,0.4,2015,Terraced,Social Rent,Private Landlord,G,7.07,0.97,9.41,2022-06-02,1.31,1314,727,3.29,270,High
+428,100059856221,121 Main Street,London,Northern Ireland,G77 7CD,58.33,-7.45,1999,Detached House,,Clyde Housing,A,7.79,0.48,4.03,2022-08-19,1.29,6236,1079,3.18,152,Very High
+429,100019948461,151 Church Lane,,Scotland,DD82 4GH,55.07,-3.35,2003,,Private Rent,Clyde Housing,A,3.07,0.04,8.08,2025-03-05,1.54,4704,580,6.3,95,High
+430,100056590038,71 Station Road,Birmingham,England,G76 2CD,55.53,0.3,2009,Bungalow,Social Rent,City Council,G,1.87,0.35,8.61,2022-05-27,0.7,725,1273,7.2,280,Very High
+431,100076236015,22 High Street,Manchester,Wales,EH9 7CD,56.72,-1.17,2022,Apartment,Shared Ownership,City Council,G,7.06,0.79,2.07,2022-03-17,1.08,9663,1172,4.95,103,Medium
+432,100056321871,51 Church Lane,London,Northern Ireland,EH21 5CD,58.03,-2.22,2003,High-Rise Flat,Private Rent,Clyde Housing,A,5.98,0.84,3.31,2023-01-28,1.76,5564,493,3.41,219,
+433,100038571924,128 Main Street,Dundee,England,G65 5AB,51.08,-4.33,1987,Terraced,Owner Occupied,Clyde Housing,,8.09,0.29,6.32,2022-12-30,1.77,2372,888,6.27,288,Very High
+434,100029521935,25 High Street,Edinburgh,Wales,DD34 8AB,56.8,-6.46,2006,Detached House,Owner Occupied,Clyde Housing,G,8.5,0.4,3.08,2021-10-13,1.81,5639,695,3.4,333,High
+435,100070543392,12 Main Street,Manchester,England,AB13 5EF,55.89,1.82,2018,High-Rise Flat,,Housing Association,D,2.05,0.13,7.1,2023-09-11,1.02,5108,1726,1.31,266,
+436,100049385938,164 Main Street,Manchester,Wales,AB9 8CD,57.88,-0.73,1995,High-Rise Flat,,Housing Association,,9.18,0.34,9.95,2023-05-22,1.07,2233,618,8.48,191,Very Low
+437,100090925281,69 High Street,Dundee,Scotland,AB2 3AB,50.17,0.86,2011,,Private Rent,Clyde Housing,A,4.28,0.73,1.67,2025-01-27,1.56,3519,960,2.89,254,Very Low
+438,100038102130,1 Station Road,,Scotland,AB64 6CD,54.48,-6.68,1964,Semi-Detached,,,G,8.12,0.09,3.36,2024-01-04,1.85,7216,1086,7.97,358,Low
+439,100034807476,100 Park Road,Inverness,,EH53 2AB,58.43,-7.36,1968,Detached House,Private Rent,Clyde Housing,E,2.41,0.33,9.82,2025-02-02,0.16,6485,190,9.8,199,Very Low
+440,100068780608,160 High Street,Inverness,,DD43 2EF,56.49,-7.91,1968,Bungalow,Private Rent,Private Landlord,G,7.65,0.8,2.44,2024-02-09,0.85,8823,136,3.49,177,
+441,100029076877,163 Church Lane,Cardiff,Scotland,G2 5CD,57.58,0.76,1976,Semi-Detached,Owner Occupied,Clyde Housing,D,8.3,0.82,5.29,2021-06-13,0.99,5473,845,5.69,63,Very Low
+442,100088850043,49 Park Road,Inverness,England,EH88 8GH,55.66,1.27,2016,Apartment,Social Rent,Housing Association,F,1.33,0.17,6.79,2025-06-18,1.1,8648,1969,7.93,270,Medium
+443,100052914018,140 Station Road,Belfast,,AB89 4CD,53.59,-7.57,2021,Terraced,Owner Occupied,,B,7.1,0.87,2.84,2021-08-18,1.29,9637,315,7.69,353,Medium
+444,100041535325,116 Church Lane,Belfast,England,AB76 3EF,58.34,-6.86,1986,Terraced,Private Rent,Clyde Housing,D,5.5,0.06,8.31,2024-05-09,0.39,4918,1339,5.42,153,
+445,100018858750,107 Park Road,Dundee,England,EH37 1EF,56.39,-0.3,1975,,Private Rent,City Council,G,1.94,0.94,6.07,2021-03-14,1.12,4883,1088,3.74,115,
+446,100037493300,173 Church Lane,Dundee,,G80 1CD,57.24,1.48,1974,Terraced,Shared Ownership,Clyde Housing,D,2.64,0.37,5.66,2020-11-29,1.38,5788,557,3.29,199,Very Low
+447,100022386486,46 Church Lane,,Northern Ireland,DD90 4EF,53.09,-4.17,1968,Terraced,Owner Occupied,Private Landlord,E,4.42,0.34,1.28,2023-01-30,0.79,4921,959,7.65,127,Medium
+448,100059358764,6 Main Street,Birmingham,Wales,EH16 3EF,53.11,-5.28,2012,Semi-Detached,,Housing Association,C,2.45,0.25,3.77,2021-02-25,1.77,7163,1157,4.13,219,Medium
+449,100076236762,98 Station Road,Glasgow,Scotland,DD62 2EF,50.88,-2.6,1995,Apartment,Private Rent,,B,6.84,0.69,6.56,2022-04-04,1.77,8150,1271,9.61,18,
+450,100077959950,22 Station Road,Aberdeen,Wales,G32 3CD,50.41,1.78,1994,Semi-Detached,,Clyde Housing,D,8.61,0.29,8.73,2021-07-18,1.7,3301,1683,4.97,53,Very Low
+451,100086551400,186 High Street,Birmingham,,EH51 2GH,54.0,-1.51,1988,Apartment,Shared Ownership,City Council,B,4.98,0.81,7.68,2021-09-12,0.1,8542,1632,6.6,68,Medium
+452,100012718027,45 Main Street,Edinburgh,Northern Ireland,DD37 7CD,51.3,-2.21,1996,Terraced,,Housing Association,,5.33,0.43,1.4,2021-03-07,1.4,1762,630,4.5,72,Very Low
+453,100041751350,27 Main Street,Birmingham,,AB15 4AB,55.88,-6.94,1959,Terraced,Social Rent,Housing Association,E,6.93,0.6,5.53,2023-05-19,1.76,9038,1613,4.54,4,Low
+454,100032504421,63 Station Road,Edinburgh,England,AB17 8GH,54.04,-3.5,1957,Detached House,,Private Landlord,G,1.58,0.22,9.49,2024-10-18,0.71,577,823,9.31,47,High
+455,100014187938,43 Park Road,Belfast,Northern Ireland,AB24 6GH,52.01,-0.38,2008,Detached House,Shared Ownership,,C,8.56,0.17,9.68,2023-12-01,1.5,2746,715,1.61,121,Very High
+456,100069164545,130 Main Street,Dundee,Wales,DD13 6GH,56.99,-1.45,1990,Detached House,Social Rent,Private Landlord,D,7.39,0.57,3.36,2022-09-29,1.32,2991,581,3.03,135,
+457,100038810365,84 Church Lane,Cardiff,,G74 6EF,51.86,-2.52,1987,,,Housing Association,F,6.35,0.75,4.2,2023-01-10,0.83,1056,1284,9.5,234,High
+458,100075201616,166 High Street,Birmingham,Wales,G73 4AB,54.81,1.38,1951,Apartment,Shared Ownership,Clyde Housing,B,2.43,0.55,9.24,2021-04-17,1.34,3217,894,9.47,212,Very Low
+459,100057112508,179 Station Road,London,Wales,G62 5GH,58.34,-0.27,1982,,Shared Ownership,City Council,D,3.58,0.1,5.82,2023-03-04,0.39,5999,699,3.38,235,Very Low
+460,100021036276,176 Park Road,Birmingham,Scotland,AB89 3AB,58.46,-3.41,2020,Detached House,,Private Landlord,D,8.45,0.75,5.47,2023-06-07,1.9,7905,907,1.98,172,Very Low
+461,100058975223,92 Park Road,Edinburgh,Northern Ireland,EH56 3GH,50.17,-7.88,1965,Bungalow,Owner Occupied,City Council,F,7.77,0.13,7.01,2022-03-21,1.58,1415,1840,1.11,50,Very Low
+462,100038127646,94 Station Road,Manchester,Wales,G2 4AB,55.78,1.3,1986,Terraced,Social Rent,Private Landlord,,8.29,0.75,9.18,2023-01-26,1.65,4624,1673,5.17,358,
+463,100074829967,3 Main Street,London,Northern Ireland,G86 8EF,58.01,0.16,2024,Apartment,Shared Ownership,,C,1.21,0.85,9.41,2021-04-19,0.38,6972,943,1.18,160,Very Low
+464,100060612924,105 Station Road,Aberdeen,Wales,EH58 1EF,51.68,-4.97,1956,High-Rise Flat,Shared Ownership,Clyde Housing,G,6.23,0.78,4.41,2024-12-30,0.19,8326,1388,3.46,296,Very High
+465,100034417771,136 Church Lane,Cardiff,Wales,EH68 5EF,51.86,-0.48,1988,High-Rise Flat,Private Rent,Housing Association,A,6.85,0.2,1.18,2022-08-14,1.51,1016,1980,7.08,268,Very Low
+466,100069638545,151 Station Road,Manchester,Scotland,DD64 4GH,56.37,-7.6,1976,Terraced,Social Rent,,B,5.3,0.85,4.65,2023-07-22,1.68,5923,1224,6.54,82,Medium
+467,100027345238,22 Park Road,Aberdeen,England,G6 2CD,50.62,-0.77,1965,High-Rise Flat,Shared Ownership,Private Landlord,B,7.66,0.95,2.94,2024-04-26,0.76,4306,624,6.97,327,
+468,100085939922,41 High Street,Manchester,Wales,G37 2EF,56.17,-3.88,1981,Bungalow,,City Council,D,3.07,0.8,7.93,2022-11-07,1.16,2656,1545,2.24,325,Low
+469,100064247573,195 Main Street,Edinburgh,Northern Ireland,AB30 4EF,55.91,-4.78,2018,High-Rise Flat,Private Rent,Clyde Housing,C,4.67,0.89,1.04,2024-04-25,1.43,8641,1141,7.72,131,Very High
+470,100029543651,129 Church Lane,London,Wales,EH24 8EF,57.27,-6.55,2024,Apartment,Shared Ownership,Private Landlord,A,3.11,0.66,2.56,2022-05-29,0.93,7741,1745,4.35,98,High
+471,100080451506,11 Main Street,Aberdeen,,G68 6CD,56.96,-4.45,2018,,Shared Ownership,Private Landlord,A,3.09,0.1,1.2,2023-01-08,1.86,8071,1585,1.83,252,Very High
+472,100073227430,183 Main Street,Belfast,Scotland,G49 6GH,55.27,1.99,2013,Terraced,Shared Ownership,Private Landlord,G,4.5,0.99,3.55,2025-04-20,0.93,6426,1202,9.96,354,Medium
+473,100028235790,18 Main Street,London,Northern Ireland,EH68 2EF,57.81,0.5,1978,Bungalow,Owner Occupied,,,8.15,0.66,7.5,2022-05-02,0.91,1791,1502,9.76,19,Medium
+474,100026137739,91 Station Road,Edinburgh,Scotland,G67 8CD,52.3,0.75,1987,Apartment,Shared Ownership,Private Landlord,,8.6,0.53,2.1,2024-05-22,1.57,1111,1701,8.01,331,High
+475,100088858316,152 High Street,Belfast,Northern Ireland,AB79 2GH,55.69,-4.49,2011,Semi-Detached,Owner Occupied,,D,9.48,0.7,2.18,2022-09-18,1.06,2164,708,9.73,240,Medium
+476,100028792775,130 Main Street,Aberdeen,Wales,EH64 7GH,54.79,-5.82,2024,Apartment,,,B,7.72,0.2,6.2,2024-06-04,1.37,4318,1870,5.17,139,Low
+477,100093865065,115 Main Street,Dundee,Wales,DD62 6AB,51.58,-7.89,1950,,Private Rent,,A,5.7,0.99,7.25,2024-06-25,0.41,2893,102,7.6,280,
+478,100041307560,148 High Street,Belfast,Scotland,DD43 3GH,52.28,-7.92,1962,Semi-Detached,,Housing Association,F,2.2,0.04,3.31,2021-10-06,1.57,4772,1975,3.52,301,Medium
+479,100084916434,12 Main Street,Cardiff,England,G30 6AB,54.44,-3.8,1951,Detached House,,,G,1.33,0.14,2.09,2022-05-29,0.97,1047,206,2.05,149,Low
+480,100028293105,152 Park Road,Dundee,Northern Ireland,AB69 5GH,53.9,-2.97,1993,High-Rise Flat,Private Rent,City Council,A,5.94,0.32,3.47,2024-09-13,0.5,5905,326,5.02,163,Very Low
+481,100090655103,92 Main Street,Birmingham,Northern Ireland,G91 6CD,56.2,-7.69,2001,Terraced,Owner Occupied,Housing Association,D,8.26,0.64,9.13,2024-08-24,1.76,1708,1782,9.93,362,Very High
+482,100041284718,156 Station Road,Edinburgh,Northern Ireland,G20 8AB,50.89,-5.64,1962,High-Rise Flat,,Clyde Housing,G,8.2,0.8,9.75,2023-03-15,1.02,9097,976,2.99,60,Very Low
+483,100052815490,173 Church Lane,Cardiff,,DD58 1GH,53.15,0.78,1973,Apartment,Social Rent,Clyde Housing,D,2.2,0.83,7.13,2025-08-10,0.54,4840,374,4.99,30,Medium
+484,100034811466,152 High Street,London,,AB93 7GH,56.04,-6.98,2006,Apartment,,Clyde Housing,F,8.77,0.29,3.96,2024-01-09,0.84,1401,1599,6.38,191,Very High
+485,100066004445,16 Main Street,London,Scotland,DD18 3AB,58.55,0.92,1951,Semi-Detached,Private Rent,City Council,G,1.19,0.44,8.2,2025-02-28,1.36,7008,1869,9.56,129,Very High
+486,100088853166,113 High Street,Aberdeen,,G42 8CD,57.27,-3.92,2015,Detached House,Owner Occupied,City Council,A,1.29,0.67,5.7,2023-07-26,1.24,5225,146,2.7,276,Very High
+487,100082094856,68 Station Road,Dundee,Northern Ireland,AB30 4EF,50.1,1.44,1987,Terraced,Social Rent,,A,5.48,0.15,6.0,2021-07-13,1.65,5887,749,7.92,251,Low
+488,100085950353,119 Park Road,Inverness,England,EH89 2GH,56.67,0.77,1960,High-Rise Flat,,City Council,G,6.28,0.34,5.6,2022-03-08,0.1,6109,370,7.84,222,Low
+489,100080147784,185 Park Road,Inverness,England,AB7 6CD,58.58,-6.74,1955,Terraced,Private Rent,Housing Association,B,7.9,0.62,7.27,2022-12-06,1.41,8432,847,3.33,75,High
+490,100096432873,148 Park Road,Glasgow,Wales,G86 3CD,56.47,0.33,1983,,Owner Occupied,Private Landlord,G,3.14,0.04,7.63,2022-06-28,1.23,7237,1336,3.81,248,Low
+491,100078701652,81 High Street,,,DD3 6EF,57.87,-1.72,2010,Detached House,Shared Ownership,,E,3.56,0.72,1.53,2024-09-08,1.53,9051,380,4.02,353,High
+492,100086424357,18 Church Lane,Inverness,,EH17 1CD,55.97,-2.61,1973,Semi-Detached,Owner Occupied,City Council,A,1.41,0.89,9.01,2020-12-28,1.15,562,1651,8.79,362,Very Low
+493,100037573209,176 High Street,Glasgow,Wales,AB8 4CD,57.66,-0.93,1977,Detached House,Social Rent,Housing Association,E,7.57,0.9,7.94,2021-11-25,1.84,8725,285,4.42,268,High
+494,100023844343,180 High Street,Birmingham,Wales,G43 8GH,56.66,-1.96,2017,Semi-Detached,Shared Ownership,,C,5.77,0.81,7.53,2024-02-05,1.84,9610,1048,4.78,97,Medium
+495,100050054667,25 Church Lane,,,G54 3GH,52.61,-3.11,1954,Apartment,Owner Occupied,Housing Association,E,2.46,0.24,5.76,2025-06-03,1.32,9262,1097,5.1,222,
+496,100095932060,117 Park Road,,Northern Ireland,EH88 5AB,54.54,1.07,1968,Detached House,Owner Occupied,Clyde Housing,D,6.73,0.98,9.81,2023-03-07,1.16,4464,1660,4.04,191,Medium
+497,100038448822,57 Station Road,Cardiff,,DD61 7GH,51.64,-2.84,2021,,,Clyde Housing,E,8.94,0.59,3.21,2024-09-24,1.6,5880,1690,3.63,270,High
+498,100054497926,22 Station Road,Glasgow,Scotland,AB83 1CD,54.59,-3.43,2023,Detached House,Shared Ownership,Private Landlord,,8.03,0.55,1.96,2023-09-25,1.61,8549,381,5.95,1,
+499,100015117466,60 Church Lane,London,,AB62 8GH,54.19,-6.0,2020,Bungalow,Private Rent,Housing Association,F,1.04,0.56,5.14,2021-03-01,0.56,4567,492,4.71,18,Low
+500,100013340277,18 Main Street,Aberdeen,Wales,EH41 5EF,53.63,-2.74,1982,Semi-Detached,Shared Ownership,City Council,B,1.46,0.27,6.38,2023-01-17,1.02,4619,826,4.51,6,
+501,100099416755,73 High Street,Glasgow,,AB54 1GH,57.52,-2.92,2024,Detached House,Private Rent,Private Landlord,B,3.87,0.2,8.02,2022-03-13,0.85,7825,1053,4.73,110,
+502,100041447236,152 High Street,Belfast,Scotland,AB71 6EF,57.56,-4.13,1994,,Social Rent,Housing Association,B,7.11,0.32,7.22,2024-05-26,0.21,3360,229,2.53,143,High
+503,100065951679,63 Main Street,Manchester,Wales,G66 4CD,51.61,1.27,1980,Terraced,Shared Ownership,Clyde Housing,D,8.24,0.66,6.6,2024-06-08,1.53,6361,1262,7.42,264,
+504,100076143491,173 Park Road,Manchester,Scotland,DD76 1GH,52.03,-4.59,1968,High-Rise Flat,,Clyde Housing,F,9.15,0.14,4.25,2023-09-11,0.96,8158,102,1.1,230,Very High
+505,100091699877,187 Park Road,Birmingham,England,AB98 2AB,53.72,-6.82,1996,High-Rise Flat,Private Rent,,F,7.03,0.29,4.91,2022-09-10,0.78,1729,1423,1.62,287,High
+506,100043542448,176 Park Road,Aberdeen,Northern Ireland,DD23 6CD,50.45,0.04,1981,Detached House,Owner Occupied,Clyde Housing,,7.67,0.24,5.61,2023-04-16,0.18,741,882,1.88,69,Very High
+507,100039403742,73 High Street,Birmingham,Wales,AB41 6GH,57.14,-3.39,2005,Terraced,Owner Occupied,Private Landlord,F,2.09,0.29,9.84,2023-06-05,0.45,5137,1793,7.95,268,Low
+508,100046535394,185 Station Road,Edinburgh,Northern Ireland,AB55 5EF,51.6,-4.14,1958,High-Rise Flat,,,,3.45,0.84,2.86,2021-05-12,1.74,6360,1156,6.22,116,Medium
+509,100067829765,67 High Street,London,Scotland,G81 6GH,58.99,1.8,2017,,,City Council,,3.43,0.11,4.16,2025-07-09,1.96,7500,1233,8.05,16,Very Low
+510,100013773718,54 Park Road,Aberdeen,Northern Ireland,G79 2AB,58.46,1.55,1994,Apartment,Shared Ownership,Private Landlord,B,4.93,0.61,8.3,2024-11-15,0.58,6208,811,9.7,196,Low
+511,100011569301,21 High Street,Inverness,,EH33 6CD,50.85,1.3,1987,Semi-Detached,Shared Ownership,Clyde Housing,C,1.9,0.65,2.09,2021-05-08,1.44,9575,1764,6.64,289,Very Low
+512,100096501247,1 Station Road,Birmingham,Northern Ireland,EH60 8CD,50.45,-4.75,2002,Bungalow,Shared Ownership,Housing Association,G,4.15,0.6,2.4,2023-09-04,0.45,1061,609,5.37,161,Very High
+513,100065662587,83 Church Lane,Birmingham,Wales,EH37 5GH,54.6,-7.0,1981,Semi-Detached,Social Rent,,E,6.6,0.19,8.44,2024-11-18,1.47,7381,1740,7.18,200,
+514,100081603325,109 Main Street,,Northern Ireland,DD58 6CD,51.49,-6.18,2016,Bungalow,Social Rent,,A,1.31,0.16,1.85,2025-09-19,0.58,4493,255,9.97,151,Low
+515,100071551344,130 Main Street,Manchester,Wales,G14 7AB,52.99,-0.54,2018,Apartment,,Clyde Housing,A,1.1,0.71,8.18,2023-01-14,1.61,5466,1679,9.8,101,High
+516,100050703851,192 Main Street,Dundee,Wales,AB42 4CD,53.11,-1.57,2023,Terraced,Private Rent,Clyde Housing,D,2.05,0.34,9.07,2022-02-22,1.91,8952,1711,2.18,18,
+517,100040371660,190 Station Road,,Northern Ireland,G82 2AB,58.37,-7.46,1993,,Private Rent,Private Landlord,G,4.7,0.35,2.48,2021-05-11,1.07,8482,1460,6.41,152,High
+518,100056578237,179 High Street,Belfast,Wales,AB47 7AB,57.51,-0.37,1956,Semi-Detached,,City Council,A,8.75,0.54,6.39,2023-11-19,0.12,8228,171,6.38,261,High
+519,100067032437,24 Main Street,Manchester,Northern Ireland,DD85 7AB,57.98,1.61,1996,Detached House,Owner Occupied,City Council,G,4.21,0.24,6.88,2024-09-12,1.21,6813,224,8.44,62,Medium
+520,100043670514,197 High Street,London,Scotland,DD64 4CD,54.02,-2.83,2003,Bungalow,Private Rent,Clyde Housing,F,2.69,0.72,7.77,2023-09-06,1.68,8956,614,2.81,130,Very Low
+521,100076102437,142 Church Lane,Manchester,Scotland,DD34 6EF,58.35,-7.81,1974,Detached House,Owner Occupied,,B,8.68,0.51,8.41,2023-08-27,0.63,2198,758,2.06,145,Very Low
+522,100081484695,48 Main Street,Belfast,Northern Ireland,DD47 1AB,50.56,-3.16,2003,Semi-Detached,Owner Occupied,,,7.82,0.35,8.48,2023-08-02,1.5,2145,433,1.68,165,
+523,100035336429,134 High Street,Birmingham,England,DD96 1AB,54.9,-7.32,1952,Detached House,Private Rent,Clyde Housing,A,7.6,0.29,3.52,2022-05-05,0.0,5184,1708,3.16,327,Very High
+524,100049192634,35 Station Road,Edinburgh,Scotland,AB59 2EF,52.25,-0.46,1974,Bungalow,Shared Ownership,City Council,D,9.15,0.97,7.78,2023-02-22,1.02,8069,885,5.83,4,High
+525,100069468685,158 Park Road,,Wales,EH97 5CD,50.51,-5.08,1951,Detached House,,City Council,A,1.32,0.02,8.98,2023-04-27,1.87,2891,1590,4.66,324,Very Low
+526,100052479571,138 Park Road,Inverness,Scotland,DD2 4EF,52.93,-1.27,1963,Semi-Detached,,Private Landlord,G,8.36,0.97,7.38,2023-11-05,1.31,9006,1428,5.14,21,Very High
+527,100042097875,80 Main Street,Edinburgh,Scotland,DD31 2AB,51.77,-1.63,1965,Bungalow,Social Rent,Clyde Housing,G,9.7,0.89,3.58,2022-06-22,0.47,2095,1038,7.7,50,Very Low
+528,100090809777,29 Station Road,Inverness,Scotland,G84 2EF,57.81,-1.45,1970,,Private Rent,,E,5.22,0.71,1.67,2023-10-22,0.39,5082,317,9.28,170,Very High
+529,100053136670,128 Main Street,Glasgow,Wales,AB56 3GH,54.66,-1.16,2019,High-Rise Flat,,Private Landlord,A,3.92,0.85,3.17,2021-10-18,0.88,7117,693,6.15,163,High
+530,100035798574,11 Main Street,Edinburgh,Northern Ireland,EH50 6GH,54.47,-3.66,1979,Terraced,Owner Occupied,,A,6.65,0.74,1.04,2025-02-23,0.66,4182,1727,4.11,88,Very Low
+531,100070067291,72 Park Road,London,Northern Ireland,DD41 2AB,50.42,-3.03,2019,,Shared Ownership,,C,6.92,0.27,7.2,2024-04-04,0.92,6702,451,4.57,18,High
+532,100030499510,119 High Street,Manchester,Wales,AB46 3CD,52.37,0.17,1968,Bungalow,Social Rent,,B,6.01,0.38,1.18,2021-09-25,1.52,3305,1926,1.46,43,Medium
+533,100032078632,47 Main Street,Aberdeen,,DD61 1EF,55.98,-3.26,2003,,Owner Occupied,Housing Association,E,2.84,0.55,2.45,2021-12-27,1.22,9692,873,4.31,210,
+534,100096157095,150 Main Street,Aberdeen,England,EH33 5CD,51.19,-6.31,2016,Apartment,Social Rent,Private Landlord,G,9.63,0.52,4.91,2025-03-20,1.88,6621,1459,1.43,267,Low
+535,100040195588,167 Main Street,London,Wales,DD2 7AB,52.51,-0.31,2012,Bungalow,Shared Ownership,,,2.87,0.15,8.72,2023-07-12,1.13,5549,664,2.74,298,Medium
+536,100016478748,66 Church Lane,Dundee,Scotland,G86 7CD,58.3,1.27,1995,Apartment,Social Rent,Housing Association,,5.88,0.5,2.24,2024-09-29,1.38,2207,1114,7.86,42,Low
+537,100063055477,132 Church Lane,Manchester,Northern Ireland,G82 8EF,58.97,-5.13,1962,High-Rise Flat,,,A,5.2,0.05,1.37,2025-08-27,1.91,1670,861,8.31,164,
+538,100060678713,34 Park Road,Glasgow,Scotland,G93 7AB,58.08,-1.47,2012,Detached House,Social Rent,City Council,B,2.15,0.99,5.22,2024-09-25,1.36,2217,1062,1.85,290,
+539,100050861751,199 Park Road,Belfast,Northern Ireland,DD41 4GH,54.57,1.91,1967,,Social Rent,Private Landlord,,5.98,0.85,3.16,2024-08-16,0.51,6020,1393,1.54,157,High
+540,100076750951,96 Main Street,Inverness,,EH91 5EF,56.61,-2.32,2009,Bungalow,,City Council,F,3.66,0.17,1.85,2021-01-10,1.93,6077,799,5.03,304,High
+541,100038077454,189 High Street,Birmingham,Northern Ireland,AB30 2CD,50.1,-5.44,2004,Apartment,,,G,4.91,0.24,7.56,2024-02-18,0.79,1058,238,5.72,323,High
+542,100050112314,146 High Street,Aberdeen,Wales,EH31 1CD,58.46,-0.46,2007,Detached House,Shared Ownership,Housing Association,D,3.99,0.71,8.98,2024-05-09,1.83,1984,1738,2.9,220,Very Low
+543,100043281842,101 High Street,Belfast,Northern Ireland,G19 7CD,52.74,-7.4,1964,High-Rise Flat,Private Rent,Clyde Housing,A,4.47,0.33,2.87,2023-06-03,0.11,9150,1771,5.02,249,Very High
+544,100097528625,85 Main Street,,Scotland,DD83 4AB,50.48,-2.76,1953,Detached House,Shared Ownership,Housing Association,F,8.78,0.88,1.63,2024-10-06,1.1,3334,1133,7.07,341,Very High
+545,100088776944,175 Station Road,Cardiff,,AB38 6GH,55.34,-2.22,2013,Semi-Detached,Social Rent,Private Landlord,A,3.27,0.03,9.07,2024-12-25,1.09,5105,647,9.96,110,
+546,100053373383,114 Station Road,,Scotland,EH89 7AB,58.61,-1.34,1988,Bungalow,Social Rent,City Council,F,1.68,0.47,5.0,2024-02-09,0.13,7523,1468,6.33,87,Low
+547,100020660864,106 Park Road,Inverness,,AB29 5AB,56.47,-5.48,1977,Terraced,Social Rent,Private Landlord,C,8.24,0.22,5.8,2022-05-16,0.18,9366,641,2.3,40,Very Low
+548,100059844413,98 High Street,Birmingham,Northern Ireland,G30 4GH,51.26,-3.37,1970,,Private Rent,Clyde Housing,D,6.47,0.14,7.54,2023-09-02,0.1,3868,1878,7.21,68,Low
+549,100016878173,64 Station Road,Dundee,,DD62 2AB,50.39,1.66,2008,Bungalow,Social Rent,Housing Association,E,3.07,0.17,4.58,2021-07-30,1.58,5298,845,2.21,149,Very Low
+550,100082645900,4 Main Street,Manchester,Wales,EH72 7EF,58.27,-4.64,1952,Detached House,Social Rent,Housing Association,,2.37,0.65,9.6,2021-05-21,0.98,9309,1945,5.81,108,Very High
+551,100085606236,71 Park Road,,,AB44 3CD,57.83,-0.47,1987,Detached House,Shared Ownership,,E,4.9,0.24,5.08,2022-10-18,1.56,1165,1910,8.45,4,High
+552,100099768937,7 Park Road,Dundee,,G82 5EF,51.3,-7.55,1958,Semi-Detached,,,D,2.69,0.21,1.0,2021-08-04,1.76,2032,1875,7.56,146,Very High
+553,100084021046,50 Park Road,Manchester,Wales,G40 8CD,55.03,-6.15,1953,High-Rise Flat,Social Rent,Private Landlord,,3.67,0.87,6.72,2021-04-13,1.74,3793,1971,6.98,292,Medium
+554,100039861305,173 Church Lane,Dundee,England,EH57 7EF,55.85,0.09,1971,Semi-Detached,,Housing Association,C,9.77,0.62,8.45,2021-05-11,1.69,2595,598,2.46,158,High
+555,100073609706,98 Main Street,Cardiff,Wales,AB86 7EF,54.18,-7.62,1953,Bungalow,,Private Landlord,,2.68,0.73,7.51,2025-10-12,0.73,3140,109,7.55,264,High
+556,100028961440,160 Main Street,Aberdeen,,EH52 8CD,58.2,-3.77,1962,Detached House,Owner Occupied,Housing Association,E,6.11,0.53,5.26,2021-09-24,1.21,5551,591,7.92,95,High
+557,100080512878,123 Park Road,London,Scotland,DD62 4CD,51.14,-6.35,1969,Semi-Detached,Owner Occupied,,D,6.89,0.39,1.03,2022-07-23,1.23,1673,1074,5.93,59,Very Low
+558,100073853465,127 Park Road,Aberdeen,Northern Ireland,EH23 5EF,56.63,-7.52,2007,Terraced,Private Rent,Private Landlord,,8.29,0.49,6.86,2023-07-18,1.77,3640,1422,3.26,349,High
+559,100069739786,19 Church Lane,Edinburgh,Wales,DD25 2GH,55.73,-6.04,1979,Semi-Detached,Owner Occupied,Private Landlord,A,7.14,0.33,1.03,2025-05-19,1.92,7160,1175,3.33,248,Medium
+560,100053974954,27 Main Street,London,Northern Ireland,AB10 6CD,52.14,-0.5,1992,Terraced,Shared Ownership,Private Landlord,G,1.64,0.83,2.44,2021-06-15,0.2,4626,1924,7.26,231,Low
+561,100097953793,169 Park Road,Manchester,England,EH27 4CD,51.97,-1.58,1988,,Shared Ownership,City Council,B,1.18,0.99,5.5,2024-08-05,0.74,4534,1786,2.45,79,Low
+562,100014645572,25 High Street,Cardiff,Scotland,DD14 4GH,57.51,-5.34,2021,Bungalow,Owner Occupied,Housing Association,D,5.02,0.08,8.71,2022-09-03,0.82,4998,615,7.29,129,Very High
+563,100030605122,64 High Street,Aberdeen,Wales,DD31 1EF,50.52,-5.72,1998,Detached House,,Private Landlord,C,4.82,0.58,9.18,2024-01-27,0.47,2758,593,8.83,250,Medium
+564,100064731025,168 Park Road,Manchester,,EH78 2AB,51.77,-4.68,1979,Semi-Detached,Shared Ownership,Clyde Housing,D,5.0,0.79,1.72,2023-08-08,0.72,6827,1714,7.69,133,Medium
+565,100093609342,192 Main Street,Manchester,,AB11 3EF,54.6,-5.12,1981,High-Rise Flat,,City Council,D,8.14,0.97,7.88,2021-09-27,1.12,2754,822,3.24,202,Very High
+566,100033899797,141 High Street,Belfast,England,G84 7CD,51.42,-6.03,2009,,Owner Occupied,Clyde Housing,D,8.82,0.42,2.06,2025-05-24,1.62,5072,1924,8.48,239,Medium
+567,100048892597,170 High Street,Aberdeen,Scotland,G95 2EF,56.67,-1.4,2007,Detached House,Shared Ownership,City Council,A,9.01,0.27,9.41,2022-12-08,1.5,4390,1706,7.46,181,
+568,100097149640,124 Church Lane,London,Scotland,G13 3EF,58.5,-7.15,1978,Semi-Detached,,Housing Association,D,6.28,0.37,1.56,2025-01-19,0.08,9718,1786,2.24,267,Low
+569,100030434715,64 Park Road,Belfast,Northern Ireland,AB55 1EF,54.61,-1.58,1953,Detached House,Social Rent,Private Landlord,C,1.28,0.96,1.61,2022-10-23,0.81,7524,851,1.55,148,Very Low
+570,100053644544,20 Park Road,Cardiff,,G16 6CD,51.39,-5.9,1995,Apartment,Social Rent,,,4.58,0.44,2.41,2022-02-08,0.11,3239,391,3.25,14,Medium
+571,100092248315,101 Station Road,Birmingham,England,DD95 5CD,54.53,-1.53,1966,Terraced,Shared Ownership,Housing Association,A,4.38,0.24,2.93,2025-08-15,1.39,1430,828,5.94,109,Medium
+572,100086100685,50 Park Road,Belfast,Scotland,G66 1AB,56.54,-3.13,1961,,Shared Ownership,Private Landlord,F,4.31,0.38,2.77,2025-10-26,0.47,9969,860,3.11,298,High
+573,100087662162,43 Park Road,Edinburgh,Wales,EH85 8CD,57.58,-0.7,2019,,Owner Occupied,Clyde Housing,D,6.11,0.73,9.09,2025-10-28,1.96,6630,848,4.49,72,
+574,100046306653,41 Station Road,Cardiff,,EH18 4CD,58.11,-2.04,2003,,Owner Occupied,Housing Association,C,5.06,0.98,9.53,2024-08-27,1.62,7642,369,8.45,220,
+575,100026563008,103 Church Lane,Glasgow,England,G80 5EF,55.1,-2.6,2016,Apartment,Private Rent,,C,2.38,0.82,8.74,2021-08-11,1.02,6970,1128,1.73,113,High
+576,100092425125,101 Church Lane,Aberdeen,Northern Ireland,EH20 1EF,50.08,0.14,1986,Apartment,Owner Occupied,Housing Association,B,6.3,0.64,3.35,2022-03-07,0.28,9381,425,1.27,213,Very High
+577,100037886624,170 Main Street,Aberdeen,Northern Ireland,DD81 8GH,53.24,-7.84,2012,Bungalow,,Housing Association,D,2.71,0.49,3.9,2022-01-12,1.71,916,1504,6.39,41,High
+578,100088450869,191 Main Street,Cardiff,England,DD17 6EF,56.05,-5.12,1957,High-Rise Flat,Owner Occupied,,,6.46,0.49,9.57,2021-05-10,1.41,949,140,9.14,38,Very High
+579,100081860983,52 Church Lane,Dundee,England,G73 5GH,57.06,-3.11,1967,Apartment,Social Rent,City Council,A,3.6,0.45,5.05,2023-08-03,1.06,3508,661,1.77,71,High
+580,100080813721,90 Station Road,Manchester,England,AB75 8GH,55.32,-0.02,2001,Terraced,Owner Occupied,City Council,D,3.77,0.62,9.22,2024-01-17,0.77,6028,698,5.64,50,Very High
+581,100032881271,87 High Street,London,,EH66 3CD,50.62,-7.59,1958,,,Clyde Housing,B,4.47,0.7,2.52,2021-04-30,1.04,2010,1758,8.61,335,High
+582,100013342201,60 Station Road,Dundee,England,EH78 1EF,54.61,-6.94,1967,Terraced,Shared Ownership,Private Landlord,B,8.07,0.45,4.08,2023-07-05,1.97,2445,1509,8.2,359,Medium
+583,100099203864,81 Park Road,Glasgow,Scotland,AB1 5CD,50.36,-0.89,1979,Apartment,Private Rent,Housing Association,,3.3,0.31,9.81,2025-09-26,1.73,4812,389,5.59,61,Low
+584,100030218178,95 Main Street,Cardiff,Scotland,G35 4CD,54.93,0.81,2004,High-Rise Flat,Owner Occupied,Private Landlord,D,7.55,0.94,8.76,2025-09-04,1.59,803,1418,2.98,72,High
+585,100097038342,195 Church Lane,Inverness,,AB55 2AB,50.7,-1.76,1997,High-Rise Flat,Shared Ownership,,A,6.09,0.75,4.84,2025-10-11,1.7,6608,432,8.12,136,Very High
+586,100071723742,134 Main Street,Inverness,Wales,G66 7EF,57.55,-0.66,2016,Terraced,Private Rent,Housing Association,,5.97,0.05,7.62,2025-01-26,1.17,1300,374,3.59,272,Very High
+587,100032017778,76 Main Street,Cardiff,England,DD1 3EF,54.96,-1.97,1993,Semi-Detached,Owner Occupied,City Council,A,1.73,0.9,2.69,2021-09-23,1.01,3366,1133,9.73,104,High
+588,100089963514,39 Church Lane,Inverness,Northern Ireland,EH31 8GH,55.07,-4.08,1987,Bungalow,Social Rent,Clyde Housing,B,3.38,0.67,1.92,2023-04-14,1.94,711,704,9.76,141,High
+589,100060569156,18 High Street,Belfast,England,G76 5GH,53.36,-4.86,1959,,Private Rent,Private Landlord,E,9.54,0.15,6.02,2022-04-07,0.33,8812,759,8.56,113,High
+590,100055950822,145 High Street,Cardiff,Scotland,EH80 2GH,58.03,0.82,2023,Bungalow,Owner Occupied,Housing Association,B,5.3,0.52,1.04,2023-03-25,1.43,2852,705,1.78,114,Very High
+591,100066945138,185 Station Road,Birmingham,,AB70 2EF,55.05,-6.64,1972,Apartment,Owner Occupied,Clyde Housing,C,8.3,0.99,3.37,2021-07-16,1.88,2196,1259,8.05,256,Very Low
+592,100023229722,6 Park Road,Birmingham,Scotland,EH59 2AB,58.09,-3.23,1988,Apartment,,City Council,B,5.67,0.13,9.71,2021-08-30,1.73,1230,1656,2.47,342,
+593,100011946483,41 Station Road,Belfast,Northern Ireland,DD43 6EF,58.99,-3.27,1953,Semi-Detached,Owner Occupied,Clyde Housing,F,5.48,0.6,5.61,2025-09-04,0.4,9061,1120,2.06,324,Low
+594,100053245605,130 Main Street,Belfast,England,EH79 3CD,50.6,0.61,1967,High-Rise Flat,Social Rent,,E,8.06,0.99,6.97,2025-05-02,2.0,5850,1745,3.46,117,Medium
+595,100085871708,60 Station Road,,Wales,DD23 2EF,54.52,0.89,1999,Terraced,Owner Occupied,Clyde Housing,D,5.5,0.05,7.8,2021-04-05,1.74,8041,651,8.1,114,Very High
+596,100077430115,117 Station Road,,,AB87 1EF,53.6,0.28,1982,,Social Rent,Housing Association,E,5.32,0.74,5.34,2021-05-18,0.21,531,1925,3.55,175,
+597,100056664345,181 Main Street,Glasgow,Wales,AB26 2AB,55.04,-1.56,2016,,Shared Ownership,,E,1.11,0.51,5.86,2022-04-11,0.81,9841,1916,6.31,124,High
+598,100021980634,82 Church Lane,Manchester,,G3 7CD,57.2,-0.41,2014,Apartment,Shared Ownership,,,9.55,0.77,8.04,2023-12-03,0.68,2207,105,9.42,317,Low
+599,100017962556,27 Main Street,Manchester,England,DD12 8AB,51.62,-0.43,1981,Semi-Detached,Social Rent,Clyde Housing,D,5.68,0.07,5.51,2021-09-26,0.51,8561,922,7.42,253,Very Low
+600,100060707908,173 Park Road,Dundee,,G96 4EF,58.96,-2.4,1981,Semi-Detached,Shared Ownership,City Council,E,4.26,0.1,8.14,2021-04-08,0.95,7900,616,4.02,298,Medium
+601,100049019502,142 Church Lane,Cardiff,Scotland,AB55 3GH,57.06,-4.52,1971,,Shared Ownership,Housing Association,E,4.37,0.61,6.88,2023-03-18,1.01,7634,867,6.96,184,
+602,100075425517,59 Main Street,Belfast,Northern Ireland,EH82 2CD,52.93,1.7,1979,Semi-Detached,,City Council,,1.89,0.77,9.53,2025-02-01,1.14,6059,285,4.54,40,Very Low
+603,100013936589,90 Station Road,Birmingham,England,G63 3CD,52.2,-2.27,1959,,Private Rent,,D,9.48,0.22,8.22,2024-07-08,0.92,9227,1628,6.64,160,High
+604,100092373438,12 Main Street,Inverness,Scotland,DD21 6AB,56.63,-1.35,2002,High-Rise Flat,,Clyde Housing,G,7.8,0.06,5.8,2023-12-25,1.3,1215,1221,5.07,33,Low
+605,100016686037,87 Church Lane,,Northern Ireland,AB59 3GH,50.96,-2.97,1962,,Shared Ownership,Clyde Housing,,8.78,0.88,4.74,2022-02-27,0.48,6610,890,8.53,225,Very Low
+606,100078305074,90 Station Road,Belfast,Northern Ireland,DD45 6EF,52.03,-7.43,1959,Terraced,Shared Ownership,Private Landlord,G,2.82,0.02,7.85,2021-12-20,1.37,4096,302,6.26,250,Medium
+607,100035372842,135 Church Lane,Aberdeen,Wales,EH10 6AB,50.85,-7.81,1992,Apartment,Social Rent,Housing Association,E,6.51,0.35,9.18,2025-03-14,1.0,1898,872,1.12,44,Very Low
+608,100031013786,184 Station Road,Aberdeen,Northern Ireland,EH70 2GH,52.62,-6.07,2005,Bungalow,Private Rent,City Council,A,7.05,0.02,4.14,2025-05-26,0.81,4719,427,5.86,331,
+609,100043583347,167 Main Street,Belfast,Northern Ireland,G79 6AB,57.02,-6.66,2004,Semi-Detached,Social Rent,Housing Association,G,9.78,0.75,6.1,2025-08-27,1.0,2607,240,8.53,142,
+610,100034946114,187 Park Road,Glasgow,,G13 6AB,56.2,-5.54,1988,Apartment,Social Rent,Housing Association,B,8.07,0.94,6.19,2022-02-07,0.37,1076,1596,6.94,238,High
+611,100014153071,155 Main Street,Edinburgh,Scotland,EH27 7AB,53.36,-5.82,1950,Apartment,Private Rent,,D,5.41,0.09,9.03,2023-11-02,0.07,3706,1775,5.82,228,
+612,100025688062,176 High Street,Belfast,,DD98 2CD,55.56,0.08,1961,High-Rise Flat,Social Rent,,F,3.11,0.09,3.25,2023-10-29,0.43,5026,217,4.35,70,Very High
+613,100077714092,177 Church Lane,Inverness,Northern Ireland,AB69 5GH,53.86,-4.78,2017,,Private Rent,Private Landlord,G,9.68,0.31,7.59,2025-09-26,0.31,3076,295,9.37,240,
+614,100067999619,4 Main Street,Dundee,Northern Ireland,G5 2EF,58.55,0.61,1973,Detached House,Social Rent,Private Landlord,C,3.69,0.83,9.1,2024-12-18,1.73,936,477,1.31,292,Low
+615,100033600835,86 Main Street,Edinburgh,Scotland,EH33 6GH,54.82,-1.87,1996,Apartment,,Private Landlord,B,4.97,0.7,7.66,2023-03-31,0.8,7109,760,3.81,216,Medium
+616,100090516781,136 Main Street,Belfast,,DD15 5CD,50.65,-0.87,2009,Bungalow,Social Rent,Clyde Housing,C,4.05,0.77,8.14,2021-11-20,1.2,2466,112,8.71,283,Medium
+617,100033289480,126 Church Lane,,Scotland,G57 5EF,58.58,-2.77,1960,Bungalow,,,,4.89,0.95,1.85,2021-03-16,1.46,7286,1652,5.08,66,Medium
+618,100097236066,171 Park Road,Aberdeen,England,EH93 2EF,58.26,-1.73,2007,Semi-Detached,Private Rent,City Council,E,9.98,0.41,9.73,2023-04-12,1.42,4615,1089,8.14,318,
+619,100045333529,131 Station Road,Birmingham,England,DD1 8GH,50.93,-5.47,1963,Bungalow,Shared Ownership,,D,1.07,0.75,4.77,2024-12-10,1.86,7499,1254,9.36,186,High
+620,100022400904,156 High Street,Aberdeen,Scotland,EH59 2EF,50.13,-7.84,2003,Semi-Detached,Social Rent,,,7.73,0.18,4.5,2022-05-06,1.78,6565,755,1.84,239,Low
+621,100094072901,157 Station Road,Edinburgh,,AB3 7AB,53.47,-5.32,2012,Apartment,Social Rent,Clyde Housing,F,5.93,0.08,5.74,2022-06-13,1.34,9497,131,4.88,14,
+622,100021168023,43 Church Lane,Edinburgh,Scotland,EH56 3GH,57.42,-6.27,1989,,Social Rent,Clyde Housing,,3.3,0.96,6.91,2025-09-30,1.1,3902,1590,7.27,24,Medium
+623,100024870361,141 Park Road,London,,G75 4AB,57.55,-0.31,1998,Bungalow,Social Rent,City Council,D,8.67,0.35,7.94,2025-01-05,0.55,3209,1572,4.9,187,Very High
+624,100023066971,105 Station Road,Manchester,Scotland,G3 8EF,51.36,-1.35,1976,Apartment,Social Rent,Housing Association,D,6.57,0.26,3.77,2022-06-02,0.87,1374,1427,2.47,0,Low
+625,100029192708,18 Church Lane,,Northern Ireland,G75 4CD,56.16,-0.99,1996,,Shared Ownership,City Council,A,6.74,0.12,6.11,2023-02-01,1.88,6663,316,5.48,358,Low
+626,100073577150,100 Station Road,Cardiff,Wales,G50 2CD,51.94,-3.11,1953,Detached House,Shared Ownership,City Council,C,7.04,0.89,4.77,2024-04-04,0.52,7419,872,1.19,311,Very Low
+627,100023242002,110 High Street,Aberdeen,,EH41 5AB,53.76,-2.18,1998,Apartment,Owner Occupied,Housing Association,C,7.41,0.78,2.4,2021-09-23,1.56,3949,1637,8.51,314,Very Low
+628,100082832860,110 Main Street,Inverness,Wales,DD78 7EF,54.1,1.74,1965,Apartment,Private Rent,Private Landlord,B,1.47,0.32,6.32,2024-09-28,1.07,2842,1918,5.37,350,High
+629,100085292654,21 Park Road,Glasgow,Northern Ireland,EH36 1GH,55.25,-4.01,1994,Apartment,,Private Landlord,C,9.61,0.62,6.12,2024-09-23,0.54,712,320,8.38,95,High
+630,100075811250,49 Main Street,Inverness,,G23 8CD,56.92,-6.99,2014,High-Rise Flat,Private Rent,Housing Association,F,5.08,0.48,9.72,2021-08-19,1.7,2053,558,7.28,126,Low
+631,100081948956,151 Church Lane,Birmingham,England,G63 6GH,50.56,-4.84,1960,Terraced,Social Rent,Private Landlord,G,6.17,0.64,4.34,2022-05-19,1.75,683,576,5.25,6,
+632,100062355705,83 Main Street,Birmingham,Northern Ireland,AB23 3CD,50.11,-0.23,2008,High-Rise Flat,Shared Ownership,Housing Association,C,6.43,0.94,8.57,2021-07-21,0.2,9966,480,1.9,233,Low
+633,100032598522,59 Church Lane,Aberdeen,Scotland,AB4 2AB,50.38,0.69,1952,High-Rise Flat,Shared Ownership,City Council,G,6.95,0.3,9.72,2023-07-13,0.67,8733,1128,7.59,239,High
+634,100055448383,150 Main Street,Cardiff,England,G67 5AB,50.67,-3.34,1969,Semi-Detached,Social Rent,,G,8.5,0.79,8.61,2024-09-19,1.41,5401,527,4.75,211,Medium
+635,100088284510,167 Main Street,London,Northern Ireland,AB97 7AB,56.89,1.69,2015,Bungalow,,Private Landlord,C,5.68,0.78,3.58,2023-12-04,1.79,4319,1149,8.58,335,Low
+636,100070014747,105 Main Street,Inverness,Wales,G79 1GH,56.29,-1.78,2014,Apartment,Private Rent,Clyde Housing,B,3.4,0.6,8.28,2022-01-06,0.61,5872,795,9.76,333,Very High
+637,100036076187,127 Main Street,Inverness,Scotland,EH81 8CD,58.12,-4.45,1955,Terraced,Shared Ownership,,E,1.91,0.94,6.21,2023-10-26,1.82,4822,960,3.03,125,Very Low
+638,100062017220,101 Station Road,Inverness,Wales,AB36 4AB,56.21,-5.01,1986,Apartment,Shared Ownership,City Council,G,5.89,0.87,5.06,2022-07-23,0.54,9516,660,1.63,36,High
+639,100095055331,199 Church Lane,Belfast,England,DD95 6GH,54.19,-6.91,2019,Semi-Detached,Owner Occupied,Housing Association,,6.02,0.47,6.91,2021-07-03,0.75,9837,1715,1.7,272,High
+640,100040621641,92 Park Road,Manchester,Wales,EH23 7CD,54.37,-2.19,1989,,Shared Ownership,Clyde Housing,F,6.44,0.81,9.81,2022-01-28,0.42,9497,933,5.02,177,Very High
+641,100062726802,112 Main Street,Belfast,Northern Ireland,AB41 7EF,54.17,-3.62,1991,High-Rise Flat,Shared Ownership,Private Landlord,B,3.58,0.52,3.45,2024-03-13,0.53,5906,297,8.89,55,Medium
+642,100074104927,165 Station Road,Belfast,England,EH86 1EF,51.76,-1.01,1968,High-Rise Flat,Social Rent,Private Landlord,G,2.65,0.46,1.84,2024-05-25,1.3,3659,1682,3.36,127,High
+643,100081152833,22 Park Road,Manchester,,DD37 2AB,53.57,-0.11,2017,Semi-Detached,Private Rent,Private Landlord,D,5.59,0.98,8.59,2022-03-28,1.29,9363,1433,2.13,288,
+644,100080386160,22 Station Road,London,Scotland,DD29 3GH,58.6,-4.73,1986,Detached House,Social Rent,Housing Association,,7.38,0.28,1.74,2024-08-07,1.04,7328,1607,8.57,220,Medium
+645,100055249524,114 Station Road,Inverness,Scotland,DD79 7AB,52.49,-2.49,1967,Apartment,Owner Occupied,,,7.15,0.27,4.08,2020-12-26,0.9,5669,1710,3.06,121,Very High
+646,100057702310,138 High Street,Inverness,Wales,G77 7GH,54.34,-0.27,2003,Semi-Detached,,City Council,,9.81,0.17,9.0,2022-05-17,1.7,9021,1561,7.96,220,Low
+647,100022153025,150 Church Lane,Cardiff,,EH31 4EF,53.91,1.25,1985,High-Rise Flat,Shared Ownership,Private Landlord,G,4.09,0.46,7.63,2023-08-20,1.9,7359,919,5.18,53,Medium
+648,100032447415,177 Park Road,,Scotland,AB69 1CD,54.88,-2.3,1953,,Private Rent,City Council,G,4.09,0.14,2.58,2024-03-14,1.6,796,1126,5.64,236,Low
+649,100091632010,120 Main Street,Aberdeen,,G26 3CD,50.75,-1.01,2010,Apartment,,Housing Association,,7.78,0.49,4.52,2024-10-09,1.19,2408,741,2.0,278,Very High
+650,100021374161,27 High Street,London,Northern Ireland,EH77 4CD,50.76,-2.06,1981,Semi-Detached,Private Rent,Private Landlord,G,3.71,0.19,7.57,2023-10-30,0.85,8037,367,6.5,301,Medium
+651,100068682992,132 Main Street,Dundee,England,DD97 3GH,56.39,-5.26,1985,High-Rise Flat,,,G,2.34,0.92,4.74,2021-03-12,0.35,5253,1227,5.14,217,High
+652,100054584104,54 Station Road,Dundee,Scotland,DD45 1GH,55.74,-7.82,2018,Apartment,Shared Ownership,,,6.06,0.89,2.32,2021-12-03,1.37,2496,294,6.75,288,Low
+653,100039115180,98 Church Lane,Dundee,Wales,DD36 4AB,57.4,-7.82,1974,Apartment,Owner Occupied,Housing Association,G,4.49,0.52,5.68,2023-05-05,1.62,9185,1426,6.4,132,Very Low
+654,100022985751,52 Church Lane,Dundee,Wales,EH12 7AB,56.41,-0.53,1983,High-Rise Flat,Owner Occupied,Private Landlord,E,5.74,0.89,6.36,2022-08-27,1.47,7013,486,2.84,40,
+655,100053749336,89 Park Road,Inverness,Northern Ireland,G77 1CD,50.03,-0.84,1965,,Private Rent,Clyde Housing,A,7.4,0.79,1.06,2023-08-18,1.61,3259,651,5.62,161,Very High
+656,100010853399,16 Main Street,London,,AB84 2GH,58.84,-1.37,1967,High-Rise Flat,,,F,5.62,0.57,9.87,2024-07-30,1.1,4919,1969,8.52,250,Medium
+657,100053401572,112 Main Street,London,Scotland,G39 1EF,57.7,0.04,1974,High-Rise Flat,Shared Ownership,Housing Association,G,6.42,0.69,6.03,2022-07-04,1.85,3786,192,1.58,31,Very High
+658,100092389695,23 Park Road,Inverness,Northern Ireland,EH29 6EF,56.65,-6.63,1977,Detached House,,,B,8.76,0.41,2.29,2022-02-14,1.83,7292,844,8.51,328,Very Low
+659,100082397064,110 High Street,Cardiff,,EH90 7GH,54.6,-6.91,1955,Terraced,Shared Ownership,Private Landlord,F,7.46,0.98,8.32,2022-12-24,1.67,7056,655,7.79,301,Medium
+660,100066320582,79 Park Road,Manchester,Wales,G58 1AB,55.91,-5.44,1991,,Social Rent,Private Landlord,C,3.23,0.86,9.72,2021-12-23,0.52,5245,1619,5.17,48,High
+661,100076594406,30 Station Road,Inverness,Wales,AB55 4GH,58.9,-0.48,1976,High-Rise Flat,Social Rent,Clyde Housing,G,2.57,0.21,7.32,2023-08-22,1.38,2326,1617,4.8,85,High
+662,100096163481,149 Station Road,Edinburgh,England,G64 8CD,52.1,-2.95,1954,Detached House,Owner Occupied,,G,4.46,0.22,8.92,2024-05-12,1.04,3813,563,1.27,240,Medium
+663,100025380176,177 Main Street,Belfast,Scotland,EH2 3EF,57.67,-4.42,2008,Terraced,Private Rent,,,6.79,0.31,4.93,2023-05-16,0.78,7864,272,1.33,316,High
+664,100043767438,46 Main Street,Inverness,Wales,DD31 2CD,55.01,-1.88,1997,Semi-Detached,Social Rent,Private Landlord,D,9.46,0.65,5.34,2024-04-20,1.14,5843,1739,4.04,233,Medium
+665,100070259098,60 Station Road,Inverness,Scotland,DD30 5EF,58.93,-2.8,2009,Detached House,Social Rent,Private Landlord,B,6.61,0.78,7.44,2024-01-09,0.1,5941,884,9.03,53,Medium
+666,100098068314,63 Main Street,Glasgow,Scotland,G97 1EF,56.93,-5.73,2013,Detached House,Private Rent,Housing Association,B,4.25,0.39,9.63,2025-07-22,0.74,4686,896,7.91,335,High
+667,100092940410,187 Park Road,Cardiff,Wales,DD79 3EF,51.13,-7.92,1995,Semi-Detached,,City Council,A,9.4,0.14,8.39,2024-10-28,1.28,7950,1555,5.91,74,High
+668,100040834020,64 Main Street,Cardiff,Northern Ireland,EH7 1EF,51.37,-7.74,2023,Bungalow,,Housing Association,D,9.99,0.73,8.16,2021-12-08,1.11,7124,1059,3.65,13,Low
+669,100054957578,83 Station Road,Inverness,Northern Ireland,G68 3EF,54.69,-0.65,2014,Apartment,Owner Occupied,Private Landlord,F,6.43,0.97,3.6,2025-08-27,1.36,7798,814,4.98,95,Very High
+670,100020091455,89 High Street,Edinburgh,Northern Ireland,EH64 4GH,52.15,-5.08,2014,Semi-Detached,Shared Ownership,Clyde Housing,G,4.94,0.39,9.11,2023-09-18,1.39,852,1848,5.9,302,
+671,100012630900,195 Park Road,Glasgow,,AB75 5CD,52.16,-6.33,1954,Bungalow,Private Rent,Housing Association,E,4.71,0.36,9.55,2025-01-15,0.38,9932,1886,7.68,78,Medium
+672,100067599290,101 Church Lane,Inverness,Northern Ireland,EH47 8EF,52.05,0.15,1958,Semi-Detached,Private Rent,City Council,,4.06,0.62,6.8,2024-12-09,0.1,2394,1494,3.99,281,Low
+673,100027372897,167 High Street,Cardiff,Northern Ireland,G81 3CD,54.6,-0.66,2006,Terraced,Private Rent,Clyde Housing,C,7.07,0.3,9.89,2025-11-17,0.82,9393,631,1.95,267,Low
+674,100088495215,151 Station Road,Belfast,,DD74 5AB,58.58,-6.06,1989,Terraced,Owner Occupied,Private Landlord,D,7.13,0.79,7.95,2025-07-23,0.43,2064,1801,4.72,237,Very High
+675,100014051413,1 Station Road,,Northern Ireland,AB75 5AB,51.23,-5.6,1953,Semi-Detached,,Private Landlord,A,6.44,0.19,7.44,2021-02-13,1.03,938,1670,5.7,39,Very Low
+676,100069100694,183 High Street,Cardiff,Scotland,G13 1EF,53.49,-0.35,1992,Semi-Detached,Private Rent,Housing Association,D,9.73,0.81,5.79,2024-03-21,0.31,6991,1368,3.92,116,Very Low
+677,100044703943,84 Church Lane,Manchester,,DD92 8GH,58.11,-1.6,1988,Bungalow,Private Rent,Clyde Housing,A,3.13,0.2,9.79,2024-11-05,0.4,9597,143,1.48,79,
+678,100042408415,159 Church Lane,Inverness,Wales,DD10 2GH,50.77,-3.07,1988,Detached House,Private Rent,City Council,,2.95,0.52,8.9,2023-07-17,1.44,7921,858,4.74,31,Low
+679,100067778127,195 Park Road,London,Scotland,DD87 8GH,56.73,-3.63,1998,Detached House,Social Rent,Housing Association,C,2.46,0.09,4.09,2022-11-01,0.13,1468,688,1.35,344,Very High
+680,100030633143,28 Church Lane,Dundee,Northern Ireland,AB65 3EF,54.8,-0.5,1961,Terraced,Private Rent,City Council,B,1.06,0.27,8.96,2024-12-12,0.58,8579,649,7.2,228,Medium
+681,100013206133,6 Main Street,,Wales,G63 4EF,51.7,-7.46,1970,Bungalow,Shared Ownership,Housing Association,A,3.27,0.58,4.46,2022-06-04,1.65,7683,1468,4.38,296,Very High
+682,100080236398,41 High Street,Glasgow,Northern Ireland,G76 2CD,52.78,-0.09,1966,Detached House,Private Rent,,E,8.57,0.79,2.66,2022-02-18,1.15,8136,1391,6.81,107,Very Low
+683,100092558818,160 Station Road,Dundee,England,DD47 5CD,56.25,1.59,2014,,Social Rent,Clyde Housing,,3.08,0.56,9.4,2025-10-20,1.59,8484,1402,7.76,335,Medium
+684,100072908537,105 Church Lane,Inverness,,DD48 3EF,50.22,-6.71,1969,,Owner Occupied,Private Landlord,,2.59,0.24,3.13,2021-07-10,0.74,7343,1389,5.14,135,Very High
+685,100087428543,136 Station Road,London,Wales,G51 2GH,57.44,-2.73,1988,High-Rise Flat,Owner Occupied,City Council,E,7.11,0.73,6.96,2023-02-28,0.02,9318,1086,7.91,302,
+686,100043815879,91 Park Road,London,England,AB84 1EF,52.53,-5.94,2001,High-Rise Flat,Shared Ownership,Private Landlord,E,1.79,0.94,5.13,2020-12-14,1.61,2243,400,1.54,349,Medium
+687,100020516257,98 Church Lane,Aberdeen,Northern Ireland,DD97 8CD,56.03,-1.05,1968,Detached House,,Housing Association,G,3.8,0.82,3.57,2025-07-06,0.89,3602,966,1.38,252,Very High
+688,100031867215,18 High Street,Cardiff,England,EH20 4EF,58.28,1.91,2009,High-Rise Flat,,Clyde Housing,E,7.39,0.7,7.64,2021-09-22,0.48,5276,445,4.76,274,High
+689,100098339335,191 Main Street,London,Northern Ireland,DD84 8GH,58.24,1.82,2006,Bungalow,,,A,1.24,0.77,3.17,2022-10-04,0.29,6347,353,8.16,214,
+690,100040438320,46 Station Road,London,Wales,DD94 3AB,54.99,1.78,1962,Apartment,Owner Occupied,Clyde Housing,A,9.78,0.17,2.98,2024-08-02,1.1,9928,1381,5.64,213,High
+691,100060461184,155 Church Lane,Belfast,England,DD68 4AB,53.36,1.78,1966,Bungalow,,,B,1.61,0.85,8.38,2023-11-12,1.31,2552,679,4.11,121,High
+692,100092358328,128 Main Street,Glasgow,Wales,AB71 5EF,58.54,-6.13,2021,Terraced,Owner Occupied,Clyde Housing,F,8.29,0.67,4.16,2022-06-07,1.83,3942,223,2.87,71,Very Low
+693,100048639113,159 Church Lane,Edinburgh,,EH84 5CD,51.29,0.39,2012,Apartment,Private Rent,City Council,G,3.74,0.66,8.62,2021-11-26,1.18,6311,738,1.34,77,Very High
+694,100026859656,154 High Street,Aberdeen,England,EH44 7EF,57.12,1.15,2002,Terraced,Private Rent,Private Landlord,F,9.99,0.35,7.49,2024-07-17,1.94,1338,688,4.24,205,
+695,100021495179,167 Station Road,Aberdeen,Scotland,EH27 7GH,56.9,-3.93,1967,Apartment,,City Council,B,3.2,0.02,1.62,2024-05-13,0.75,2483,1529,5.27,359,Medium
+696,100092268597,190 Station Road,Belfast,,G29 4EF,58.65,1.61,2016,High-Rise Flat,Shared Ownership,,C,1.5,0.63,1.49,2021-08-13,0.53,2316,1292,6.62,315,
+697,100094122139,73 High Street,Manchester,,AB7 1AB,55.4,-2.65,1976,Terraced,Owner Occupied,Private Landlord,G,2.53,0.68,1.05,2023-07-23,1.22,8327,1498,1.29,158,Very Low
+698,100076224087,117 Park Road,London,,G39 3GH,58.05,1.63,2006,Semi-Detached,,Clyde Housing,F,6.21,0.77,3.8,2022-07-02,0.85,5085,902,6.28,29,High
+699,100048931625,75 High Street,Aberdeen,Wales,EH24 8GH,51.09,-1.92,1986,Bungalow,Social Rent,Housing Association,A,3.03,0.13,5.9,2025-06-04,0.54,5832,667,8.79,72,Low
+700,100058095790,106 Park Road,London,,EH18 1GH,58.58,1.51,2003,Detached House,Private Rent,Private Landlord,E,5.11,0.53,3.65,2025-03-29,1.62,3373,213,3.35,277,Very High
+701,100077593063,28 Church Lane,Edinburgh,England,EH3 2EF,53.74,1.97,1962,High-Rise Flat,Private Rent,City Council,F,1.67,0.96,1.42,2024-08-02,1.09,6621,1202,2.25,133,Very Low
+702,100038186584,128 Station Road,Inverness,Wales,EH68 5AB,58.78,-1.27,1974,Bungalow,Private Rent,,D,6.59,0.01,3.89,2023-08-12,1.97,7195,1670,2.57,3,High
+703,100010093707,171 Main Street,Aberdeen,,DD58 3EF,50.72,-2.69,1955,High-Rise Flat,Owner Occupied,City Council,A,1.69,0.15,9.31,2023-01-30,0.13,2592,403,2.5,194,
+704,100056906333,53 Station Road,Manchester,Scotland,EH23 4AB,51.39,-5.97,1965,Bungalow,Private Rent,City Council,C,7.65,0.34,8.86,2021-05-20,0.4,1128,418,3.05,202,High
+705,100047101329,118 High Street,Cardiff,Scotland,G75 7AB,54.28,-3.3,1966,Semi-Detached,Social Rent,Housing Association,B,2.11,0.65,7.75,2022-12-23,1.64,5742,1978,6.27,234,
+706,100084520026,120 Main Street,Cardiff,England,G78 3CD,56.72,-5.22,1963,Bungalow,,Clyde Housing,A,6.14,0.7,9.01,2024-09-10,0.35,871,1896,9.29,32,
+707,100020041852,8 Main Street,Manchester,England,EH59 5GH,58.83,-6.84,1963,,Shared Ownership,Housing Association,F,8.92,0.08,5.26,2025-04-09,1.51,5864,1187,6.09,92,
+708,100016963890,62 Church Lane,,England,DD57 5EF,53.22,-0.91,2003,Terraced,,City Council,E,2.18,0.05,6.03,2021-08-30,1.55,5444,920,4.81,224,Very Low
+709,100098527888,34 Church Lane,Dundee,Northern Ireland,EH98 2CD,52.66,-4.67,1993,Detached House,Private Rent,Clyde Housing,F,2.55,0.44,6.45,2023-04-27,0.73,1881,243,4.18,344,Medium
+710,100040848283,97 Main Street,Cardiff,Scotland,DD37 7AB,51.18,0.42,1999,,Owner Occupied,City Council,G,1.25,0.71,2.26,2021-10-19,1.62,3893,1977,8.17,88,Very High
+711,100030775678,9 High Street,Dundee,Northern Ireland,EH84 4CD,51.55,-5.08,1986,Detached House,Shared Ownership,City Council,F,2.76,0.07,4.01,2025-09-19,1.49,9016,1599,7.7,240,Very High
+712,100017340630,82 Station Road,,Northern Ireland,EH75 7AB,52.23,0.28,1994,Apartment,Private Rent,City Council,,7.28,0.99,8.04,2023-05-20,0.16,9966,412,3.84,309,Very Low
+713,100084608820,185 Church Lane,,Northern Ireland,G64 2GH,50.09,-5.32,2010,Detached House,Social Rent,,A,2.5,0.84,5.06,2023-01-06,0.1,2076,1095,4.78,346,High
+714,100059986916,95 Park Road,Cardiff,Wales,AB4 8AB,57.82,1.94,1961,,Shared Ownership,Housing Association,D,5.56,0.97,1.48,2021-09-12,0.82,784,1687,4.74,117,
+715,100072315117,177 Main Street,Manchester,Northern Ireland,G76 4CD,53.86,-5.03,1958,Detached House,Shared Ownership,City Council,A,4.93,0.64,7.21,2024-03-29,0.19,4360,939,4.02,203,High
+716,100089654541,169 High Street,Birmingham,England,AB68 6EF,55.85,0.4,1973,Terraced,Shared Ownership,City Council,D,3.29,0.99,2.52,2021-03-26,1.02,4470,104,3.47,316,Medium
+717,100011728357,119 High Street,,Scotland,AB80 1AB,57.96,-3.23,1985,Semi-Detached,,Private Landlord,G,3.05,0.32,6.52,2024-01-29,1.13,4422,1958,9.68,66,High
+718,100048297627,74 Park Road,Manchester,England,G25 7GH,51.72,-2.16,1988,Detached House,Social Rent,Clyde Housing,G,9.68,0.11,2.12,2025-06-28,1.16,1900,1719,3.61,260,High
+719,100021348609,189 High Street,Cardiff,,G45 7CD,57.34,-4.78,2007,Apartment,Social Rent,Clyde Housing,,2.18,0.48,2.84,2021-05-31,1.3,8858,817,3.87,256,Medium
+720,100025523347,165 Church Lane,Birmingham,Wales,G33 4GH,51.89,-5.14,2004,Detached House,Shared Ownership,,F,1.52,0.13,7.35,2022-07-31,0.78,3950,770,2.21,98,High
+721,100064570034,169 Park Road,Dundee,,DD61 5AB,51.55,-7.43,1998,,Social Rent,Private Landlord,D,8.16,0.12,9.0,2024-10-21,0.85,815,1998,2.63,203,Very High
+722,100075019078,34 Main Street,Aberdeen,,DD44 1AB,56.07,1.75,2006,,Social Rent,Housing Association,D,3.39,0.12,8.72,2024-10-01,1.74,8591,1710,3.68,247,Medium
+723,100072477582,77 Main Street,Manchester,,AB90 3CD,58.96,-5.51,1998,Detached House,Shared Ownership,City Council,,5.96,0.46,1.03,2021-05-17,0.29,2864,1327,8.4,159,Very Low
+724,100090656104,153 Station Road,,Scotland,DD39 1CD,56.43,-6.05,1981,,Owner Occupied,City Council,F,1.73,0.09,2.28,2023-06-25,0.68,2823,1407,1.47,135,Medium
+725,100065677635,164 Main Street,Glasgow,Wales,G72 8EF,53.24,-1.86,1994,Detached House,,Private Landlord,F,2.43,0.9,7.42,2021-06-06,1.57,7669,697,1.01,332,Low
+726,100033799431,33 Station Road,Edinburgh,Wales,EH66 2GH,50.89,-4.24,1998,Apartment,Private Rent,Housing Association,,6.08,0.57,7.83,2025-11-05,0.33,2753,1654,2.1,169,Very High
+727,100015236074,197 Church Lane,Belfast,,G55 2EF,53.12,-1.79,1959,,,,C,3.18,0.52,8.79,2022-05-15,0.27,6810,1610,7.71,314,Medium
+728,100070149065,176 Park Road,,England,EH69 2GH,52.34,-0.83,1970,Bungalow,,Housing Association,A,4.05,0.67,9.57,2022-01-28,1.02,7925,1129,2.19,23,Medium
+729,100018561055,147 Church Lane,Edinburgh,Northern Ireland,G91 4CD,53.77,-4.49,1959,Semi-Detached,,Housing Association,C,7.83,0.78,7.67,2022-10-02,0.06,6918,1558,5.94,30,Low
+730,100035469028,183 Main Street,Edinburgh,Scotland,G76 7EF,54.25,-6.53,1974,High-Rise Flat,Shared Ownership,Housing Association,D,3.58,0.31,6.58,2025-08-21,0.07,2188,1571,2.8,194,High
+731,100088778303,184 Station Road,Belfast,Wales,EH77 4EF,56.64,-6.01,2002,Terraced,Owner Occupied,Clyde Housing,A,1.86,0.75,4.54,2023-10-24,0.55,2097,1043,3.46,353,Very Low
+732,100073324912,98 Station Road,Birmingham,Scotland,AB67 3AB,56.29,1.6,1960,Detached House,Owner Occupied,Clyde Housing,D,5.64,0.85,2.16,2023-08-25,1.64,8394,1299,3.12,184,Low
+733,100069939939,115 High Street,Dundee,Northern Ireland,AB54 6AB,52.78,1.09,1983,Terraced,,Clyde Housing,G,6.64,0.47,3.71,2023-07-20,0.37,9730,304,7.83,206,Medium
+734,100079797682,71 High Street,Edinburgh,,AB68 1EF,52.38,1.28,1999,High-Rise Flat,Owner Occupied,Housing Association,F,9.16,0.74,6.89,2021-03-27,0.95,5225,944,7.96,362,
+735,100099396038,160 High Street,Inverness,Scotland,G50 4CD,56.72,0.72,1991,Apartment,Private Rent,Private Landlord,A,8.59,0.68,6.09,2024-02-20,1.75,8682,1732,9.63,98,
+736,100073921876,182 Park Road,Glasgow,Northern Ireland,DD53 2AB,51.76,1.27,1975,Semi-Detached,Private Rent,Private Landlord,D,1.62,0.84,7.49,2023-08-07,0.55,6046,696,9.31,315,High
+737,100064658220,171 High Street,Dundee,,G81 2AB,52.13,-3.71,1969,Apartment,Owner Occupied,Housing Association,F,3.2,0.77,9.23,2025-02-03,0.19,2959,687,7.65,179,Medium
+738,100011115807,12 Church Lane,Dundee,,AB49 3CD,53.94,0.87,2000,Terraced,Social Rent,Private Landlord,B,8.89,0.17,5.96,2022-05-30,0.92,2851,1106,4.29,215,
+739,100016452307,60 Station Road,London,Northern Ireland,DD62 5CD,54.66,-5.0,1953,Apartment,Shared Ownership,Private Landlord,B,4.79,0.91,5.98,2021-10-17,0.42,8446,377,5.42,283,Very Low
+740,100094501672,74 Main Street,London,England,EH27 7CD,58.3,-3.99,2004,Apartment,Owner Occupied,Housing Association,D,5.03,0.23,3.13,2022-10-23,1.85,9327,1882,8.95,210,
+741,100013166673,170 High Street,London,Scotland,G3 8GH,50.81,-2.93,1955,High-Rise Flat,,Private Landlord,B,5.91,0.23,3.71,2023-09-22,1.76,6878,931,9.88,185,Very Low
+742,100015411103,4 Main Street,Edinburgh,,AB36 4EF,55.95,-4.46,1970,Terraced,Shared Ownership,Clyde Housing,,6.09,0.18,7.53,2022-07-12,0.49,8267,1419,9.55,31,Very Low
+743,100070560583,27 Main Street,Edinburgh,Northern Ireland,DD35 5EF,58.16,-0.55,1969,High-Rise Flat,Owner Occupied,Housing Association,E,2.36,0.65,2.8,2024-11-27,1.81,5583,1869,5.7,90,Very Low
+744,100032773710,33 Park Road,Birmingham,Wales,G94 1CD,52.73,1.48,1952,Semi-Detached,Shared Ownership,Clyde Housing,A,9.98,0.55,2.07,2023-04-01,0.89,5984,639,2.91,302,Very High
+745,100082434372,180 Station Road,Edinburgh,Northern Ireland,EH87 7EF,55.38,-2.0,1954,Detached House,Social Rent,Housing Association,E,7.06,0.57,5.09,2022-08-01,0.87,9955,1904,2.42,127,Very High
+746,100085332413,187 Park Road,Edinburgh,England,G32 8EF,53.97,1.91,1962,Apartment,,Housing Association,D,9.16,0.19,1.97,2020-12-07,0.75,5623,1687,7.01,307,High
+747,100015027340,131 Church Lane,Belfast,,EH94 1EF,55.38,-5.28,1969,Bungalow,Owner Occupied,,F,4.87,0.78,7.98,2025-03-08,0.5,1056,1962,2.85,182,Low
+748,100049139162,61 Station Road,Dundee,Northern Ireland,AB33 5CD,50.6,-6.31,1977,High-Rise Flat,Private Rent,,E,6.95,0.33,3.41,2023-01-19,1.68,865,230,8.65,140,Medium
+749,100041249109,140 Station Road,Belfast,,DD20 3EF,54.87,-4.94,1952,Bungalow,Shared Ownership,Housing Association,F,9.0,0.58,9.75,2021-12-07,1.84,9287,1776,2.6,141,Low
+750,100092470772,180 Main Street,Glasgow,Northern Ireland,EH93 5GH,53.8,-4.99,2006,Bungalow,Shared Ownership,Clyde Housing,,1.43,0.64,8.76,2023-01-10,1.5,5974,1596,6.9,330,
+751,100070666156,17 Park Road,Edinburgh,Scotland,G79 6GH,54.32,-2.52,2006,,Social Rent,City Council,B,2.68,0.1,7.26,2023-10-09,0.73,2241,1585,9.04,302,Very High
+752,100038479431,18 High Street,Dundee,Northern Ireland,G36 7AB,51.05,-6.37,2012,Semi-Detached,,Clyde Housing,A,2.2,0.1,1.49,2022-07-17,0.97,2296,891,7.67,37,
+753,100031200052,164 Park Road,Aberdeen,Scotland,AB47 2EF,56.85,-4.65,1977,Terraced,Social Rent,Private Landlord,G,9.57,0.56,7.74,2024-09-25,1.64,4684,1700,9.78,217,High
+754,100078019201,9 Main Street,Aberdeen,Northern Ireland,AB20 6EF,56.15,-3.81,2014,Terraced,Private Rent,Clyde Housing,D,2.29,0.12,1.87,2023-07-02,0.94,1890,465,4.69,257,Medium
+755,100066085493,27 Main Street,Cardiff,,G55 4GH,58.73,1.89,1980,High-Rise Flat,,City Council,D,2.16,0.25,4.55,2025-09-28,0.36,5847,1980,4.6,346,Very High
+756,100063808956,131 High Street,Manchester,Northern Ireland,DD29 1GH,56.04,-7.15,1964,Detached House,Owner Occupied,Housing Association,B,7.03,0.06,4.67,2023-07-15,1.81,8326,1123,4.2,277,Very Low
+757,100027792473,12 Church Lane,Aberdeen,Wales,AB89 3GH,50.75,-7.23,1977,Semi-Detached,Owner Occupied,Clyde Housing,C,2.84,0.29,4.7,2022-12-20,1.79,8556,875,5.37,171,Very High
+758,100011104258,58 Church Lane,Edinburgh,Wales,AB70 5GH,51.75,-5.11,2018,Semi-Detached,Social Rent,,,2.23,0.21,8.65,2022-06-27,1.91,3562,1069,2.52,160,
+759,100087469861,123 Main Street,Inverness,England,G73 8CD,55.88,-4.89,1978,,Social Rent,Private Landlord,F,5.0,0.23,4.49,2025-06-03,1.57,6163,1540,3.91,214,Very Low
+760,100047023971,27 Station Road,Edinburgh,Northern Ireland,DD37 1CD,58.17,-7.86,1967,Apartment,Shared Ownership,Private Landlord,E,7.19,0.05,9.3,2022-10-07,1.6,533,1098,9.44,261,Low
+761,100056329665,98 High Street,London,,AB70 3GH,56.73,-3.01,2007,,Social Rent,Housing Association,F,8.66,0.2,6.11,2023-12-07,1.36,3075,674,3.46,267,High
+762,100082661835,179 Station Road,London,England,G90 5GH,54.15,-6.64,1967,Detached House,,,B,4.49,0.09,9.78,2023-03-05,0.55,3986,322,7.1,229,Very High
+763,100097912062,105 High Street,Birmingham,Scotland,G84 4GH,52.1,-0.15,1980,Semi-Detached,Owner Occupied,Housing Association,C,1.85,0.98,2.93,2022-04-13,1.45,5247,1162,8.51,152,Low
+764,100015489168,61 Station Road,Aberdeen,,EH5 8GH,51.82,-4.7,1962,Semi-Detached,,Private Landlord,,4.67,0.69,5.09,2025-11-16,1.74,1810,808,1.03,362,Low
+765,100010839533,68 Church Lane,Cardiff,Northern Ireland,DD45 3GH,52.74,-3.06,1991,Apartment,Shared Ownership,,F,7.71,0.85,7.04,2022-07-24,1.03,6447,633,7.3,329,High
+766,100081684449,179 Station Road,Edinburgh,,AB12 5AB,56.55,-3.02,1978,Detached House,,Housing Association,G,4.21,0.96,3.27,2023-09-30,0.43,4907,1347,9.89,23,Very High
+767,100012200659,13 High Street,Belfast,,AB38 7GH,50.01,-0.3,1978,Semi-Detached,Private Rent,City Council,B,2.89,0.05,5.52,2025-03-07,0.52,6148,1097,3.11,14,
+768,100021296617,165 Park Road,Aberdeen,Scotland,EH67 4EF,54.32,-5.92,1950,,,Clyde Housing,E,7.05,0.63,8.3,2020-12-16,1.39,2740,318,7.26,333,
+769,100072574606,153 Main Street,Cardiff,Wales,EH77 3EF,54.29,-0.48,1977,Detached House,Owner Occupied,Clyde Housing,G,7.52,0.26,5.66,2024-05-24,1.6,6764,101,7.23,41,Very Low
+770,100093484930,191 Church Lane,,Scotland,G68 1AB,54.21,-4.22,1953,,,,A,2.37,0.5,1.11,2025-02-26,0.41,3600,1546,6.44,155,High
+771,100088076845,198 Station Road,Belfast,Scotland,G26 8GH,58.54,-0.77,1956,Semi-Detached,,City Council,C,1.28,0.74,3.44,2024-01-22,0.51,8259,1534,3.31,112,Low
+772,100041799978,60 Park Road,Birmingham,Scotland,G91 4CD,55.18,-3.79,1972,Semi-Detached,Social Rent,Housing Association,E,1.34,0.42,9.06,2022-08-26,0.35,7464,1911,6.01,272,
+773,100084332623,179 Station Road,Cardiff,Scotland,EH21 5EF,55.5,-4.69,2015,High-Rise Flat,Social Rent,,,5.93,0.99,5.66,2022-01-20,0.69,7542,1973,6.46,169,
+774,100028985204,34 Park Road,Inverness,Northern Ireland,DD46 8GH,51.0,-4.87,2024,Detached House,Social Rent,Private Landlord,,3.89,0.45,7.43,2022-11-23,0.4,7058,494,6.43,192,Very Low
+775,100055246513,197 Church Lane,Edinburgh,Scotland,DD45 1EF,55.38,-7.54,1961,Apartment,,Housing Association,,7.92,0.22,9.7,2022-01-08,1.61,4516,1755,9.72,15,Very Low
+776,100020672541,150 Station Road,,Northern Ireland,G67 6GH,54.13,0.5,1961,,Owner Occupied,Housing Association,D,7.22,0.27,6.71,2021-11-09,1.22,7075,1213,3.03,53,
+777,100050005536,46 Church Lane,Edinburgh,,AB13 6CD,54.39,-1.48,1956,,Owner Occupied,Private Landlord,D,6.56,0.2,5.46,2024-08-18,1.57,2868,121,8.44,243,Medium
+778,100013651372,177 Park Road,Birmingham,,EH75 4EF,50.86,-6.36,1999,Apartment,Shared Ownership,,C,6.18,0.47,9.47,2022-07-02,1.98,8835,1326,1.55,164,
+779,100061948348,77 Main Street,London,,G61 6GH,51.58,-3.14,2019,Semi-Detached,Owner Occupied,Private Landlord,D,3.12,0.45,1.91,2024-05-19,1.89,1314,1333,8.72,89,Very Low
+780,100037060199,172 Park Road,,Wales,EH4 2AB,50.63,-1.67,2021,Terraced,,Housing Association,B,5.47,0.19,1.51,2023-03-25,0.12,2606,673,8.93,239,Low
+781,100020918461,4 Main Street,Manchester,Scotland,G38 3AB,50.24,0.96,2019,Bungalow,Shared Ownership,Private Landlord,F,6.4,0.49,9.66,2022-11-07,1.68,8196,1801,5.64,313,Low
+782,100024158512,29 Park Road,Cardiff,Northern Ireland,AB22 5GH,55.83,-4.31,1999,Terraced,Social Rent,Clyde Housing,,3.76,0.37,9.52,2022-01-04,0.12,8979,1436,5.94,171,Very Low
+783,100093925011,170 Main Street,Birmingham,Scotland,EH98 4CD,52.1,-3.89,2021,Terraced,Private Rent,Private Landlord,A,9.55,0.86,6.5,2023-12-31,1.55,8666,1476,8.17,10,Medium
+784,100093996729,57 High Street,London,England,EH41 5EF,55.08,-6.42,2023,Apartment,Owner Occupied,Private Landlord,,6.45,0.89,6.04,2025-01-28,0.72,510,445,6.68,86,Medium
+785,100019627993,77 Main Street,Belfast,Wales,AB18 2AB,50.38,-6.82,2000,Semi-Detached,Private Rent,Clyde Housing,F,2.16,0.19,7.59,2025-04-30,0.96,3706,264,2.3,306,Medium
+786,100022703233,191 Main Street,,England,DD15 4AB,57.34,-4.63,1998,Bungalow,Private Rent,Housing Association,D,4.21,0.23,9.04,2025-08-21,1.84,1651,1189,7.24,15,Very High
+787,100060311880,68 Park Road,Inverness,Wales,DD14 5AB,56.26,-0.6,1992,Bungalow,Private Rent,Housing Association,F,9.45,0.17,2.7,2022-06-04,0.77,9174,113,8.5,95,Low
+788,100018173068,94 Main Street,Manchester,Wales,EH42 8EF,57.27,-0.89,2019,Bungalow,Owner Occupied,Housing Association,,2.42,0.58,3.31,2024-07-06,1.94,2682,1343,7.32,157,Medium
+789,100031885190,154 Church Lane,Edinburgh,Wales,AB83 6CD,57.27,1.51,1979,High-Rise Flat,Shared Ownership,Private Landlord,,1.45,0.91,9.94,2021-02-03,0.96,8268,415,7.03,237,Very High
+790,100052350957,37 Park Road,Dundee,Scotland,G16 4GH,51.57,0.06,1950,Detached House,Social Rent,Housing Association,F,6.87,0.68,9.59,2024-09-12,1.83,7439,1612,9.49,312,Very Low
+791,100052439428,173 Church Lane,Edinburgh,England,DD78 4GH,56.49,-5.22,1975,High-Rise Flat,Private Rent,,C,6.06,0.58,7.82,2021-04-12,0.28,1257,891,5.98,21,Low
+792,100053775500,54 Park Road,London,England,DD88 3AB,56.23,-3.91,1956,Semi-Detached,Private Rent,Housing Association,C,5.75,0.5,9.88,2022-01-08,0.49,5925,480,3.9,64,High
+793,100076621380,79 High Street,Edinburgh,,DD18 5GH,53.34,1.38,1965,Bungalow,Private Rent,,A,7.8,0.4,5.9,2025-04-16,1.95,3483,138,7.95,279,Very High
+794,100021106529,9 Main Street,Birmingham,Northern Ireland,AB78 8AB,51.12,1.72,1953,Terraced,Social Rent,Housing Association,B,6.49,0.75,1.64,2023-05-21,0.27,8293,815,7.92,174,Very High
+795,100080416295,14 Park Road,Inverness,Scotland,G7 3EF,58.79,0.84,2019,Detached House,,Housing Association,D,1.22,0.52,5.75,2022-11-30,0.92,4317,1828,6.26,197,Medium
+796,100035425570,186 High Street,Birmingham,Northern Ireland,G12 5GH,54.44,0.77,2018,Detached House,Shared Ownership,City Council,C,9.97,0.98,6.07,2023-02-28,0.97,1565,1555,6.94,177,High
+797,100094324556,66 Church Lane,Edinburgh,Wales,AB26 1CD,55.31,1.94,1976,Apartment,Owner Occupied,City Council,F,1.64,0.08,2.71,2021-11-14,0.29,6890,406,3.38,98,Medium
+798,100034892513,76 Main Street,Manchester,Wales,EH20 8EF,58.11,1.0,2011,Bungalow,Shared Ownership,Housing Association,D,3.85,0.19,8.5,2021-05-29,0.25,8684,1906,4.69,189,
+799,100080306752,186 High Street,Belfast,Northern Ireland,G78 8EF,50.6,1.64,2011,High-Rise Flat,Owner Occupied,City Council,A,6.66,0.17,2.18,2025-01-22,1.2,7587,807,5.56,78,Very Low
+800,100085063062,182 Park Road,Birmingham,Wales,AB48 7EF,50.06,0.67,2023,,Shared Ownership,Housing Association,D,6.41,0.55,6.29,2024-02-05,1.42,1083,1779,4.41,168,High
+801,100066448367,172 Church Lane,Manchester,England,G14 1CD,50.44,-2.46,1956,,Private Rent,Clyde Housing,,6.59,0.7,7.98,2022-01-05,1.88,6475,1356,4.55,43,Medium
+802,100085877314,111 High Street,Edinburgh,,DD16 2EF,51.47,-3.08,1991,Apartment,,Clyde Housing,D,9.94,0.78,2.76,2022-11-23,0.87,6182,1582,6.45,106,High
+803,100047599404,177 High Street,,England,G26 5AB,52.43,-2.49,1978,High-Rise Flat,Shared Ownership,Clyde Housing,F,3.68,0.6,3.04,2025-04-03,0.72,6099,701,3.83,247,Very Low
+804,100015750000,66 Church Lane,Manchester,Wales,AB97 7EF,56.01,1.53,1958,Semi-Detached,Social Rent,Clyde Housing,B,6.2,0.39,5.51,2022-04-23,0.3,4236,893,3.89,64,Low
+805,100083681529,27 Main Street,Dundee,,DD58 6CD,54.42,-0.03,2010,Semi-Detached,Private Rent,Private Landlord,E,7.6,0.22,1.97,2022-05-29,0.1,829,103,8.54,249,Medium
+806,100031284085,49 Main Street,Aberdeen,,G5 2EF,58.22,-0.71,1987,,Social Rent,Housing Association,E,4.26,0.76,7.42,2024-01-04,0.41,6830,1024,5.63,192,High
+807,100049305852,93 Park Road,Cardiff,Scotland,AB9 4CD,55.98,1.46,1991,Semi-Detached,Owner Occupied,Private Landlord,G,1.05,0.1,7.65,2021-02-07,1.36,9724,1536,3.09,53,Medium
+808,100059665978,28 Church Lane,Aberdeen,Wales,AB80 7GH,52.32,-4.7,2022,Terraced,,Private Landlord,G,4.81,0.17,8.05,2024-08-04,0.48,3017,1323,6.38,264,Very High
+809,100091561327,193 Church Lane,Inverness,Scotland,AB64 4AB,53.27,-2.51,1991,,Owner Occupied,City Council,B,8.09,0.83,1.81,2024-04-20,1.58,7615,346,8.6,295,Very Low
+810,100062522590,11 Main Street,London,Northern Ireland,DD38 8EF,57.16,-0.94,2023,Semi-Detached,,Private Landlord,,5.56,0.77,6.22,2022-08-02,1.48,6833,1784,9.26,339,Low
+811,100045361268,158 Park Road,,,EH22 2AB,57.52,-5.76,1955,Semi-Detached,Private Rent,Private Landlord,C,2.28,0.96,1.02,2024-06-25,1.75,1943,1446,8.06,229,Low
+812,100028824959,128 Main Street,Inverness,Northern Ireland,AB13 3CD,53.26,-2.83,1955,Detached House,Shared Ownership,City Council,E,8.38,0.78,6.12,2022-11-16,1.65,3551,198,6.97,328,Low
+813,100057903360,44 Park Road,Cardiff,Scotland,G10 7AB,57.59,-3.74,1970,Apartment,Social Rent,Housing Association,,1.45,0.84,6.4,2021-07-23,1.35,2374,1928,7.88,344,High
+814,100098119620,59 Church Lane,Manchester,,G74 8AB,52.87,-3.82,1961,Semi-Detached,,,F,3.05,0.95,5.56,2023-08-13,1.91,5583,1906,1.24,251,High
+815,100058193127,149 High Street,Manchester,,DD88 2CD,57.78,0.62,1956,Detached House,Owner Occupied,Private Landlord,F,6.26,0.32,9.85,2025-09-25,0.9,721,1270,2.69,1,
+816,100015150396,163 Main Street,Cardiff,England,EH96 8EF,53.19,-6.62,1955,High-Rise Flat,Owner Occupied,Private Landlord,E,9.5,0.79,2.57,2025-01-02,1.76,8838,1488,7.42,77,Very High
+817,100030633921,170 Park Road,Aberdeen,Northern Ireland,DD26 8GH,56.3,-5.14,1973,Terraced,,,G,1.15,0.61,2.13,2021-11-17,1.44,1319,919,9.59,21,Low
+818,100052757158,94 Main Street,Belfast,,EH26 3CD,53.53,0.15,1965,Bungalow,Social Rent,Housing Association,F,8.67,0.92,7.4,2021-02-05,0.66,8237,1225,2.08,323,Very High
+819,100046997749,23 High Street,,Northern Ireland,DD89 5AB,58.29,-2.95,1974,High-Rise Flat,Shared Ownership,Clyde Housing,F,3.3,0.47,7.28,2025-07-17,1.13,1492,770,5.89,268,
+820,100067642257,190 Main Street,Manchester,Wales,DD25 8AB,51.09,-7.88,2007,Detached House,Private Rent,,B,3.74,0.2,9.74,2023-01-08,1.62,6403,330,5.22,273,High
+821,100097248883,105 High Street,Birmingham,,DD69 4CD,57.64,-1.75,2002,Semi-Detached,Owner Occupied,Clyde Housing,D,7.66,0.25,5.78,2021-05-10,0.91,6107,1571,1.85,99,Medium
+822,100089662562,151 Main Street,Aberdeen,,G36 2EF,52.08,-3.9,2021,Apartment,Shared Ownership,City Council,A,2.64,0.28,2.8,2023-09-01,0.04,2670,1731,4.71,351,High
+823,100071158451,27 Station Road,Birmingham,England,DD15 7GH,56.66,-2.75,1950,Bungalow,Private Rent,City Council,G,3.78,0.98,3.41,2023-11-03,0.12,9169,116,5.79,319,Very Low
+824,100021946178,140 Church Lane,London,Wales,DD62 8GH,58.64,-0.59,2024,High-Rise Flat,,Clyde Housing,B,6.67,0.89,8.37,2022-05-15,0.45,6852,1748,3.19,12,
+825,100079696157,97 Church Lane,Belfast,,G31 4AB,54.45,-7.93,1962,Semi-Detached,,,,2.04,0.19,5.98,2021-08-11,0.57,4269,1130,7.81,268,Low
+826,100091878501,188 Main Street,Dundee,Scotland,EH63 1GH,52.72,-3.76,2005,Detached House,Private Rent,Private Landlord,G,5.02,0.85,3.73,2022-12-02,1.84,6566,1756,8.55,319,Medium
+827,100014050273,114 Station Road,Manchester,Wales,DD25 6EF,56.79,-7.65,2009,Terraced,Owner Occupied,City Council,C,1.93,0.15,3.7,2024-10-18,1.5,7594,1425,7.81,20,Low
+828,100099618788,199 Park Road,Belfast,England,G1 3CD,55.87,-2.86,1983,Bungalow,,City Council,F,2.5,0.71,7.6,2025-11-06,1.39,1106,817,5.76,294,
+829,100014766118,175 Park Road,Belfast,Northern Ireland,AB47 8GH,58.69,0.66,1952,Bungalow,Social Rent,Private Landlord,B,6.23,0.61,3.33,2023-03-14,0.43,9741,1054,1.81,344,
+830,100029161855,107 Station Road,Edinburgh,England,EH52 1CD,51.66,-2.58,2001,Bungalow,Private Rent,Housing Association,D,3.5,0.12,4.68,2021-07-21,0.89,1659,812,3.91,323,Very Low
+831,100079844318,152 High Street,,Scotland,AB24 5GH,58.63,-5.74,2001,Bungalow,Shared Ownership,Housing Association,B,9.67,0.0,5.03,2022-12-30,1.82,4840,1040,1.99,111,Very High
+832,100027671453,25 High Street,Edinburgh,Scotland,G2 4GH,57.05,1.54,2000,Apartment,Social Rent,City Council,C,7.34,0.22,7.27,2025-09-05,0.97,7581,1397,8.38,79,High
+833,100077047173,51 Main Street,Manchester,Northern Ireland,AB96 1CD,55.62,-5.83,2021,Terraced,Owner Occupied,City Council,E,9.06,0.78,7.78,2021-11-02,1.21,1604,1037,1.51,6,Low
+834,100016098112,192 Station Road,Aberdeen,,G46 3GH,58.75,-1.74,1975,Bungalow,Shared Ownership,Private Landlord,E,8.93,0.77,6.04,2021-03-21,0.45,934,306,5.46,24,Very High
+835,100080648143,130 Main Street,Edinburgh,,EH1 6EF,57.99,1.53,1981,High-Rise Flat,Social Rent,,,5.58,0.59,4.43,2021-10-19,1.91,9540,794,3.25,239,Very Low
+836,100086615117,24 Park Road,Dundee,England,G16 8AB,58.52,0.22,2006,,Social Rent,Clyde Housing,G,9.72,0.09,1.9,2023-03-28,1.1,7409,1404,5.36,105,
+837,100028112728,128 Main Street,Dundee,,AB74 5AB,52.11,-4.19,1969,Semi-Detached,Owner Occupied,Housing Association,D,1.11,0.32,4.03,2021-07-24,1.17,1441,1763,6.98,182,High
+838,100043820926,67 Park Road,Glasgow,Scotland,AB50 7GH,57.57,-6.01,1982,Terraced,Private Rent,City Council,F,2.05,0.48,1.41,2022-02-03,1.23,8251,1060,4.44,134,Very Low
+839,100092195623,98 Main Street,Inverness,Scotland,DD89 5CD,54.9,0.09,1996,Apartment,Owner Occupied,Private Landlord,A,6.84,0.73,5.23,2024-03-04,1.08,7261,825,5.83,155,
+840,100017246425,120 Church Lane,Belfast,England,DD95 6GH,52.39,1.56,2020,,Shared Ownership,City Council,A,9.45,0.13,4.63,2024-11-08,0.36,8148,1864,6.33,233,Low
+841,100094756192,72 High Street,Belfast,England,G14 1AB,50.88,-7.49,1982,Bungalow,Shared Ownership,Housing Association,E,9.69,0.39,2.96,2024-08-04,1.4,1985,482,4.99,1,Very High
+842,100076119707,102 Church Lane,Inverness,Scotland,EH14 7AB,56.06,-3.47,2021,Semi-Detached,,City Council,F,2.12,0.49,8.82,2021-08-07,1.45,6504,240,7.95,360,Low
+843,100071415490,102 Park Road,Dundee,,DD27 2GH,50.31,-6.18,1975,Bungalow,Shared Ownership,Clyde Housing,B,6.88,0.44,3.17,2024-10-05,1.12,628,782,8.64,301,Medium
+844,100065265790,137 High Street,Aberdeen,Scotland,EH79 7CD,50.19,-3.48,1956,Terraced,,Clyde Housing,E,5.01,0.22,5.64,2021-10-21,0.21,2759,1148,9.06,9,High
+845,100057814292,5 Station Road,Inverness,England,EH86 5CD,56.68,-2.71,1972,,,City Council,B,4.89,0.7,2.19,2024-10-09,0.37,1523,1314,8.88,217,Low
+846,100096287016,164 Station Road,Cardiff,,EH90 1AB,53.58,0.26,1983,Semi-Detached,Private Rent,Private Landlord,F,2.42,0.63,1.59,2021-12-22,0.03,4083,229,5.57,112,
+847,100041711535,74 Park Road,Inverness,Scotland,G26 4EF,51.28,-4.59,1985,Apartment,,City Council,F,7.66,0.19,4.88,2023-06-24,1.17,1766,1568,4.81,241,Very Low
+848,100076894385,184 Station Road,Inverness,Wales,AB74 5AB,50.74,-5.32,1970,High-Rise Flat,,Private Landlord,F,5.94,0.57,3.7,2024-11-30,1.65,8671,1986,4.71,171,
+849,100035194152,191 Main Street,Belfast,England,AB32 4CD,50.83,-6.7,1988,Bungalow,Private Rent,,E,4.2,0.29,3.95,2022-11-18,0.58,9231,1704,5.33,185,Very High
+850,100058250818,33 High Street,Belfast,England,AB62 4AB,52.3,-6.37,2009,Semi-Detached,Shared Ownership,Private Landlord,C,1.26,0.32,6.96,2021-10-02,0.51,906,382,7.3,169,Very Low
+851,100044939368,81 Church Lane,Belfast,,EH5 6EF,55.53,-5.63,1969,Bungalow,Social Rent,Housing Association,C,4.63,0.38,3.17,2023-11-19,0.89,4392,994,4.79,354,High
+852,100041127543,160 Church Lane,Edinburgh,,DD89 7EF,52.51,1.67,2011,High-Rise Flat,Social Rent,City Council,G,3.74,0.21,2.33,2025-03-03,0.19,6440,1054,7.69,301,
+853,100075733118,120 Main Street,Edinburgh,,AB37 4GH,52.19,0.16,1980,High-Rise Flat,Shared Ownership,,,8.03,0.36,3.4,2020-11-26,0.8,1332,796,2.59,141,Very Low
+854,100018677682,147 Church Lane,Manchester,England,EH27 5EF,53.41,-3.55,1962,Apartment,Shared Ownership,City Council,B,8.32,0.18,9.07,2024-11-05,1.03,9006,558,7.05,189,Medium
+855,100061781463,44 Church Lane,Dundee,Northern Ireland,AB74 4EF,53.62,-7.71,2020,Apartment,,City Council,C,5.08,0.75,9.86,2021-04-30,0.54,6484,1692,1.45,105,Very High
+856,100021786529,78 Main Street,Cardiff,Wales,DD81 8CD,51.62,-4.12,2024,Detached House,Shared Ownership,,F,4.83,0.6,3.8,2021-04-12,0.09,3998,597,1.56,9,High
+857,100092931339,5 Church Lane,,Wales,AB30 6EF,52.43,-0.98,1968,Bungalow,Shared Ownership,,E,5.78,0.31,1.87,2022-06-08,1.12,8959,350,4.76,86,
+858,100075050092,84 High Street,London,Northern Ireland,DD90 2EF,57.84,-3.83,2009,Apartment,,,B,2.66,0.88,7.48,2020-12-08,0.42,4572,1435,4.11,352,Very High
+859,100036917664,40 Station Road,London,,DD85 6EF,58.42,1.64,1986,Bungalow,,Private Landlord,A,8.11,0.99,8.63,2024-03-07,0.3,1396,1117,8.0,167,
+860,100080066261,162 Park Road,Aberdeen,England,EH54 3GH,50.43,-3.44,2022,High-Rise Flat,Shared Ownership,Clyde Housing,G,2.43,0.11,9.85,2024-12-20,1.37,6658,1613,1.69,91,
+861,100019721639,47 Station Road,Edinburgh,Northern Ireland,DD38 1AB,57.64,-5.5,2001,Apartment,Owner Occupied,Private Landlord,,2.56,0.01,1.68,2022-11-28,0.18,6391,1081,2.86,87,
+862,100067845437,54 Station Road,,Scotland,G56 2EF,55.22,-0.86,1978,Apartment,Social Rent,Clyde Housing,F,5.15,0.55,8.87,2023-12-06,1.07,4371,423,3.69,87,Medium
+863,100024528068,152 High Street,London,,G61 5CD,58.15,-6.29,1974,Semi-Detached,Shared Ownership,Housing Association,F,4.29,0.77,7.74,2022-06-24,1.94,9858,471,3.01,199,Very Low
+864,100046257769,164 Station Road,Cardiff,England,AB28 4AB,54.01,-0.2,1973,,Social Rent,City Council,B,6.98,0.79,4.94,2021-11-17,1.58,7488,461,5.71,218,Very Low
+865,100044647368,99 Station Road,Cardiff,,AB44 6GH,56.34,-2.81,2010,Apartment,,City Council,,7.3,0.55,9.86,2024-05-20,0.25,6028,1035,7.78,177,High
+866,100084308647,150 High Street,Belfast,England,AB28 1CD,50.19,-7.17,1990,Apartment,Private Rent,City Council,A,1.97,0.87,8.66,2022-01-29,1.01,6805,1403,5.69,129,Low
+867,100035711423,105 Park Road,Aberdeen,,AB88 1AB,53.39,-5.82,1961,Terraced,Private Rent,City Council,G,5.69,0.4,8.49,2023-02-23,0.85,7817,1993,7.79,75,Very Low
+868,100021397836,89 High Street,Inverness,Scotland,EH32 7AB,57.59,-5.68,1973,Semi-Detached,,City Council,B,4.48,0.6,2.85,2023-09-11,0.94,593,1386,5.89,142,High
+869,100018036513,140 Station Road,Glasgow,,G41 4AB,58.48,-3.79,1978,Semi-Detached,Shared Ownership,Clyde Housing,C,1.78,0.9,1.56,2025-07-28,0.38,5953,1730,2.38,27,High
+870,100066736857,95 Church Lane,Aberdeen,Wales,DD5 5CD,53.07,-4.93,1987,Detached House,Social Rent,Private Landlord,D,1.55,0.39,1.26,2024-05-14,1.41,5016,1244,7.78,207,Medium
+871,100035632334,28 Main Street,Birmingham,Scotland,G20 8EF,56.87,-4.25,1987,High-Rise Flat,Social Rent,City Council,C,3.43,0.87,1.08,2025-09-27,0.24,3518,1989,8.32,165,
+872,100079014433,104 Main Street,Glasgow,Wales,DD60 8EF,56.85,-3.22,2013,Detached House,Shared Ownership,City Council,G,8.76,0.62,4.58,2024-07-24,0.75,3915,1936,2.8,301,High
+873,100094483625,147 Church Lane,London,,AB96 8CD,52.42,0.47,2014,Bungalow,,Clyde Housing,G,5.69,0.19,8.44,2024-03-13,0.25,1310,816,6.63,168,Very High
+874,100088500033,18 Church Lane,Edinburgh,Wales,AB47 1AB,54.11,-2.19,1973,Bungalow,Shared Ownership,Housing Association,F,1.54,0.08,2.31,2024-04-20,0.47,8865,479,2.94,41,Very High
+875,100053406152,178 Park Road,Edinburgh,Northern Ireland,EH17 4EF,57.75,-0.88,2024,Terraced,Shared Ownership,,G,7.18,0.05,9.38,2022-09-03,0.87,2868,669,5.59,22,Very Low
+876,100079325440,27 Station Road,Edinburgh,Northern Ireland,EH83 7AB,58.46,-1.86,1964,Bungalow,,City Council,G,6.81,0.52,3.45,2021-04-10,0.47,909,1729,4.26,352,Low
+877,100071130884,37 Park Road,Belfast,England,EH31 2GH,54.4,-2.31,1984,Semi-Detached,Shared Ownership,Clyde Housing,B,6.26,0.19,7.75,2021-01-12,1.4,6613,1321,4.32,243,Very Low
+878,100051556590,52 Church Lane,Manchester,Scotland,DD14 1GH,52.68,-0.66,2010,Semi-Detached,,Housing Association,A,7.67,0.52,4.41,2022-03-29,0.37,1549,918,8.24,330,Medium
+879,100056345835,123 Church Lane,Edinburgh,Wales,DD20 4AB,54.73,-5.16,1963,Terraced,,Clyde Housing,A,1.77,0.65,8.94,2025-09-01,0.15,5620,1840,6.52,141,Very High
+880,100047951556,89 High Street,London,England,EH10 2EF,58.36,-1.51,2003,Detached House,Shared Ownership,,A,7.94,0.91,4.63,2021-05-28,0.68,1263,1822,9.16,339,Medium
+881,100058741290,47 Main Street,Glasgow,England,AB12 8AB,50.08,-0.45,1987,Detached House,Social Rent,,F,6.99,0.28,4.67,2023-03-11,1.84,8266,544,8.78,198,Medium
+882,100031469828,123 High Street,Inverness,Wales,DD76 5GH,58.23,-5.84,2010,Terraced,,Private Landlord,D,4.62,0.13,4.88,2021-01-15,1.38,5733,808,6.99,194,Low
+883,100059979879,34 Station Road,Dundee,Northern Ireland,AB55 7EF,51.95,-3.69,1956,High-Rise Flat,Owner Occupied,Housing Association,G,9.82,0.81,6.08,2025-07-27,1.4,1887,1710,3.65,31,High
+884,100059188279,100 Park Road,Belfast,Northern Ireland,AB77 3EF,50.2,-6.4,2007,Semi-Detached,,City Council,,4.05,0.51,7.97,2021-09-27,1.56,522,1914,5.42,20,
+885,100083064080,179 Station Road,Glasgow,,DD42 3CD,53.53,-0.92,2015,Bungalow,,Private Landlord,G,9.41,0.97,3.93,2023-06-20,1.9,5919,1398,8.52,190,Low
+886,100038074744,77 Main Street,Glasgow,England,DD55 7GH,52.77,-6.1,1985,,,City Council,D,5.17,0.73,2.54,2022-06-06,0.08,7668,746,1.98,182,
+887,100013633710,48 Main Street,Manchester,England,DD90 2AB,51.6,1.73,1950,Apartment,Shared Ownership,City Council,G,8.79,0.74,3.25,2023-02-19,1.23,2896,967,4.21,185,Medium
+888,100071856693,138 Church Lane,Cardiff,,DD86 1EF,51.15,-6.73,2006,Bungalow,Social Rent,Private Landlord,D,9.9,0.4,5.09,2021-03-31,0.01,4206,770,4.55,217,
+889,100022214024,63 Main Street,Belfast,Northern Ireland,EH90 8AB,51.87,-4.87,2014,Bungalow,,Private Landlord,B,8.93,0.67,8.61,2022-04-05,0.66,3018,1674,8.18,263,
+890,100033348719,87 High Street,Inverness,,G13 5AB,50.95,-4.25,1996,Bungalow,Owner Occupied,Private Landlord,,5.25,0.54,7.0,2023-04-12,1.22,1169,723,5.91,2,
+891,100041092695,122 Park Road,Edinburgh,Northern Ireland,G1 5AB,51.78,-3.74,1963,,,City Council,A,9.53,0.99,2.94,2025-06-12,0.92,5272,268,8.54,221,Very Low
+892,100015202980,63 Main Street,Glasgow,England,EH60 3CD,58.09,-1.14,2000,Semi-Detached,,City Council,D,3.73,0.57,4.55,2023-08-03,0.57,5273,728,3.45,207,Medium
+893,100014000596,29 Station Road,,Northern Ireland,AB10 8EF,58.82,-0.56,1968,High-Rise Flat,Social Rent,Clyde Housing,A,6.67,0.02,4.83,2024-12-12,1.3,8091,1320,1.67,158,Low
+894,100044425499,61 Station Road,Inverness,Scotland,EH84 7GH,54.79,-0.99,1992,Bungalow,Owner Occupied,Private Landlord,D,7.54,0.91,4.74,2023-08-31,0.15,5394,1312,3.93,28,High
+895,100038688018,52 Church Lane,Belfast,,G22 2EF,54.51,-0.7,2004,High-Rise Flat,,Housing Association,B,9.1,0.74,4.65,2024-02-22,1.3,3321,1057,9.4,213,Low
+896,100053508446,105 Park Road,Birmingham,Northern Ireland,DD95 2CD,56.21,-0.99,1964,Detached House,Private Rent,,D,5.7,0.65,1.53,2022-03-11,0.65,9839,292,4.06,147,Very Low
+897,100015260398,113 Station Road,Manchester,Northern Ireland,AB72 2GH,56.2,1.82,1989,Terraced,Social Rent,Housing Association,A,1.38,0.21,4.44,2022-12-30,0.8,1585,657,4.01,91,High
+898,100031280700,90 Station Road,Inverness,Northern Ireland,AB9 1EF,55.49,-0.67,1983,Semi-Detached,Owner Occupied,Housing Association,,5.48,0.42,6.05,2022-07-03,0.49,5437,689,2.58,244,Very Low
+899,100053260395,196 Main Street,Dundee,England,G73 1CD,52.57,-7.09,1959,Terraced,,Housing Association,A,5.99,0.97,3.81,2023-04-30,1.75,6926,1224,4.46,261,Medium
+900,100013166486,163 Park Road,Dundee,,G47 2CD,54.01,-6.92,1974,Semi-Detached,Private Rent,,G,1.73,0.41,3.58,2024-07-10,1.12,4684,1786,4.5,293,Very Low
+901,100077996142,89 Park Road,Inverness,Wales,G47 6AB,57.05,-4.69,1982,Terraced,Shared Ownership,Private Landlord,,7.05,0.88,3.4,2021-04-09,0.94,9614,1143,3.7,187,
+902,100096154901,100 High Street,Dundee,Northern Ireland,DD94 4CD,56.88,-0.0,1975,Semi-Detached,Owner Occupied,Private Landlord,C,8.84,0.85,9.36,2024-01-19,0.96,8848,835,9.36,338,Very Low
+903,100084445606,48 Church Lane,Belfast,Scotland,EH3 3GH,50.06,-6.2,2023,,Private Rent,Private Landlord,D,5.0,0.43,8.12,2023-01-10,1.42,4338,997,5.47,135,Medium
+904,100097524698,74 Park Road,Aberdeen,Scotland,DD39 1GH,52.31,-7.63,1985,Bungalow,Owner Occupied,Clyde Housing,A,2.42,0.78,2.7,2024-07-15,0.58,7521,614,3.67,243,Very Low
+905,100065672457,22 High Street,Birmingham,,EH45 7GH,52.34,-5.75,1994,Bungalow,Social Rent,City Council,E,9.46,0.51,3.51,2025-08-16,0.29,6435,1777,2.7,35,Very High
+906,100084320902,14 Station Road,Belfast,Wales,G30 2GH,57.54,-4.73,2001,Detached House,,Private Landlord,G,8.2,0.32,5.61,2022-03-15,1.55,767,976,8.0,282,Very High
+907,100097775119,9 High Street,,Scotland,AB39 4GH,53.74,-3.62,1998,Semi-Detached,Private Rent,,A,1.15,0.55,9.48,2023-04-15,0.27,4210,388,7.06,338,Very High
+908,100090428188,183 Main Street,Glasgow,Scotland,AB4 4CD,58.63,-2.61,1992,High-Rise Flat,Social Rent,Private Landlord,B,8.05,0.92,5.33,2025-01-25,1.84,6550,1512,5.0,273,Low
+909,100023195631,66 Church Lane,Dundee,Wales,DD22 8GH,51.78,-5.39,2020,High-Rise Flat,Social Rent,Private Landlord,G,9.7,0.74,1.1,2022-05-18,0.32,2144,312,7.92,198,High
+910,100012849456,106 Park Road,Edinburgh,Scotland,EH5 8CD,54.95,0.64,1996,,Shared Ownership,Private Landlord,G,8.69,0.03,1.68,2025-08-25,1.88,5724,1902,8.81,317,Low
+911,100046651682,78 Station Road,Dundee,Northern Ireland,EH14 1CD,52.14,-4.07,2017,Semi-Detached,Private Rent,,E,7.81,0.94,6.7,2021-01-04,0.23,2660,1305,1.21,364,Very Low
+912,100033067163,68 Park Road,Belfast,England,AB44 4AB,58.74,-0.64,2010,Detached House,Shared Ownership,Housing Association,B,8.97,0.11,8.74,2025-11-06,1.94,8734,470,5.0,17,Medium
+913,100057869694,117 Station Road,Dundee,England,AB30 6GH,50.49,-3.71,2005,Detached House,Private Rent,Clyde Housing,G,5.04,0.78,2.83,2022-01-18,1.13,3650,649,3.67,107,Low
+914,100061757733,37 High Street,Dundee,England,DD75 2GH,51.24,-5.07,1957,Terraced,,Housing Association,B,7.39,0.84,7.87,2021-06-07,0.98,9128,596,6.98,316,High
+915,100090810048,130 Main Street,,Northern Ireland,DD86 3AB,56.96,1.97,2023,Detached House,Social Rent,Housing Association,B,6.9,0.72,5.56,2021-11-18,0.45,4901,1645,6.29,344,Low
+916,100078857245,47 Station Road,Cardiff,Scotland,G92 1EF,56.56,-3.26,1967,Semi-Detached,,Housing Association,D,9.11,0.63,9.88,2023-02-13,0.28,5977,678,2.24,135,Very Low
+917,100057244221,80 Main Street,Aberdeen,England,DD40 7CD,58.24,-0.27,1955,Detached House,Private Rent,City Council,B,2.8,0.51,1.72,2025-04-06,0.55,4897,906,6.77,29,
+918,100053691230,80 Church Lane,Manchester,,DD43 4GH,55.36,-1.24,2008,Terraced,,,A,4.01,0.16,7.79,2025-04-25,1.32,2829,131,3.21,237,Low
+919,100086214652,140 Church Lane,Belfast,England,G14 1CD,50.22,0.35,2000,Bungalow,Social Rent,Private Landlord,G,7.29,0.75,3.65,2023-09-03,1.64,8393,751,1.64,2,Medium
+920,100088029678,35 High Street,Belfast,,DD75 3AB,55.15,-1.47,1969,,Owner Occupied,Private Landlord,,9.94,0.69,9.56,2022-11-14,0.81,9823,874,7.17,39,Medium
+921,100048286031,37 Church Lane,Manchester,,DD43 5AB,51.44,-6.5,1959,,Private Rent,Private Landlord,G,1.13,0.41,5.38,2025-09-20,0.26,7072,902,5.03,215,Very Low
+922,100098245405,101 Park Road,Glasgow,Northern Ireland,G57 1GH,55.19,-5.33,1960,,Owner Occupied,Private Landlord,A,4.32,0.59,9.71,2021-06-17,1.4,3326,1648,2.23,346,High
+923,100032987070,160 Main Street,Belfast,Wales,EH31 4AB,53.62,-2.12,2020,,,Clyde Housing,B,9.13,0.87,4.95,2023-01-30,1.25,5543,143,3.17,185,Very Low
+924,100025729218,6 Main Street,Inverness,Scotland,G57 8AB,54.89,-5.65,2019,Semi-Detached,Private Rent,Private Landlord,C,3.42,0.51,3.82,2021-11-10,0.09,4983,1253,8.46,361,Low
+925,100079242977,27 Park Road,Dundee,England,EH97 6AB,51.89,-5.73,1988,Terraced,Owner Occupied,City Council,,3.99,0.7,7.09,2022-12-18,0.35,9910,771,4.45,49,Very High
+926,100067993231,87 Church Lane,Manchester,Wales,DD9 1CD,58.19,-4.58,1957,Apartment,,,E,2.87,0.03,6.56,2025-10-22,0.95,2933,927,5.51,78,Very High
+927,100010345304,40 Station Road,Manchester,England,G58 7GH,54.25,-2.89,1990,Terraced,,Private Landlord,A,7.12,0.91,5.8,2025-07-12,0.7,5126,1964,8.49,344,Very Low
+928,100018803052,183 Church Lane,Inverness,,G95 1GH,51.36,-2.32,2008,Detached House,Social Rent,,G,7.72,0.87,9.47,2025-02-24,1.37,775,1503,1.43,240,Very Low
+929,100049553552,191 Main Street,Manchester,England,G94 4AB,53.1,-2.44,1970,High-Rise Flat,Owner Occupied,Clyde Housing,C,9.15,0.64,1.69,2023-05-25,0.11,8304,871,5.3,235,Medium
+930,100076260789,165 Station Road,London,Scotland,DD4 7EF,53.64,-5.95,1998,Detached House,Social Rent,,G,6.97,0.18,2.19,2024-02-19,0.04,1631,1967,1.98,234,High
+931,100084884241,160 High Street,Inverness,Northern Ireland,G26 1GH,58.7,-7.16,1974,,Shared Ownership,City Council,C,2.85,0.33,7.57,2022-03-04,1.47,7824,1727,2.2,232,High
+932,100039460768,118 High Street,Aberdeen,Scotland,AB88 1AB,57.39,-7.0,2018,Semi-Detached,,Private Landlord,G,7.61,0.04,3.36,2022-06-07,1.0,8007,1743,3.77,33,
+933,100019849298,113 High Street,Dundee,England,DD8 1CD,58.28,-2.66,1971,Apartment,Owner Occupied,Clyde Housing,A,7.36,0.21,2.16,2025-02-14,1.72,5529,1950,4.05,6,Very High
+934,100035624215,51 Church Lane,Manchester,Scotland,EH25 8EF,53.89,-5.81,2012,,Social Rent,Clyde Housing,A,6.18,0.25,6.65,2021-11-30,0.28,4204,370,5.76,177,Very Low
+935,100063339121,48 Church Lane,Belfast,,DD38 8CD,53.74,1.41,1989,Terraced,Shared Ownership,,D,2.22,0.73,4.16,2023-09-13,0.99,4253,394,3.38,20,Medium
+936,100022535937,77 Main Street,Glasgow,Scotland,EH47 3CD,57.7,-2.1,1978,Semi-Detached,Private Rent,,C,7.2,0.12,9.9,2022-03-29,1.52,3719,1457,1.6,143,
+937,100015356771,129 High Street,Birmingham,Northern Ireland,AB56 8AB,50.26,-4.31,1956,Bungalow,,Private Landlord,E,5.41,0.35,9.91,2023-01-28,1.27,7657,1882,5.78,214,Medium
+938,100027442112,165 Church Lane,Cardiff,Northern Ireland,DD92 8GH,55.48,-6.99,1968,Apartment,Owner Occupied,Clyde Housing,D,7.72,0.03,9.98,2025-10-22,1.53,5751,1724,2.03,282,Medium
+939,100069615496,78 Park Road,Inverness,,DD11 1EF,50.5,-0.92,1977,Terraced,,Clyde Housing,C,9.37,0.75,2.61,2021-08-01,1.65,6107,103,5.5,70,High
+940,100086858230,11 High Street,Edinburgh,Northern Ireland,DD77 4EF,54.46,-3.31,2023,Detached House,Owner Occupied,,C,4.62,0.2,8.84,2025-04-19,1.06,4082,669,1.09,106,Very Low
+941,100096311228,103 Church Lane,Aberdeen,Wales,AB29 2EF,50.72,-6.21,2023,,Shared Ownership,,G,3.01,0.23,8.47,2023-10-01,1.17,6441,1853,6.72,209,Low
+942,100091848919,119 High Street,Edinburgh,,EH61 3AB,56.08,-3.47,1975,High-Rise Flat,Shared Ownership,Housing Association,F,5.15,0.05,7.26,2024-08-02,0.96,8633,1744,7.87,155,Low
+943,100011350519,148 High Street,Cardiff,,DD12 6GH,55.96,-7.01,1997,Terraced,Owner Occupied,Private Landlord,A,1.64,0.15,1.38,2021-12-04,0.95,4800,1973,6.81,304,Low
+944,100039105424,13 Park Road,Inverness,England,G74 4GH,53.11,-1.81,2000,High-Rise Flat,Shared Ownership,Housing Association,E,7.56,0.59,6.75,2023-03-13,0.08,3852,804,1.88,119,
+945,100040117751,97 Main Street,,England,DD29 6GH,52.78,-6.42,2013,Bungalow,Private Rent,Housing Association,,4.78,0.58,2.27,2024-12-24,1.72,504,1057,8.99,20,Very High
+946,100022041278,189 Main Street,,Scotland,EH11 6CD,56.13,-1.07,1990,Detached House,,Clyde Housing,E,8.4,0.35,6.46,2024-12-07,1.61,8367,1622,2.05,227,
+947,100077863132,126 Station Road,London,,G26 7CD,57.74,-7.94,2013,Terraced,,City Council,G,6.86,0.95,3.22,2022-06-06,0.9,9377,1420,3.22,3,Low
+948,100023155975,192 Church Lane,Inverness,,G1 1AB,57.41,-7.33,1955,Apartment,Shared Ownership,City Council,A,8.25,0.71,5.37,2024-11-17,1.5,7129,1974,4.06,296,Very Low
+949,100088609017,11 Main Street,Birmingham,England,EH56 5CD,54.31,-3.55,1962,Apartment,Shared Ownership,Private Landlord,E,1.82,0.02,1.35,2024-06-20,0.06,5150,1297,2.48,116,High
+950,100057201911,85 Station Road,Birmingham,Wales,AB1 5EF,52.07,-4.24,1959,Bungalow,Private Rent,Clyde Housing,A,4.43,0.75,6.37,2024-04-14,1.76,9703,927,1.52,241,Very High
+951,100080935035,105 High Street,London,,AB63 4EF,53.91,-3.27,2022,High-Rise Flat,,Clyde Housing,G,9.86,0.73,6.39,2024-11-07,0.02,1801,1390,9.75,266,Very High
+952,100015963330,190 Main Street,Glasgow,Wales,EH12 8GH,50.13,1.42,1967,,Shared Ownership,Clyde Housing,C,6.97,0.48,8.35,2024-07-13,1.48,897,244,6.58,264,Very Low
+953,100016292555,5 High Street,Glasgow,Wales,G87 8AB,51.69,-2.18,1991,Terraced,Shared Ownership,City Council,A,5.15,0.35,1.16,2024-03-16,0.45,3812,1831,8.23,222,Medium
+954,100026127347,198 Station Road,,Northern Ireland,DD81 2GH,53.33,-6.48,1970,Terraced,Shared Ownership,Housing Association,B,5.91,0.36,1.98,2021-05-10,1.72,9873,1007,9.99,171,High
+955,100076765406,35 Station Road,Inverness,England,DD24 8CD,52.18,-2.62,1971,High-Rise Flat,,Housing Association,E,7.31,0.12,6.61,2022-08-06,0.24,2440,712,4.61,275,Very Low
+956,100058007494,101 Church Lane,Edinburgh,,AB1 2EF,56.02,-5.13,1997,,Shared Ownership,Clyde Housing,A,2.17,0.78,2.89,2021-08-08,1.1,5154,1350,8.75,72,Very High
+957,100023952277,47 Station Road,,England,DD76 4EF,50.76,-5.62,2004,Detached House,Social Rent,City Council,B,1.65,0.91,6.5,2025-01-25,0.65,6574,764,5.89,70,Medium
+958,100047866927,78 Station Road,Edinburgh,Northern Ireland,AB46 8GH,58.83,-7.91,2011,High-Rise Flat,Social Rent,Private Landlord,E,5.82,0.53,7.79,2023-12-14,1.43,9660,1133,8.36,182,High
+959,100040699691,28 Church Lane,Cardiff,Wales,DD69 4AB,54.66,-2.63,1982,Apartment,Owner Occupied,Housing Association,F,7.06,0.51,7.42,2025-08-15,0.71,3821,919,8.57,137,High
+960,100055261327,23 High Street,Aberdeen,England,AB90 7GH,57.53,-1.3,1982,Terraced,Social Rent,Private Landlord,C,7.97,0.41,8.28,2025-08-09,1.52,5831,1345,7.22,59,High
+961,100014964647,120 High Street,Belfast,Northern Ireland,DD3 6EF,50.77,1.8,2004,Terraced,Owner Occupied,Clyde Housing,E,6.05,0.73,3.44,2024-02-27,0.02,7132,344,3.53,330,Low
+962,100083006096,89 Church Lane,Belfast,Northern Ireland,G28 7GH,57.98,0.5,1960,,,Clyde Housing,A,8.48,0.51,7.31,2024-02-07,0.1,6689,896,3.77,191,Low
+963,100073011497,138 Church Lane,Aberdeen,,AB71 6CD,58.9,-2.05,1997,,Owner Occupied,Private Landlord,D,6.98,0.45,2.6,2025-06-08,0.82,5286,256,4.84,286,Very Low
+964,100083353832,93 Park Road,Dundee,,AB27 8CD,57.86,1.39,2019,Bungalow,Private Rent,,A,3.05,0.09,1.69,2025-05-31,0.7,6331,1836,8.92,53,Very Low
+965,100060719145,50 Park Road,Manchester,Scotland,G4 7CD,57.97,-6.81,1976,Bungalow,,Private Landlord,E,6.99,0.54,8.84,2023-05-20,1.57,4232,396,3.88,266,Very Low
+966,100038357943,127 Main Street,Aberdeen,Scotland,G29 7CD,58.49,-1.13,2009,Terraced,,Housing Association,F,7.82,0.42,7.16,2024-10-13,1.44,1594,1804,8.92,115,
+967,100021969060,103 Church Lane,Edinburgh,Northern Ireland,DD15 4CD,51.87,1.74,2017,Terraced,Social Rent,Housing Association,A,1.52,0.64,6.69,2023-11-16,1.65,7358,1079,7.75,56,High
+968,100092735511,191 Church Lane,Cardiff,Northern Ireland,G43 4CD,53.48,-7.08,2009,Bungalow,Social Rent,Housing Association,C,2.2,0.32,1.73,2020-12-09,1.13,2836,1202,2.75,290,Very High
+969,100015039558,180 High Street,Cardiff,,AB66 1CD,55.89,1.01,2003,Detached House,Private Rent,Private Landlord,B,7.68,0.13,2.64,2021-06-02,1.54,2951,1716,2.79,76,Low
+970,100059841414,89 Station Road,Cardiff,Scotland,AB14 6EF,57.09,-4.31,1993,,Social Rent,Clyde Housing,A,6.36,0.74,3.83,2022-01-25,1.0,3759,1629,7.79,128,Very Low
+971,100018510866,138 High Street,Cardiff,Wales,G39 7AB,51.81,-2.47,1968,Terraced,Shared Ownership,Clyde Housing,C,8.41,0.59,5.83,2021-03-25,0.26,7334,1917,7.81,230,Medium
+972,100021770100,96 Main Street,Edinburgh,Wales,DD10 2EF,51.0,-3.32,1955,Apartment,Private Rent,City Council,B,8.36,0.01,6.84,2023-12-17,0.96,6200,1663,5.54,8,Very Low
+973,100093991859,129 High Street,,Scotland,EH22 2GH,52.4,-2.74,2019,Apartment,Social Rent,City Council,C,7.84,0.94,8.58,2023-07-04,0.13,8144,1094,6.03,35,Very High
+974,100074889369,24 Park Road,Birmingham,Northern Ireland,EH29 2CD,50.94,0.34,1977,Apartment,,,E,9.43,0.81,8.54,2021-12-17,0.65,4077,517,2.15,202,Very High
+975,100015186319,169 Park Road,Edinburgh,Wales,DD69 3CD,54.26,-4.4,1955,Bungalow,Shared Ownership,Private Landlord,,3.9,0.14,5.6,2024-09-17,0.36,9659,1414,5.84,203,
+976,100067653493,90 Station Road,Belfast,,DD68 6AB,54.53,-3.38,1982,Apartment,,Private Landlord,C,1.85,0.03,2.15,2021-05-12,1.89,7860,762,1.49,29,High
+977,100092447544,34 Church Lane,,,EH91 3EF,54.52,-0.14,1986,Detached House,Private Rent,Housing Association,,1.14,0.84,6.85,2024-05-27,0.53,7300,379,5.98,179,Very High
+978,100055860901,150 High Street,Glasgow,England,DD61 2AB,54.22,-6.47,2024,Semi-Detached,Private Rent,,B,6.98,0.38,8.4,2024-10-11,1.13,5563,1910,5.85,339,Medium
+979,100061211485,105 Church Lane,Glasgow,England,EH7 5GH,51.84,-1.8,1958,Terraced,Owner Occupied,City Council,C,7.58,0.06,9.89,2021-01-24,0.02,2813,936,4.77,23,Medium
+980,100077470503,50 Park Road,Birmingham,,G46 2CD,52.77,1.73,1999,Terraced,Owner Occupied,City Council,G,1.16,0.7,1.35,2021-09-03,0.02,6427,1465,3.99,136,Very High
+981,100066520453,191 Main Street,Cardiff,Scotland,AB94 5CD,53.63,0.73,1985,Bungalow,Social Rent,Housing Association,B,3.12,0.17,4.56,2023-09-15,1.23,4485,1915,6.88,334,High
+982,100040576130,106 Park Road,Aberdeen,Wales,EH11 2EF,50.03,1.73,1987,Semi-Detached,,Private Landlord,C,8.06,0.59,5.16,2024-03-12,0.81,8554,421,3.95,212,Very High
+983,100093067722,99 Church Lane,London,Wales,EH30 4AB,50.49,0.06,1993,Semi-Detached,,City Council,D,8.07,0.61,4.47,2024-10-05,1.2,5170,1401,2.81,187,Medium
+984,100016827482,188 Main Street,Inverness,England,EH52 4AB,52.14,-5.0,1981,,Owner Occupied,,B,3.89,0.66,8.99,2025-06-20,1.04,6290,983,7.69,127,Very Low
+985,100051081388,4 Main Street,Glasgow,Wales,AB71 7AB,50.04,-3.21,2011,Apartment,Private Rent,Clyde Housing,F,5.57,0.27,3.11,2022-01-03,1.19,2336,1762,2.44,159,
+986,100046941559,35 Church Lane,Edinburgh,Wales,DD35 7AB,52.94,-4.65,1953,High-Rise Flat,Private Rent,Private Landlord,G,1.72,0.1,3.96,2023-09-10,1.06,8592,1726,9.07,110,Low
+987,100033397931,186 Main Street,Dundee,Northern Ireland,EH40 8AB,58.91,-1.04,2008,Terraced,Private Rent,City Council,G,3.12,0.22,6.43,2021-07-28,1.98,6508,1683,9.24,341,High
+988,100023805251,71 Park Road,Manchester,,G86 2GH,50.11,-1.55,1951,,Private Rent,City Council,D,4.97,0.3,2.55,2021-03-01,1.07,7899,1243,2.05,280,High
+989,100051195367,140 Station Road,Glasgow,Northern Ireland,DD81 3CD,58.08,1.48,1997,Detached House,Private Rent,Clyde Housing,D,3.23,0.52,5.0,2025-04-07,0.42,5749,1599,8.04,190,Medium
+990,100094311743,66 Church Lane,,England,DD64 6GH,52.76,-5.37,2024,Apartment,Shared Ownership,,A,9.65,0.81,7.48,2024-08-19,1.01,1632,456,8.76,261,Low
+991,100087036406,118 Station Road,Cardiff,Northern Ireland,AB61 5EF,53.16,-4.95,1972,Detached House,,,B,2.24,0.39,6.87,2023-01-14,1.16,993,633,2.49,113,Very High
+992,100089325214,129 High Street,Belfast,Scotland,EH24 3CD,53.97,-3.39,1992,,Private Rent,Private Landlord,C,1.89,0.34,7.62,2021-06-25,0.28,9045,1153,9.85,301,Medium
+993,100076004484,16 Park Road,Dundee,,DD97 7CD,56.73,0.17,2001,Detached House,Owner Occupied,City Council,D,3.77,0.24,8.23,2023-06-15,1.79,8799,1115,4.82,33,Very High
+994,100021275918,137 Main Street,Inverness,Wales,DD12 3AB,57.35,-7.96,1994,Terraced,Shared Ownership,,D,1.5,0.05,2.14,2024-12-10,0.36,5423,1267,4.42,146,
+995,100073570692,138 High Street,Birmingham,Northern Ireland,DD39 8AB,57.42,-3.44,1953,Bungalow,Private Rent,Private Landlord,F,2.08,0.49,6.96,2023-01-13,1.92,2567,602,5.4,91,
+996,100022298183,162 Park Road,Cardiff,Wales,AB40 6AB,57.87,-5.34,2016,High-Rise Flat,Owner Occupied,Private Landlord,F,1.55,0.59,1.5,2021-01-01,1.16,7631,1302,8.52,155,Low
+997,100048031244,192 Main Street,Manchester,England,EH84 8EF,53.91,-7.05,1952,Terraced,Shared Ownership,,B,4.54,0.95,6.14,2021-06-06,0.3,9795,865,7.66,140,Very Low
+998,100034021802,195 Church Lane,Inverness,Northern Ireland,EH34 7AB,53.54,-2.54,2000,Terraced,Social Rent,Housing Association,B,8.47,0.97,4.52,2023-11-07,1.94,3302,1516,3.75,24,Very High
+999,100045585218,112 Main Street,Inverness,Northern Ireland,G44 1CD,55.82,-6.82,2004,Detached House,Shared Ownership,,A,3.98,0.71,4.24,2024-03-23,1.74,3951,1240,4.2,199,Very High
+1000,100083807488,91 Station Road,,England,DD36 8AB,58.14,-1.94,1962,Terraced,Social Rent,Clyde Housing,,6.2,0.38,1.66,2025-04-14,0.94,7170,1450,9.07,105,Very Low
