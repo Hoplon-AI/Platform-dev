@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import "./LandingPage.css";
+import "./Landingpage.css";
 
 const CITY_IMAGES = [
   {
@@ -20,15 +20,15 @@ const CITY_IMAGES = [
   },
 ];
 
-function LandingPage({ onGetStarted }) {
+function Landingpage({ onGetStarted }) {
   const [cityIndex, setCityIndex] = useState(0);
 
   useEffect(() => {
-    const id = setInterval(
-      () => setCityIndex((prev) => (prev + 1) % CITY_IMAGES.length),
-      6000
-    );
-    return () => clearInterval(id);
+    const interval = setInterval(() => {
+      setCityIndex((prev) => (prev + 1) % CITY_IMAGES.length);
+    }, 6000);
+
+    return () => clearInterval(interval);
   }, []);
 
   const currentCity = CITY_IMAGES[cityIndex];
@@ -39,35 +39,37 @@ function LandingPage({ onGetStarted }) {
       <header className="landing-header">
         <div className="header-content">
           <div className="logo">EquiRisk</div>
-          <button
-            className="btn-primary"
-            onClick={() => onGetStarted("portfolio")}
-          >
+
+          <button className="btn-primary" onClick={onGetStarted}>
             Get Started
           </button>
         </div>
       </header>
 
-      {/* Hero Section */}
+      {/* Hero */}
       <section className="hero">
         <div className="hero-content">
           <h1 className="hero-title">EquiRisk</h1>
+
           <p className="hero-description">
             AI-powered insights for social housing insurance.
           </p>
-          {/* Removed the second Get Started button to avoid redundancy */}
         </div>
 
         <div className="hero-image">
-          <img src={currentCity.url} alt={currentCity.label} />
-          <div className="hero-city-chip">{currentCity.label}</div>
+          <img
+            src={currentCity.url}
+            alt={currentCity.label}
+            className="hero-slideshow-image"
+          />
         </div>
       </section>
 
-      {/* Services Section */}
+      {/* Services */}
       <section className="services">
         <div className="section-header">
           <h2>Smart Coverage</h2>
+
           <p>
             AI-powered insights that sharpen social housing insurance decisions.
           </p>
@@ -78,6 +80,7 @@ function LandingPage({ onGetStarted }) {
             src="https://equirisk.ai/wp-content/uploads/2025/11/iStock-1424081499.jpg"
             alt="Family"
           />
+
           <img
             src="https://equirisk.ai/wp-content/uploads/2025/11/iStock-175139990.jpg"
             alt="Housing"
@@ -85,14 +88,16 @@ function LandingPage({ onGetStarted }) {
         </div>
       </section>
 
-      {/* About Section */}
+      {/* About */}
       <section className="about">
         <div className="section-header">
           <h2>About EquiRisk</h2>
+
           <p>
             We bring AI-driven insight to social housing insurance, making risk
-            clearer and more manageable for you.
+            clearer and more manageable.
           </p>
+
           <button className="btn-secondary">Learn More</button>
         </div>
 
@@ -101,34 +106,40 @@ function LandingPage({ onGetStarted }) {
             src="https://equirisk.ai/wp-content/uploads/2025/11/iStock-1289432415.jpg"
             alt="City"
           />
+
           <img
             src="https://equirisk.ai/wp-content/uploads/2025/11/iStock-1408723366-1.jpg"
-            alt="Houses"
+            alt="Homes"
           />
         </div>
       </section>
 
-      {/* CTA Section */}
+      {/* CTA */}
       <section className="cta">
         <h2>Insure Smarter</h2>
+
         <p>
           Harness AI-driven insights to manage social housing risks clearly and
           confidently.
         </p>
-        <button className="btn-cta" onClick={() => onGetStarted("portfolio")}>
+
+        <button className="btn-cta" onClick={onGetStarted}>
           Start
         </button>
       </section>
 
-      {/* Contact Section */}
+      {/* Contact */}
       <section className="contact">
         <div className="contact-form">
           <h2>Get in touch</h2>
-          <p>Now</p>
+
           <form onSubmit={(e) => e.preventDefault()}>
             <input type="text" placeholder="Name" />
+
             <input type="email" placeholder="Email" />
+
             <textarea placeholder="Message" rows="4" />
+
             <button type="submit" className="btn-primary">
               Send
             </button>
@@ -145,10 +156,10 @@ function LandingPage({ onGetStarted }) {
 
       {/* Footer */}
       <footer className="landing-footer">
-        <p>&copy; 2025 EquiRisk. All rights reserved.</p>
+        <p>© 2025 EquiRisk. All rights reserved.</p>
       </footer>
     </div>
   );
 }
 
-export default LandingPage;
+export default Landingpage;
