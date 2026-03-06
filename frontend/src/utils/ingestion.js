@@ -31,9 +31,7 @@ const toSnake = (s) =>
 const normalizeHeader = (h) => {
   const key = toSnake(h);
 
-  // Common aliases found in real SOV sheets
   const ALIASES = {
-    // IDs
     id: "id",
     property_id: "id",
     ref: "id",
@@ -41,58 +39,67 @@ const normalizeHeader = (h) => {
     council_reference: "council_reference",
     council_ref: "council_reference",
 
-    // Address
+    uprn: "uprn",
+    u_p_r_n: "uprn",
+    unique_property_reference_number: "uprn",
+    unique_property_reference: "uprn",
+    property_uprn: "uprn",
+    asset_uprn: "uprn",
+
     address: "address_line_1",
     address1: "address_line_1",
     address_line1: "address_line_1",
     address_line_1: "address_line_1",
     address_1: "address_line_1",
+
     address2: "address_line_2",
     address_line2: "address_line_2",
     address_line_2: "address_line_2",
     address_2: "address_line_2",
+
     postcode: "post_code",
     post_code: "post_code",
     zip: "post_code",
+
     city: "city",
     town: "city",
 
-    // Geo
     lat: "latitude",
     latitude: "latitude",
     lon: "longitude",
     long: "longitude",
     longitude: "longitude",
 
-    // Sums
     suminsured: "sum_insured",
     sum_insured: "sum_insured",
     tsi: "sum_insured",
     total_sum_insured: "sum_insured",
     declared_value: "sum_insured",
+    declared_value_with_full_vat: "sum_insured",
 
-    // Types
     propertytype: "property_type",
     property_type: "property_type",
+    asset_type: "property_type",
+
     occupancy: "occupancy_type",
     occupancy_type: "occupancy_type",
     tenure: "occupancy_type",
 
-    // Counts
     flats: "number_of_flats",
     number_of_flats: "number_of_flats",
     no_of_flats: "number_of_flats",
 
-    // Height
     height: "height_m",
     height_m: "height_m",
     building_height: "height_m",
     building_height_m: "height_m",
 
-    // Optional
     year_built: "year_built",
     construction: "construction",
     construction_type: "construction",
+
+    readiness_score: "readiness_score",
+    readiness_band: "readiness_band",
   };
 
   return ALIASES[key] || key;
@@ -103,17 +110,14 @@ const parseNumber = (v) => {
   const s = String(v).trim();
   if (!s) return null;
 
-  // Remove currency symbols and commas
   const cleaned = s.replace(/[£$,]/g, "").replace(/\s/g, "");
-
   const x = Number(cleaned);
   return Number.isFinite(x) ? x : null;
 };
 
 const safeStr = (v) => {
   if (v === null || v === undefined) return "";
-  const s = String(v).trim();
-  return s;
+  return String(v).trim();
 };
 
 const isLikelyUkCoord = (lat, lon) => {
@@ -126,16 +130,30 @@ const isLikelyUkCoord = (lat, lon) => {
   );
 };
 
+const isPresent = (v) => {
+  if (v === null || v === undefined) return false;
+  if (typeof v === "string") return v.trim().length > 0;
+  if (typeof v === "number") return Number.isFinite(v);
+  return true;
+};
+
+const pct = (count, total) => {
+  if (!total) return 0;
+  return Math.round((count / total) * 100);
+};
+
 const computeReadiness = (obj) => {
   const missing = [];
+
   for (const k of REQUIRED_FIELDS) {
     const v = obj[k];
-    const isMissing =
+    const missingField =
       v === null ||
       v === undefined ||
       (typeof v === "string" && !v.trim()) ||
       (typeof v === "number" && !Number.isFinite(v));
-    if (isMissing) missing.push(k);
+
+    if (missingField) missing.push(k);
   }
 
   const total = REQUIRED_FIELDS.length;
@@ -143,12 +161,11 @@ const computeReadiness = (obj) => {
 
   let band = "Red";
   if (score >= 80) band = "Green";
-  else if (score >= 50) band = "Yellow";
+  else if (score >= 50) band = "Amber";
 
   return { score, band, missing };
 };
 
-// --- CSV parsing (minimal but robust enough for typical SOV exports) ---
 const splitCsvLine = (line) => {
   const out = [];
   let cur = "";
@@ -176,6 +193,7 @@ const splitCsvLine = (line) => {
 
     cur += ch;
   }
+
   out.push(cur);
   return out.map((s) => s.trim());
 };
@@ -201,19 +219,16 @@ const parseCsvText = (text) => {
     });
     rows.push(row);
   }
+
   return rows;
 };
 
-// --- XLSX parsing (requires `xlsx`) ---
 const parseXlsxFile = async (file) => {
-  // dynamic import so dev server doesn’t crash if not installed
   let XLSX;
   try {
     XLSX = await import("xlsx");
   } catch (e) {
-    throw new Error(
-      "XLSX support requires the 'xlsx' package. Install it with: npm i xlsx"
-    );
+    throw new Error("XLSX support requires the 'xlsx' package. Install it with: npm i xlsx");
   }
 
   const buf = await file.arrayBuffer();
@@ -233,7 +248,6 @@ const parseXlsxFile = async (file) => {
   const rows = [];
   for (let i = 1; i < grid.length; i++) {
     const arr = grid[i] || [];
-    // ignore empty rows
     if (arr.every((x) => String(x ?? "").trim() === "")) continue;
 
     const row = {};
@@ -253,34 +267,38 @@ const normalizeRow = (row, idx) => {
     safeStr(row.id) ||
     safeStr(row.council_reference) ||
     safeStr(row.property_reference) ||
+    safeStr(row.uprn) ||
     `ROW-${idx + 1}`;
 
   const latitude = parseNumber(row.latitude);
   const longitude = parseNumber(row.longitude);
-
   const sumInsured = parseNumber(row.sum_insured);
-
   const heightM = parseNumber(row.height_m);
+  const uprn = safeStr(row.uprn);
 
   const base = {
     id,
+    uprn,
     council_reference: safeStr(row.council_reference),
+
     address_line_1: safeStr(row.address_line_1),
     address_line_2: safeStr(row.address_line_2),
     city: safeStr(row.city),
     post_code: safeStr(row.post_code),
+
     latitude,
     longitude,
+
     sum_insured: sumInsured,
     property_type: safeStr(row.property_type),
     occupancy_type: safeStr(row.occupancy_type),
     number_of_flats: parseNumber(row.number_of_flats),
+
     height_m: heightM,
     year_built: parseNumber(row.year_built),
     construction: safeStr(row.construction),
   };
 
-  // If sheet already provides readiness, keep it; otherwise compute.
   const providedScore = parseNumber(row.readiness_score);
   const providedBand = safeStr(row.readiness_band);
 
@@ -290,15 +308,14 @@ const normalizeRow = (row, idx) => {
     const score = Math.max(0, Math.min(100, Math.round(providedScore)));
     let band = "Red";
     if (score >= 80) band = "Green";
-    else if (score >= 50) band = "Yellow";
+    else if (score >= 50) band = "Amber";
 
     readiness = {
       score,
       band: providedBand || band,
-      missing: readiness.missing, // still useful
+      missing: readiness.missing,
     };
   } else if (providedBand) {
-    // If only band is given, keep computed score but adopt band
     readiness = { ...readiness, band: providedBand };
   }
 
@@ -329,19 +346,17 @@ export const parsePortfolioFile = async (file, onSuccess, onError) => {
       throw new Error("Unsupported file type. Please upload a CSV or XLSX.");
     }
 
-    const props = rows.map((r, i) => normalizeRow(r, i));
-
-    // Helpful: count how many rows are not mappable
-    const skipped = props.filter((p) => !p.hasValidCoords).length;
+    const properties = rows.map((r, i) => normalizeRow(r, i));
+    const skipped = properties.filter((p) => !p.hasValidCoords).length;
 
     onSuccess?.({
       sourceName: name,
-      properties: props,
+      properties,
       stats: {
-        rowCount: props.length,
-        mappableCount: props.length - skipped,
+        rowCount: properties.length,
+        mappableCount: properties.length - skipped,
         skippedInvalidCoords: skipped,
-        totalValue: props.reduce((s, p) => s + (p.sum_insured || 0), 0),
+        totalValue: properties.reduce((s, p) => s + (p.sum_insured || 0), 0),
       },
     });
   } catch (e) {
@@ -349,20 +364,66 @@ export const parsePortfolioFile = async (file, onSuccess, onError) => {
   }
 };
 
+const avg = (nums) => {
+  const list = (nums || []).filter((n) => Number.isFinite(Number(n))).map(Number);
+  if (!list.length) return null;
+  return list.reduce((a, b) => a + b, 0) / list.length;
+};
+
 export const getIngestionSummary = (ingestionResult) => {
   if (!ingestionResult?.properties) return null;
 
   const props = ingestionResult.properties;
-  const missingCore = props.filter((p) => (p.missing_fields || []).length > 0)
-    .length;
+  const total = props.length;
+
+  const totalValue = props.reduce((s, p) => s + (p.sum_insured || 0), 0);
+  const skippedInvalidCoords = ingestionResult.stats?.skippedInvalidCoords ?? 0;
+  const mappableCount = ingestionResult.stats?.mappableCount ?? 0;
+
+  const avgReadinessRaw = avg(props.map((p) => p.readiness_score));
+  const avgReadiness = Number.isFinite(avgReadinessRaw) ? Math.round(avgReadinessRaw) : 0;
+
+  const uprnMatchedCount = props.filter((p) => isPresent(p.uprn)).length;
+  const uprnMatchPct = pct(uprnMatchedCount, total);
+
+  // Address completeness: address line 1 + postcode + city all present
+  const addressCompleteCount = props.filter(
+    (p) =>
+      isPresent(p.address_line_1) &&
+      isPresent(p.post_code) &&
+      isPresent(p.city)
+  ).length;
+  const addrCompletenessPct = pct(addressCompleteCount, total);
+
+  // Geo completeness: valid lat/lon in UK bounds
+  const geoCompletenessPct = pct(mappableCount, total);
+
+  // SOV completeness: sum insured + property type + height present
+  const sovCompleteCount = props.filter(
+    (p) =>
+      isPresent(p.sum_insured) &&
+      isPresent(p.property_type) &&
+      isPresent(p.height_m)
+  ).length;
+  const sovCompletenessPct = pct(sovCompleteCount, total);
+
+  const missingCore = props.filter((p) => (p.missing_fields || []).length > 0).length;
 
   return {
     source: ingestionResult.sourceName,
-    propertyCount: props.length,
-    mappableCount: ingestionResult.stats?.mappableCount ?? 0,
-    skippedInvalidCoords: ingestionResult.stats?.skippedInvalidCoords ?? 0,
-    totalValue: ingestionResult.stats?.totalValue ?? 0,
+    propertyCount: total,
+    mappableCount,
+    skippedInvalidCoords,
+    totalValue,
     missingCore,
+
+    avgReadiness,
+    uprnMatchedCount,
+    uprnMatchPct,
+
+    addrCompletenessPct,
+    geoCompletenessPct,
+    sovCompletenessPct,
   };
 };
 
