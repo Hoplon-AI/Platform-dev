@@ -144,6 +144,13 @@ def get_building_height_from_uprn(
         "geometry_area_m2": props.get("geometry_area_m2"),
         "osid": props.get("osid"),
         "description": props.get("description"),
+        # Extra COPE data
+        "property_type": props.get("description"),
+        "wall_construction": props.get("constructionmaterial"),
+        "roof_construction": props.get("roofmaterial_primarymaterial"),
+        "age_band": props.get("buildingage_period"),
+        "year_of_build": props.get("buildingage_year"),
+        "basement": props.get("basementpresence"),
     }
 
 
@@ -152,7 +159,7 @@ if __name__ == "__main__":
     PLACES_KEY = "Ajrj5AiJphBOM2GdP7KqVx6Ax6CTemtY"
     NGD_KEY = "6O5pS5fOPakmnsCbdaykC8nszFcaGSkz"
     TEST_UPRN = 906369718  # 3/2 Grange Loan, Edinburgh
-    test_U = [200004166668,
+    test_U = [906700278607, 906700350103, 200004166668,
               10002925710, 100021008224,
               200003423587, 10023012454, 100120943507]
 
@@ -169,6 +176,12 @@ if __name__ == "__main__":
             print(f"Height confidence:   {result['height_confidencelevel']}")
             print(f"Number of floors:   {result['numberoffloors']}")
             print(f"Building area:       {result['geometry_area_m2']} m²")
+            print(f"Property type:      {result['property_type']}")
+            print(f"Wall Construction       {result['wall_construction']}")
+            print(f"Roof Construction       {result['roof_construction']}")
+            print(f"Age Band:              {result['age_band']}")
+            print(f"Year of Build:         {result['year_of_build']}")
+            print(f"Basement:              {result['basement']}")
             print(f"OS ID:               {result['osid']}")
         else:
             print(f"Error: {result}")
