@@ -2,6 +2,8 @@
 """
 Main FastAPI application entry point.
 """
+from dotenv import load_dotenv
+load_dotenv()
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
@@ -9,10 +11,13 @@ from typing import Dict, Any
 from backend.api.ingestion.upload_router import router as upload_router
 from backend.api.v1.lineage_router import router as lineage_router
 from backend.api.v1.portfolios_router import router as portfolios_router
+from backend.api.enrichment.enrichment_router import router as enrichment_router
 from backend.geo import router as geo_router
 from backend.api.v1.ha_profile_router import router as ha_profile_router
 # from backend.api.v1.underwriter_router import router as underwriter_router
 from backend.api.v1.pdf_test_router import router as pdf_test_router
+from backend.api.v1.export_router import router as export_router
+from backend.api.v1.underwriter_router import router as underwriter_router
 from backend.core.database.db_pool import DatabasePool
 from infrastructure.storage.s3_config import get_s3_config
 
@@ -60,8 +65,10 @@ app.include_router(lineage_router)
 app.include_router(portfolios_router)
 app.include_router(geo_router)
 app.include_router(ha_profile_router)
-# app.include_router(underwriter_router)
+app.include_router(export_router)
+app.include_router(underwriter_router)
 app.include_router(pdf_test_router)
+app.include_router(enrichment_router)
 
 
 

@@ -66,56 +66,58 @@ def get_epc_from_uprn(uprn, email, api_key):
     except requests.exceptions.RequestException as e:
         return f"An error occurred: {e}"
 
-MY_EMAIL = "igorshuvalov23@gmail.com"
-MY_API_KEY = "9213b51f9af85ba4700865191700778f0cc7f3fc"
-PLACES_API_KEY = "Ajrj5AiJphBOM2GdP7KqVx6Ax6CTemtY"
 
-test_U = [200004166668,
-10002925710, 100021008224,
-200003423587, 10023012454]
+if __name__ == "__main__":
+    MY_EMAIL = "igorshuvalov23@gmail.com"
+    MY_API_KEY = "9213b51f9af85ba4700865191700778f0cc7f3fc"
+    PLACES_API_KEY = "Ajrj5AiJphBOM2GdP7KqVx6Ax6CTemtY"
 
-FIELDS_OF_INTEREST = {
-    "address": "Address",
-    "lodgement-datetime": "Lodgement Date",
-    "property-type": "Property Type",
-    "built-form": "Built Form",
-    "walls-description": "Wall Type / Insulation",
-    "roof-description": "Roof Type",
-    "main-fuel": "Main Fuel",
-    "total-floor-area": "Total Floor Area (m²)",
-    "construction-age-band": "Year of Build (Band)",
-    "extension-count": "Extension Count",
-    "number-open-fireplaces": "Open Fireplaces",
-    "current-energy-rating": "EPC Rating",
-    "potential-energy-rating": "Potential EPC Rating",
-    "transaction-type": "Transaction Type",
-    "lighting-cost-current": "Lighting Cost (£)",
-    "heating-cost-current": "Heating Cost (£)",
-    "hot-water-cost-current": "Hot Water Cost (£)",
-}
+    test_U = [200004166668,
+    10002925710, 100021008224,
+    200003423587, 10023012454]
 
-for test_uprns in test_U:
+    FIELDS_OF_INTEREST = {
+        "address": "Address",
+        "lodgement-datetime": "Lodgement Date",
+        "property-type": "Property Type",
+        "built-form": "Built Form",
+        "walls-description": "Wall Type / Insulation",
+        "roof-description": "Roof Type",
+        "main-fuel": "Main Fuel",
+        "total-floor-area": "Total Floor Area (m²)",
+        "construction-age-band": "Year of Build (Band)",
+        "extension-count": "Extension Count",
+        "number-open-fireplaces": "Open Fireplaces",
+        "current-energy-rating": "EPC Rating",
+        "potential-energy-rating": "Potential EPC Rating",
+        "transaction-type": "Transaction Type",
+        "lighting-cost-current": "Lighting Cost (£)",
+        "heating-cost-current": "Heating Cost (£)",
+        "hot-water-cost-current": "Hot Water Cost (£)",
+    }
 
-    result = get_epc_from_uprn(test_uprns, MY_EMAIL, MY_API_KEY)
+    for test_uprns in test_U:
 
-    if isinstance(result, list):
-        print(f"Found {len(result)} certificate(s) — showing most recent:\n")
-        cert = result[0]
-        for api_key, label in FIELDS_OF_INTEREST.items():
-            print(f"  {label:30s}: {cert.get(api_key, 'N/A')}")
+        result = get_epc_from_uprn(test_uprns, MY_EMAIL, MY_API_KEY)
 
-        # Cross-validate: compare OS Places address with EPC address
-        place = get_coordinates_from_uprn(test_uprns, PLACES_API_KEY)
-        if isinstance(place, dict):
-            os_address = place.get("ADDRESS", "")
-            epc_address = cert.get("address", "")
-            match = compare_addresses(os_address, epc_address)
-            print(f"\n  --- Address Cross-Validation ---")
-            print(f"  OS Places:  {os_address}")
-            print(f"  EPC:        {epc_address}")
-            print(f"  Score: {match['score']}  Confidence: {match['confidence']}")
+        if isinstance(result, list):
+            print(f"Found {len(result)} certificate(s) — showing most recent:\n")
+            cert = result[0]
+            for api_key, label in FIELDS_OF_INTEREST.items():
+                print(f"  {label:30s}: {cert.get(api_key, 'N/A')}")
 
-    else:
-        print(result)
+            # Cross-validate: compare OS Places address with EPC address
+            place = get_coordinates_from_uprn(test_uprns, PLACES_API_KEY)
+            if isinstance(place, dict):
+                os_address = place.get("ADDRESS", "")
+                epc_address = cert.get("address", "")
+                match = compare_addresses(os_address, epc_address)
+                print(f"\n  --- Address Cross-Validation ---")
+                print(f"  OS Places:  {os_address}")
+                print(f"  EPC:        {epc_address}")
+                print(f"  Score: {match['score']}  Confidence: {match['confidence']}")
 
-    print()
+        else:
+            print(result)
+
+        print()

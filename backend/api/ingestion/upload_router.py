@@ -8,6 +8,7 @@ import os
 import io
 from datetime import datetime
 from backend.core.database.db_pool import DatabasePool
+from backend.workers.sov_processor import process_sov_to_silver
 import json
 
 from backend.api.ingestion.upload_models import (
@@ -15,6 +16,7 @@ from backend.api.ingestion.upload_models import (
 )
 from backend.api.ingestion.upload_validator import UploadValidator
 from backend.api.ingestion.file_type_detector import FileTypeDetector, FileType
+from backend.workers.sov_processor_v2 import process_sov_to_silver
 from infrastructure.storage.upload_service import get_upload_service
 from backend.core.audit.audit_logger import get_audit_logger
 from backend.core.tenancy.tenant_middleware import TenantMiddleware
@@ -306,7 +308,17 @@ async def _process_single_file(
         user_id=user_id,
         status=_get_upload_status(),
     )
-    
+
+    if file_type == 'property_schedule':
+        pool = DatabasePool.get_pool()
+        await process_sov_to_silver(
+            file_bytes=file_content,
+            ha_id=ha_id,
+            submission_id=upload_id,
+            upload_id=upload_id,
+            db_pool=pool,
+        )
+
     return UploadResponse(
         success=True,
         upload_id=upload_id,
