@@ -1,16 +1,22 @@
 """
 FastAPI router for file uploads.
 """
-from fastapi import APIRouter, UploadFile, File, Depends, HTTPException, status
+from fastapi import APIRouter, UploadFile, File, Depends, HTTPException, Query, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from typing import Optional, List, Tuple
-import os
+from fastapi.responses import JSONResponse
+from typing import Optional, List, Tuple, Literal
+import decimal
+import hashlib
 import io
-from datetime import datetime
-from backend.core.database.db_pool import DatabasePool
-from backend.workers.sov_processor import process_sov_to_silver
 import json
+import logging
+import os
+import uuid
+from datetime import date, datetime, timezone
 
+import pdfplumber
+
+from backend.core.database.db_pool import DatabasePool
 from backend.api.ingestion.upload_models import (
     UploadRequest, UploadResponse, UploadStatusResponse, UploadListResponse, BatchUploadResponse
 )
@@ -25,6 +31,8 @@ from backend.core.pdf_extraction.pdf_pipeline import (
     is_pdf_type,
     agent_assisted_interpretation_placeholder,
 )
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/v1/upload", tags=["upload"])
 security = HTTPBearer(auto_error=False)  # Don't auto-raise on missing token
@@ -479,30 +487,6 @@ async def upload_files_batch(
     )
 
 
-@router.post("/property-schedule", response_model=UploadResponse)
-async def upload_property_schedule(
-    file: UploadFile = File(...),
-    tenant: Tuple[str, str] = Depends(get_tenant_info),
-):
-    """
-    Upload property schedule (CSV/Excel).
-    
-    Args:
-        file: Uploaded file
-        tenant: Tuple of (ha_id, user_id) extracted from JWT token
-        
-    Returns:
-        UploadResponse with upload details
-    """
-    ha_id, user_id = tenant
-    return await _process_single_file(
-        file=file,
-        ha_id=ha_id,
-        user_id=user_id,
-        file_type='property_schedule',
-    )
-
-
 @router.post("/epc-data", response_model=UploadResponse)
 async def upload_epc_data(
     file: UploadFile = File(...),
@@ -524,54 +508,6 @@ async def upload_epc_data(
         ha_id=ha_id,
         user_id=user_id,
         file_type='epc_data',
-    )
-
-
-@router.post("/fra-document", response_model=UploadResponse)
-async def upload_fra_document(
-    file: UploadFile = File(...),
-    tenant: Tuple[str, str] = Depends(get_tenant_info),
-):
-    """
-    Upload FRA document (PDF - Fire Risk Assessment).
-    
-    Args:
-        file: Uploaded file
-        tenant: Tuple of (ha_id, user_id) extracted from JWT token
-        
-    Returns:
-        UploadResponse with upload details
-    """
-    ha_id, user_id = tenant
-    return await _process_single_file(
-        file=file,
-        ha_id=ha_id,
-        user_id=user_id,
-        file_type='fra_document',
-    )
-
-
-@router.post("/fraew-document", response_model=UploadResponse)
-async def upload_fraew_document(
-    file: UploadFile = File(...),
-    tenant: Tuple[str, str] = Depends(get_tenant_info),
-):
-    """
-    Upload FRAEW document (PDF - PAS 9980 Fire Risk Appraisal of External Walls).
-    
-    Args:
-        file: Uploaded file
-        tenant: Tuple of (ha_id, user_id) extracted from JWT token
-        
-    Returns:
-        UploadResponse with upload details
-    """
-    ha_id, user_id = tenant
-    return await _process_single_file(
-        file=file,
-        ha_id=ha_id,
-        user_id=user_id,
-        file_type='fraew_document',
     )
 
 
@@ -685,3 +621,238 @@ async def get_upload_status(
         checksum=row["checksum"],
         metadata=_parse_metadata(row["metadata"]),
     )
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Helpers for the unified ingest endpoint
+# ─────────────────────────────────────────────────────────────────────────────
+
+def _extract_pdf_text_full(pdf_bytes: bytes) -> str:
+    """Extract all text from a PDF using pdfplumber (all pages)."""
+    pages = []
+    with pdfplumber.open(io.BytesIO(pdf_bytes)) as pdf:
+        for page_num, page in enumerate(pdf.pages, start=1):
+            parts = []
+            text = page.extract_text(x_tolerance=3, y_tolerance=3)
+            if text and text.strip():
+                parts.append(text.strip())
+            elif not parts:
+                words = page.extract_words(x_tolerance=3, y_tolerance=3)
+                if words:
+                    parts.append(" ".join(w["text"] for w in words))
+            try:
+                for table in page.extract_tables():
+                    for row in table:
+                        if row:
+                            row_text = " | ".join(c.strip() if c else "" for c in row)
+                            if row_text.strip(" |"):
+                                parts.append(row_text)
+            except Exception:
+                pass
+            if parts:
+                pages.append(f"[Page {page_num}]\n" + "\n".join(parts))
+    return "\n\n".join(pages)
+
+
+def _make_serializable(obj):
+    """Recursively convert non-JSON-serializable values."""
+    if obj is None:
+        return None
+    if isinstance(obj, bool):
+        return obj
+    if isinstance(obj, decimal.Decimal):
+        return float(obj)
+    if isinstance(obj, (datetime, date)):
+        return obj.isoformat()
+    if isinstance(obj, bytes):
+        return obj.hex()
+    if isinstance(obj, dict):
+        return {str(k): _make_serializable(v) for k, v in obj.items()}
+    if isinstance(obj, (list, tuple)):
+        return [_make_serializable(v) for v in obj]
+    if isinstance(obj, set):
+        return sorted(_make_serializable(v) for v in obj)
+    if isinstance(obj, (int, float, str)):
+        return obj
+    return str(obj)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Unified ingest endpoint
+# ─────────────────────────────────────────────────────────────────────────────
+
+@router.post("/ingest", summary="Unified ingestion — SoV (Excel) or FRA/FRAEW (PDF)")
+async def ingest_document(
+    file: UploadFile = File(...),
+    document_type: Literal["sov", "fra", "fraew"] = Query(
+        ...,
+        description="Select document type: 'sov' for Schedule of Values (Excel), 'fra' for Fire Risk Assessment (PDF), 'fraew' for Fire Risk Appraisal of External Walls (PDF)",
+    ),
+    tenant: Tuple[str, str] = Depends(get_tenant_info),
+):
+    """
+    Single ingestion endpoint for all document types.
+
+    - **sov**   → Excel/CSV Schedule of Values → processed into silver.properties
+    - **fra**   → FRA PDF → Bedrock LLM extraction → silver.fra_features
+    - **fraew** → FRAEW PDF → Bedrock LLM extraction → silver.fraew_features
+
+    The system also auto-detects the file type internally. If the user selection
+    and auto-detection disagree, the user's selection takes priority and a
+    `detection_warning` is included in the response.
+    """
+    ha_id, user_id = tenant
+    file_content = await file.read()
+    filename = file.filename or "upload"
+
+    if not file_content:
+        raise HTTPException(status_code=400, detail="Uploaded file is empty")
+
+    # ── Step 1: Auto-detect file type internally ──────────────────────────
+    auto_detected = detector.detect_file_type(filename=filename, file_content=file_content)
+
+    # Map user selection to FileType for comparison
+    user_type_map = {
+        "sov":   FileType.PROPERTY_SCHEDULE,
+        "fra":   FileType.FRA_DOCUMENT,
+        "fraew": FileType.FRAEW_DOCUMENT,
+    }
+    user_file_type = user_type_map[document_type]
+
+    # ── Step 2: Two-way check ─────────────────────────────────────────────
+    detection_warning = None
+    if auto_detected != FileType.UNKNOWN and auto_detected != user_file_type:
+        detection_warning = (
+            f"You selected '{document_type}' but the system detected this file as "
+            f"'{auto_detected.value}'. Proceeding with your selection."
+        )
+        logger.warning(
+            "Type mismatch for %s: user=%s detected=%s ha_id=%s",
+            filename, document_type, auto_detected.value, ha_id,
+        )
+
+    # ── Step 3: Validate extension matches selection ───────────────────────
+    ext = os.path.splitext(filename)[1].lower()
+    if document_type == "sov" and ext not in [".xlsx", ".xls", ".csv"]:
+        raise HTTPException(status_code=400, detail="SoV must be an Excel or CSV file (.xlsx, .xls, .csv)")
+    if document_type in ("fra", "fraew") and ext != ".pdf":
+        raise HTTPException(status_code=400, detail=f"{document_type.upper()} must be a PDF file")
+
+    # ── Step 4: Upload to S3 + audit log ──────────────────────────────────
+    upload_service = get_upload_service()
+    upload_id, s3_key, checksum = upload_service.upload_file(
+        ha_id=ha_id,
+        file_content=file_content,
+        filename=filename,
+        file_type=user_file_type.value,
+        user_id=user_id,
+    )
+
+    audit_logger = get_audit_logger()
+    await audit_logger.log_upload(
+        upload_id=upload_id,
+        ha_id=ha_id,
+        file_type=user_file_type.value,
+        filename=filename,
+        s3_key=s3_key,
+        metadata={"auto_detected": auto_detected.value, "user_selected": document_type},
+        checksum=checksum,
+        file_size=len(file_content),
+        user_id=user_id,
+        status="processing",
+    )
+
+    # ── Step 5: Process based on user selection ───────────────────────────
+
+    # SoV → sov_processor_v2
+    if document_type == "sov":
+        pool = DatabasePool.get_pool()
+        await process_sov_to_silver(
+            file_bytes=file_content,
+            ha_id=ha_id,
+            submission_id=upload_id,
+            upload_id=upload_id,
+            db_pool=pool,
+        )
+        return JSONResponse(content=_make_serializable({
+            "status": "success",
+            "document_type": "sov",
+            "upload_id": upload_id,
+            "filename": filename,
+            "file_size": len(file_content),
+            "s3_key": s3_key,
+            "auto_detected": auto_detected.value,
+            "user_selected": document_type,
+            "detection_warning": detection_warning,
+            "message": "SoV processed and written to silver.properties",
+        }))
+
+    # FRA / FRAEW → pdfplumber text extraction → Bedrock LLM → silver.*
+    try:
+        text = _extract_pdf_text_full(file_content)
+    except Exception as e:
+        raise HTTPException(status_code=422, detail=f"Could not read PDF: {e}")
+
+    if not text.strip():
+        raise HTTPException(
+            status_code=422,
+            detail="No text could be extracted. File may be a scanned/image PDF.",
+        )
+
+    try:
+        from backend.workers.llm_client import LLMClient
+        llm = LLMClient.from_env()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"LLM client error: {e}")
+
+    pool = DatabasePool.get_pool()
+    async with pool.acquire() as conn:
+        processor = None
+        try:
+            if document_type == "fra":
+                from backend.workers.fra_processor import FRAProcessor
+                processor = FRAProcessor(conn, llm)
+                result = await processor.process(
+                    text=text,
+                    upload_id=str(upload_id),
+                    block_id=None,
+                    ha_id=ha_id,
+                    s3_path=s3_key,
+                )
+            else:  # fraew
+                from backend.workers.fraew_processor import FRAEWProcessor
+                processor = FRAEWProcessor(conn, llm)
+                result = await processor.process(
+                    text=text,
+                    upload_id=str(upload_id),
+                    block_id=None,
+                    ha_id=ha_id,
+                    s3_path=s3_key,
+                )
+        except Exception as e:
+            raw_llm = getattr(processor, "last_raw_response", None) if processor else None
+            logger.exception("Processor failed for %s", filename)
+            return JSONResponse(status_code=500, content=_make_serializable({
+                "status": "failed",
+                "document_type": document_type,
+                "upload_id": upload_id,
+                "filename": filename,
+                "error": str(e),
+                "raw_llm_response": raw_llm,
+                "detection_warning": detection_warning,
+            }))
+
+    return JSONResponse(content=_make_serializable({
+        "status": "success",
+        "document_type": document_type,
+        "upload_id": upload_id,
+        "feature_id": result.get("feature_id"),
+        "filename": filename,
+        "file_size": len(file_content),
+        "s3_key": s3_key,
+        "text_chars_extracted": len(text),
+        "auto_detected": auto_detected.value,
+        "user_selected": document_type,
+        "detection_warning": detection_warning,
+        "message": f"{document_type.upper()} extracted by Bedrock and written to silver.{document_type}_features",
+    }))

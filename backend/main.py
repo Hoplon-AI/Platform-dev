@@ -14,8 +14,6 @@ from backend.api.v1.portfolios_router import router as portfolios_router
 from backend.api.enrichment.enrichment_router import router as enrichment_router
 from backend.geo import router as geo_router
 from backend.api.v1.ha_profile_router import router as ha_profile_router
-# from backend.api.v1.underwriter_router import router as underwriter_router
-from backend.api.v1.pdf_test_router import router as pdf_test_router
 from backend.api.v1.export_router import router as export_router
 from backend.api.v1.underwriter_router import router as underwriter_router
 from backend.core.database.db_pool import DatabasePool
@@ -67,7 +65,6 @@ app.include_router(geo_router)
 app.include_router(ha_profile_router)
 app.include_router(export_router)
 app.include_router(underwriter_router)
-app.include_router(pdf_test_router)
 app.include_router(enrichment_router)
 
 
