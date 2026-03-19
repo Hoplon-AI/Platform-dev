@@ -1077,11 +1077,15 @@ async def process_features_to_silver(
     upload_id_uuid = uuid.UUID(metadata["submission_id"])
     document_type = metadata["file_type"]
     
-    # Only process PDF document types
-    # Accept both short names (scr, fra) and full names (scr_document, fra_document)
-    pdf_types = {"fra", "fra_document", "fraew", "fraew_document", "scr", "scr_document"}
-    if document_type not in pdf_types:
-        return {"status": "ignored", "reason": "not_pdf_document", "document_type": document_type}
+    # Handled document types
+    handled_types = {
+        "fra", "fra_document",
+        "fraew", "fraew_document",
+        "scr", "scr_document",
+        "property_schedule",   # SOV CSV
+    }
+    if document_type not in handled_types:
+        return {"status": "ignored", "reason": "unsupported_document_type", "document_type": document_type}
 
     # Normalize document type to full name for consistent processing
     document_type_map = {
@@ -1114,50 +1118,126 @@ async def process_features_to_silver(
         # Set tenant context for RLS
         await conn.execute("SELECT set_config('app.current_ha_id', $1, true)", ha_id)
         
-        # Write to document_features (base table)
-        feature_id = await _write_document_features(
-            conn,
-            ha_id=ha_id,
-            upload_id=upload_id_uuid,
-            document_type=document_type,
-            features_json=features_json,
-        )
-        
-        # Get UPRN and postcode from document_features for denormalization
-        doc_row = await conn.fetchrow(
-            "SELECT uprn, postcode FROM silver.document_features WHERE feature_id = $1",
-            feature_id,
-        )
-        uprn = doc_row["uprn"] if doc_row else None
-        postcode = doc_row["postcode"] if doc_row else None
-        
-        # Write to document-type-specific table
-        if document_type == "fraew_document":
-            await _write_fraew_features(
+        # -----------------------------------------------------------------
+        # SOV / Property Schedule: parse CSV and write to silver layer
+        # -----------------------------------------------------------------
+        if document_type == "property_schedule":
+            csv_s3_key = await conn.fetchval(
+                "SELECT s3_key FROM upload_audit WHERE upload_id = $1",
+                upload_id_uuid,
+            )
+            if not csv_s3_key:
+                raise ValueError(f"upload_audit row not found for upload_id={upload_id_uuid}")
+
+            csv_bytes = upload_service.get_file(csv_s3_key)
+
+            from backend.workers.sov_processor import SOVProcessor
+            processor = SOVProcessor(conn)
+            sov_result = await processor.process(
+                csv_bytes=csv_bytes,
+                upload_id=str(upload_id_uuid),
+                ha_id=ha_id,
+                filename=csv_s3_key.split("/")[-1],
+            )
+
+            await _update_processing_audit(
                 conn,
-                feature_id=feature_id,
                 ha_id=ha_id,
                 upload_id=upload_id_uuid,
-                features_json=features_json,
-                uprn=uprn,
-                postcode=postcode,
+                status="completed" if sov_result["status"] == "completed" else "failed",
+                execution_arn=execution_arn,
             )
-        elif document_type == "fra_document":
-            await _write_fra_features(
+
+            return {
+                "status": sov_result["status"],
+                "document_type": "property_schedule",
+                "ha_id": ha_id,
+                "upload_id": str(upload_id_uuid),
+                **{k: v for k, v in sov_result.items() if k != "status"},
+            }
+
+        # -----------------------------------------------------------------
+        # FRA / FRAEW: LLM-powered processor path
+        #
+        # FRAProcessor / FRAEWProcessor fetch raw PDF text, call the LLM,
+        # and write BOTH document_features AND fra_features/fraew_features
+        # themselves inside a single transaction — so we do NOT call
+        # _write_document_features() or _write_fra/ew_features() here.
+        #
+        # SCR keeps the original regex path (unchanged).
+        # -----------------------------------------------------------------
+        if document_type in ("fra_document", "fraew_document"):
+            # 1. Retrieve the original PDF S3 key from upload_audit
+            pdf_s3_key = await conn.fetchval(
+                "SELECT s3_key FROM upload_audit WHERE upload_id = $1",
+                upload_id_uuid,
+            )
+            if not pdf_s3_key:
+                raise ValueError(
+                    f"upload_audit row not found for upload_id={upload_id_uuid}. "
+                    "Cannot fetch source PDF for LLM extraction."
+                )
+
+            # 2. Fetch raw PDF bytes from S3
+            pdf_bytes = upload_service.get_file(pdf_s3_key)
+
+            # 3. Extract text (same helper used by the ingestion worker)
+            from backend.core.pdf_extraction.pdf_pipeline import _extract_text_sample
+            text = _extract_text_sample(pdf_bytes, max_pages=15)
+
+            # 4. Create LLM client (reads LLM_PROVIDER + ANTHROPIC_API_KEY from env)
+            from backend.workers.llm_client import LLMClient
+            llm = LLMClient.from_env()
+
+            # 5. Route to the correct processor — it handles all DB writes
+            if document_type == "fra_document":
+                from backend.workers.fra_processor import FRAProcessor
+                processor = FRAProcessor(conn, llm)
+                result = await processor.process(
+                    text=text,
+                    upload_id=str(upload_id_uuid),
+                    block_id=None,          # not yet linked to a block
+                    ha_id=ha_id,
+                    s3_path=pdf_s3_key,     # kept in signature for logging
+                )
+            else:  # fraew_document
+                from backend.workers.fraew_processor import FRAEWProcessor
+                processor = FRAEWProcessor(conn, llm)
+                result = await processor.process(
+                    text=text,
+                    upload_id=str(upload_id_uuid),
+                    block_id=None,
+                    ha_id=ha_id,
+                    s3_path=pdf_s3_key,
+                )
+
+            feature_id = uuid.UUID(result["feature_id"])
+
+        else:
+            # SCR (and any future non-LLM types): original regex flow
+            feature_id = await _write_document_features(
                 conn,
-                feature_id=feature_id,
                 ha_id=ha_id,
                 upload_id=upload_id_uuid,
+                document_type=document_type,
                 features_json=features_json,
             )
-        elif document_type == "scr_document":
-            await _write_scr_features(
-                conn,
-                feature_id=feature_id,
-                ha_id=ha_id,
-                upload_id=upload_id_uuid,
-                features_json=features_json,
+
+            doc_row = await conn.fetchrow(
+                "SELECT uprn, postcode FROM silver.document_features WHERE feature_id = $1",
+                feature_id,
             )
+            uprn = doc_row["uprn"] if doc_row else None
+            postcode = doc_row["postcode"] if doc_row else None
+
+            if document_type == "scr_document":
+                await _write_scr_features(
+                    conn,
+                    feature_id=feature_id,
+                    ha_id=ha_id,
+                    upload_id=upload_id_uuid,
+                    features_json=features_json,
+                )
         
         # Write agentic building safety features (Category A + B) - applies to all document types
         await _write_building_safety_features(

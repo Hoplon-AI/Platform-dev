@@ -98,6 +98,8 @@ if __name__ == "__main__":
     search_address = "10 Downing Street, London"
     search_address = "3/2 Grange Loan, Edinburgh, EH9 2NP"
     search_address = "Flat 9 Whittingham Court, Tower Hill"
+    search_address = "Flat 2/1, 22 Brunton Street, Cathcart, Glasgow, G443DX"
+    search_address = "Flat 2/1, 269 Holmlea Road, Cathcart, Glasgow, G44 4BU"
     #search_address = "1/8 Cables Wynd, Leith, Edinburgh EH6 6DU"
     #search_address = "30 Sycamore Drive, Carterton, OX18 3AT"
 

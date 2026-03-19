@@ -176,4 +176,16 @@ def _parse_response(model_id: str, response: Dict[str, Any]) -> str:
 
 def _get_bedrock_runtime():
     import boto3
-    return boto3.client("bedrock-runtime", region_name=os.getenv("AWS_DEFAULT_REGION", "eu-west-1"))
+
+    region = os.getenv("AWS_DEFAULT_REGION", "eu-west-1")
+
+    # Use dedicated Bedrock credentials if set, otherwise fall back to shared AWS credentials
+    access_key = os.getenv("BEDROCK_AWS_ACCESS_KEY_ID") or os.getenv("AWS_ACCESS_KEY_ID")
+    secret_key = os.getenv("BEDROCK_AWS_SECRET_ACCESS_KEY") or os.getenv("AWS_SECRET_ACCESS_KEY")
+
+    kwargs = {"region_name": region}
+    if access_key and secret_key:
+        kwargs["aws_access_key_id"] = access_key
+        kwargs["aws_secret_access_key"] = secret_key
+
+    return boto3.client("bedrock-runtime", **kwargs)

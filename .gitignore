@@ -274,6 +274,12 @@ os_datahub_credentials.json
 #analyze test
 backend/geo/premium_vs_mapping_analysis/analyze_scoring.py
 
-#keys
-os_dh_fun_keys
-epc_keys
+# Local dev field-name reference dumps (not code, not needed in repo)
+backend/geo/epc_keys
+backend/geo/os_dh_fun_keys
+
+# Claude Code local settings (machine-specific)
+.claude/settings.local.json
+
+# Claude session docs (internal dev notes)
+.claude/docs/
