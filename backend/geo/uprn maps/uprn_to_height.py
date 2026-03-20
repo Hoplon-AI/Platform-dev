@@ -81,6 +81,67 @@ def get_building_from_coords(x: float, y: float, api_key: str) -> dict | str:
     return best
 
 
+def get_buildings_from_coords_batch(
+    coords: list[tuple[str, float, float]],
+    api_key: str,
+) -> dict[str, dict | str]:
+    """Query NGD Buildings API for multiple properties using pre-resolved coordinates.
+
+    Accepts a list of (uprn, x, y) tuples so callers don't need to look up
+    coordinates again. Uses a shared ``requests.Session`` for connection reuse.
+
+    Args:
+        coords: List of (uprn_str, easting, northing) tuples in BNG (EPSG:27700).
+        api_key: OS Data Hub API key (NGD Features API).
+
+    Returns:
+        Dict mapping each UPRN to its nearest building GeoJSON feature,
+        or to an error string if no building was found.
+    """
+    results: dict[str, dict | str] = {}
+
+    with requests.Session() as session:
+        for uprn, x, y in coords:
+            bbox = f"{x - BBOX_BUFFER_M},{y - BBOX_BUFFER_M},{x + BBOX_BUFFER_M},{y + BBOX_BUFFER_M}"
+            params = {
+                "key": api_key,
+                "bbox": bbox,
+                "bbox-crs": BNG_CRS,
+                "crs": BNG_CRS,
+                "limit": 10,
+            }
+            try:
+                response = session.get(NGD_BUILDINGS_URL, params=params)
+                response.raise_for_status()
+                data = response.json()
+            except requests.exceptions.RequestException as e:
+                results[str(uprn)] = f"NGD API error: {e}"
+                continue
+
+            features = data.get("features", [])
+            if not features:
+                results[str(uprn)] = "No building found at these coordinates."
+                continue
+
+            best = None
+            best_dist = float("inf")
+            for feat in features:
+                feat_coords = feat.get("geometry", {}).get("coordinates", [])
+                if not feat_coords:
+                    continue
+                ring = feat_coords[0] if feat["geometry"]["type"] == "Polygon" else feat_coords[0][0]
+                cx = sum(p[0] for p in ring) / len(ring)
+                cy = sum(p[1] for p in ring) / len(ring)
+                dist = ((cx - x) ** 2 + (cy - y) ** 2) ** 0.5
+                if dist < best_dist:
+                    best_dist = dist
+                    best = feat
+
+            results[str(uprn)] = best if best else "No building geometry found."
+
+    return results
+
+
 def get_building_height_from_uprn(
     uprn: str | int,
     places_api_key: str,

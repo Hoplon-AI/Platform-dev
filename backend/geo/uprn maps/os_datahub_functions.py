@@ -3,8 +3,11 @@
 Thin wrappers around the OS Places API for UPRN lookups and address searches.
 API docs: https://osdatahub.os.uk/docs/places/overview
 
-Both functions return either a DPA/LPI result dict on success, or an error
-string on failure. Callers should check ``isinstance(result, dict)``.
+Single-item functions return either a DPA/LPI result dict on success, or an
+error string on failure. Callers should check ``isinstance(result, dict)``.
+
+Batch functions accept lists and use ``requests.Session`` to reuse the
+underlying TCP/SSL connection across calls (saves ~50-100 ms per request).
 """
 
 import requests
@@ -92,16 +95,84 @@ def get_uprn_from_address(address, api_key):
         return f"An error occurred: {e}"
 
 
+# ── Batch functions ────────────────────────────────────────
+
+
+def get_coordinates_from_uprns(uprns: list, api_key: str) -> dict[str, dict | str]:
+    """Look up multiple UPRNs and return their address records.
+
+    Uses a shared ``requests.Session`` so the TCP/SSL connection to
+    api.os.uk is established once and reused for every UPRN.
+
+    Args:
+        uprns: List of UPRNs (str or int).
+        api_key: OS Data Hub API key (Places API).
+
+    Returns:
+        Dict mapping each UPRN (as str) to its DPA/LPI record dict,
+        or to an error string if that particular lookup failed.
+    """
+    url = "https://api.os.uk/search/places/v1/uprn"
+    results: dict[str, dict | str] = {}
+
+    with requests.Session() as session:
+        for uprn in uprns:
+            params = {"uprn": uprn, "key": api_key}
+            try:
+                response = session.get(url, params=params)
+                response.raise_for_status()
+                data = response.json()
+
+                if "results" in data and len(data["results"]) > 0:
+                    record = data["results"][0].get("DPA") or data["results"][0].get("LPI")
+                    results[str(uprn)] = record
+                else:
+                    results[str(uprn)] = "No match found."
+            except requests.exceptions.RequestException as e:
+                results[str(uprn)] = f"An error occurred: {e}"
+
+    return results
+
+
+def get_uprns_from_addresses(addresses: list[str], api_key: str) -> list[dict | str]:
+    """Search for multiple addresses and return their best-matching records.
+
+    Uses a shared ``requests.Session`` for connection reuse. Results are
+    returned in the same order as the input list.
+
+    Args:
+        addresses: List of free-text address strings.
+        api_key: OS Data Hub API key (Places API).
+
+    Returns:
+        List of DPA/LPI record dicts (or error strings), one per input address.
+    """
+    url = "https://api.os.uk/search/places/v1/find"
+    results: list[dict | str] = []
+
+    with requests.Session() as session:
+        for address in addresses:
+            params = {"query": address, "key": api_key, "maxresults": 1}
+            try:
+                response = session.get(url, params=params)
+                response.raise_for_status()
+                data = response.json()
+
+                if "results" in data and len(data["results"]) > 0:
+                    record = data["results"][0].get("DPA") or data["results"][0].get("LPI")
+                    results.append(record)
+                else:
+                    results.append("No match found.")
+            except requests.exceptions.RequestException as e:
+                results.append(f"An error occurred: {e}")
+
+    return results
+
+
 # Usage example
 if __name__ == "__main__":
-    MY_API_KEY = "Ajrj5AiJphBOM2GdP7KqVx6Ax6CTemtY"
-    search_address = "10 Downing Street, London"
-    search_address = "3/2 Grange Loan, Edinburgh, EH9 2NP"
-    search_address = "Flat 9 Whittingham Court, Tower Hill"
-    search_address = "Flat 2/1, 22 Brunton Street, Cathcart, Glasgow, G443DX"
-    search_address = "Flat 2/1, 269 Holmlea Road, Cathcart, Glasgow, G44 4BU"
-    #search_address = "1/8 Cables Wynd, Leith, Edinburgh EH6 6DU"
-    #search_address = "30 Sycamore Drive, Carterton, OX18 3AT"
+    MY_API_KEY = "1cNGEE0jL0R5pXlDpPd55wyEXnIBCF2J"
+    search_address = "Flat 2/1, 60 Grange Road, Battlefield, Glasgow, G42 9LF"
 
     #parent_uprn: 906421443
 
