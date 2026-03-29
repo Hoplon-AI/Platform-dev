@@ -16,6 +16,8 @@ from backend.geo import router as geo_router
 from backend.api.v1.ha_profile_router import router as ha_profile_router
 from backend.api.v1.export_router import router as export_router
 from backend.api.v1.underwriter_router import router as underwriter_router
+from backend.api.v1.pdf_test_router import router as pdf_test_router
+from backend.api.v1.auth_router import router as auth_router
 from backend.core.database.db_pool import DatabasePool
 from infrastructure.storage.s3_config import get_s3_config
 
@@ -66,6 +68,8 @@ app.include_router(ha_profile_router)
 app.include_router(export_router)
 app.include_router(underwriter_router)
 app.include_router(enrichment_router)
+app.include_router(pdf_test_router)
+app.include_router(auth_router)
 
 
 

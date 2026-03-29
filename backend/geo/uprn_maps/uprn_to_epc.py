@@ -14,7 +14,7 @@ import base64
 import csv
 import io
 from address_confidence import compare_addresses
-from os_datahub_functions import get_coordinates_from_uprn
+from backend.geo.uprn_maps.os_datahub_functions import get_coordinates_from_uprn
 
 
 def get_epc_from_uprn(uprn, email, api_key):
@@ -65,6 +65,49 @@ def get_epc_from_uprn(uprn, email, api_key):
 
     except requests.exceptions.RequestException as e:
         return f"An error occurred: {e}"
+
+
+def get_epcs_from_uprns(uprns: list, email: str, api_key: str) -> dict[str, list | str]:
+    """Fetch EPC certificates for multiple UPRNs.
+
+    Uses a shared ``requests.Session`` to reuse the TCP/SSL connection
+    across all calls to the EPC API.
+
+    Args:
+        uprns: List of UPRNs (str or int).
+        email: Registered email for EPC API auth.
+        api_key: EPC API key.
+
+    Returns:
+        Dict mapping each UPRN (as str) to a list of certificate dicts,
+        or to an error string if that particular lookup failed/found nothing.
+    """
+    url = "https://epc.opendatacommunities.org/api/v1/domestic/search"
+    token = base64.b64encode(f"{email}:{api_key}".encode()).decode()
+    headers = {
+        "Authorization": f"Basic {token}",
+        "Accept": "text/csv",
+    }
+
+    results: dict[str, list | str] = {}
+
+    with requests.Session() as session:
+        session.headers.update(headers)
+        for uprn in uprns:
+            params = {"uprn": str(uprn), "size": 100}
+            try:
+                response = session.get(url, params=params)
+                response.raise_for_status()
+                reader = csv.DictReader(io.StringIO(response.text))
+                rows = list(reader)
+                if len(rows) > 0:
+                    results[str(uprn)] = rows
+                else:
+                    results[str(uprn)] = "No EPC certificates found."
+            except requests.exceptions.RequestException as e:
+                results[str(uprn)] = f"An error occurred: {e}"
+
+    return results
 
 
 if __name__ == "__main__":

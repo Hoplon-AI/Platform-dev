@@ -32,6 +32,7 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from backend.core.database.db_pool import DatabasePool
 from backend.core.tenancy.tenant_middleware import TenantMiddleware
+from backend.api.v1.auth_router import _decode_token
 
 router = APIRouter(prefix="/api/v1/underwriter", tags=["underwriter"])
 
@@ -79,6 +80,7 @@ async def _resolve_portfolio(conn, portfolio_id: str) -> Dict[str, Any]:
             po.ha_id,
             po.name          AS portfolio_name,
             po.renewal_year,
+            po.renewal_date,
             ha.name          AS ha_name
         FROM silver.portfolios po
         JOIN public.housing_associations ha ON ha.ha_id = po.ha_id
@@ -92,6 +94,142 @@ async def _resolve_portfolio(conn, portfolio_id: str) -> Dict[str, Any]:
             detail=f"Portfolio {portfolio_id} not found.",
         )
     return dict(row)
+
+
+# ===========================================================================
+# 0. Underwriter Home — filtered portfolios + attention items
+# ===========================================================================
+
+@router.get("/home")
+async def underwriter_home(
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(security),
+) -> Dict[str, Any]:
+    """
+    Home page data for underwriter portal.
+
+    Returns:
+      - portfolios: filtered by underwriter's ha_ids (from JWT), each with
+        granted_by, access_status, and all KPI fields
+      - attention: cross-portfolio roll-up of RED FRA blocks, combustible
+        cladding portfolios, and newly-shared portfolios
+    """
+    dev_mode = os.getenv("DEV_MODE", "false").lower() == "true"
+
+    # Resolve underwriter identity from JWT or DEV defaults
+    if credentials:
+        payload = _decode_token(credentials.credentials)
+        ha_ids: List[str] = payload.get("ha_ids", [])
+        underwriter_id: Optional[str] = payload.get("sub")
+    elif dev_mode:
+        ha_ids = [os.getenv("DEV_HA_ID", "ha_demo")]
+        underwriter_id = None  # no real DB record in DEV — skip access join filter
+    else:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Not authenticated.",
+        )
+
+    if not ha_ids:
+        return {"portfolios": [], "attention": {"fra_red_blocks": 0, "combustible_cladding_portfolios": 0, "new_portfolios": 0}}
+
+    pool = DatabasePool.get_pool()
+    async with pool.acquire() as conn:
+        rows = await conn.fetch(
+            """
+            SELECT
+                po.portfolio_id::text,
+                po.ha_id,
+                po.name          AS portfolio_name,
+                po.renewal_year,
+                po.renewal_date,
+                ha.name          AS ha_name,
+
+                -- Access grant metadata (NULL when DEV_MODE has no real underwriter_id)
+                acc.granted_by,
+                acc.status       AS access_status,
+
+                -- Block KPIs
+                COUNT(DISTINCT b.block_id)                          AS block_count,
+                COALESCE(SUM(b.unit_count), 0)::bigint              AS total_units,
+                COALESCE(SUM(b.total_sum_insured), 0)               AS total_insured_value,
+
+                -- FRA RAG
+                COUNT(DISTINCT b.block_id) FILTER (
+                    WHERE fra.rag_status = 'RED'
+                )                                                   AS fra_red_count,
+                COUNT(DISTINCT b.block_id) FILTER (
+                    WHERE fra.rag_status = 'AMBER'
+                )                                                   AS fra_amber_count,
+                COUNT(DISTINCT b.block_id) FILTER (
+                    WHERE fra.rag_status = 'GREEN'
+                )                                                   AS fra_green_count,
+                COUNT(DISTINCT b.block_id) FILTER (
+                    WHERE fra.rag_status IS NULL
+                )                                                   AS fra_unassessed_count,
+
+                -- FRAEW
+                COUNT(DISTINCT b.block_id) FILTER (
+                    WHERE fraew.rag_status IS NOT NULL
+                )                                                   AS fraew_assessed_count,
+                COUNT(DISTINCT b.block_id) FILTER (
+                    WHERE fraew.rag_status IS NULL
+                )                                                   AS fraew_unassessed_count,
+                BOOL_OR(fraew.has_combustible_cladding = TRUE)      AS has_combustible_cladding_blocks
+
+            FROM silver.portfolios po
+            JOIN public.housing_associations ha ON ha.ha_id = po.ha_id
+
+            -- Access grant — filtered by underwriter when we have a real ID
+            LEFT JOIN public.ha_underwriter_access acc
+                ON  acc.ha_id = po.ha_id
+                AND acc.renewal_year = po.renewal_year
+                AND ($2::text IS NULL OR acc.underwriter_id::text = $2)
+
+            LEFT JOIN silver.blocks b ON b.ha_id = po.ha_id
+
+            LEFT JOIN LATERAL (
+                SELECT rag_status
+                FROM silver.fra_features
+                WHERE block_id = b.block_id
+                ORDER BY assessment_date DESC NULLS LAST, created_at DESC
+                LIMIT 1
+            ) fra ON TRUE
+
+            LEFT JOIN LATERAL (
+                SELECT rag_status, has_combustible_cladding
+                FROM silver.fraew_features
+                WHERE block_id = b.block_id
+                ORDER BY created_at DESC
+                LIMIT 1
+            ) fraew ON TRUE
+
+            WHERE po.ha_id = ANY($1)
+
+            GROUP BY
+                po.portfolio_id, po.ha_id, po.name, po.renewal_year, po.renewal_date,
+                ha.name, acc.granted_by, acc.status
+
+            ORDER BY po.renewal_year DESC, ha.name
+            """,
+            ha_ids,
+            underwriter_id,
+        )
+
+    portfolios = [dict(r) for r in rows]
+
+    # Attention roll-up
+    fra_red_blocks = sum((p.get("fra_red_count") or 0) for p in portfolios)
+    cladding_count = sum(1 for p in portfolios if p.get("has_combustible_cladding_blocks"))
+    new_count = sum(1 for p in portfolios if p.get("access_status") == "new")
+
+    return {
+        "portfolios": portfolios,
+        "attention": {
+            "fra_red_blocks": fra_red_blocks,
+            "combustible_cladding_portfolios": cladding_count,
+            "new_portfolios": new_count,
+        },
+    }
 
 
 # ===========================================================================
@@ -121,6 +259,7 @@ async def list_portfolios(
                 po.ha_id,
                 po.name          AS portfolio_name,
                 po.renewal_year,
+                po.renewal_date,
                 ha.name          AS ha_name,
 
                 -- Block counts
@@ -290,7 +429,18 @@ async def portfolio_summary(
                 -- Listed buildings
                 COUNT(DISTINCT b.block_id) FILTER (
                     WHERE b.is_listed = TRUE
-                )                                                   AS listed_blocks
+                )                                                   AS listed_blocks,
+
+                -- FRAEW 18m+ coverage (for the "X/Y Blocks 1m+ with FRAEW" KPI card)
+                COUNT(DISTINCT b.block_id) FILTER (
+                    WHERE b.height_max_m >= 18
+                )                                                   AS fraew_18m_total,
+                COUNT(DISTINCT b.block_id) FILTER (
+                    WHERE b.height_max_m >= 18 AND fraew.rag_status IS NOT NULL
+                )                                                   AS fraew_18m_assessed,
+                COUNT(DISTINCT b.block_id) FILTER (
+                    WHERE b.height_max_m >= 18 AND fraew.rag_status IS NULL
+                )                                                   AS fraew_18m_awaiting
 
             FROM silver.blocks b
 
@@ -322,6 +472,7 @@ async def portfolio_summary(
             "portfolio_name": portfolio["portfolio_name"],
             "ha_name":        portfolio["ha_name"],
             "renewal_year":   portfolio["renewal_year"],
+            "renewal_date":   portfolio["renewal_date"].isoformat() if portfolio["renewal_date"] else None,
         })
         return result
 
@@ -1236,4 +1387,154 @@ async def risk_summary(
             "fra":               fra,
             "fraew":             fraew,
             "urgent_blocks":     [dict(r) for r in urgent_blocks],
+        }
+
+
+# ===========================================================================
+# 8. Doc A / Doc B Completeness
+# ===========================================================================
+
+@router.get("/portfolios/{portfolio_id}/doc-completeness")
+async def doc_completeness(
+    portfolio_id: str,
+    tenant: Tuple[str, str] = Depends(get_tenant_info),
+) -> Dict[str, Any]:
+    """
+    Field completeness % for Doc A (Stock Listing) and Doc B (High Value).
+
+    Doc A — checks 13 core SoV fields per property, averaged across all properties.
+    Doc B — checks 10 SoV block fields + 3 FRA fields + 4 FRAEW fields per block,
+            averaged across all blocks.
+
+    Returns:
+      doc_a.completeness_pct  — e.g. 94.0
+      doc_a.total_properties
+      doc_a.total_fields       — fields checked per property
+      doc_a.field_detail       — per-field fill rate
+
+      doc_b.completeness_pct  — e.g. 78.0
+      doc_b.total_blocks
+      doc_b.total_fields
+      doc_b.field_detail
+    """
+    pool = DatabasePool.get_pool()
+    async with pool.acquire() as conn:
+        portfolio = await _resolve_portfolio(conn, portfolio_id)
+        ha_id = portfolio["ha_id"]
+
+        # ── Doc A: per-property SoV field fill rates ─────────────────────────
+        doc_a_row = await conn.fetchrow(
+            """
+            SELECT
+                COUNT(*)                                            AS total_properties,
+                -- Per-field fill rates (0.0–1.0)
+                ROUND(AVG(CASE WHEN property_reference   IS NOT NULL THEN 1.0 ELSE 0.0 END), 3) AS f_property_reference,
+                ROUND(AVG(CASE WHEN block_reference      IS NOT NULL THEN 1.0 ELSE 0.0 END), 3) AS f_block_reference,
+                ROUND(AVG(CASE WHEN occupancy_type       IS NOT NULL THEN 1.0 ELSE 0.0 END), 3) AS f_occupancy_type,
+                ROUND(AVG(CASE WHEN address              IS NOT NULL THEN 1.0 ELSE 0.0 END), 3) AS f_address,
+                ROUND(AVG(CASE WHEN postcode             IS NOT NULL THEN 1.0 ELSE 0.0 END), 3) AS f_postcode,
+                ROUND(AVG(CASE WHEN units                IS NOT NULL THEN 1.0 ELSE 0.0 END), 3) AS f_units,
+                ROUND(AVG(CASE WHEN sum_insured          IS NOT NULL THEN 1.0 ELSE 0.0 END), 3) AS f_sum_insured,
+                ROUND(AVG(CASE WHEN wall_construction    IS NOT NULL THEN 1.0 ELSE 0.0 END), 3) AS f_wall_construction,
+                ROUND(AVG(CASE WHEN roof_construction    IS NOT NULL THEN 1.0 ELSE 0.0 END), 3) AS f_roof_construction,
+                ROUND(AVG(CASE WHEN year_of_build        IS NOT NULL THEN 1.0 ELSE 0.0 END), 3) AS f_year_of_build,
+                ROUND(AVG(CASE WHEN age_banding          IS NOT NULL THEN 1.0 ELSE 0.0 END), 3) AS f_age_banding,
+                ROUND(AVG(CASE WHEN storeys              IS NOT NULL THEN 1.0 ELSE 0.0 END), 3) AS f_storeys,
+                ROUND(AVG(CASE WHEN is_listed            IS NOT NULL THEN 1.0 ELSE 0.0 END), 3) AS f_is_listed
+            FROM silver.properties
+            WHERE ha_id = $1
+            """,
+            ha_id,
+        )
+
+        doc_a_fields = [
+            "property_reference", "block_reference", "occupancy_type", "address",
+            "postcode", "units", "sum_insured", "wall_construction", "roof_construction",
+            "year_of_build", "age_banding", "storeys", "is_listed",
+        ]
+        doc_a_detail = {f: float(doc_a_row[f"f_{f}"]) for f in doc_a_fields}
+        doc_a_pct = round(sum(doc_a_detail.values()) / len(doc_a_fields) * 100, 1)
+
+        # ── Doc B: per-block field fill rates (SoV + FRA + FRAEW) ─────────────
+        doc_b_rows = await conn.fetch(
+            """
+            SELECT
+                b.block_id,
+                -- SoV block fields
+                CASE WHEN b.name                IS NOT NULL THEN 1.0 ELSE 0.0 END AS f_block_name,
+                CASE WHEN b.unit_count          IS NOT NULL THEN 1.0 ELSE 0.0 END AS f_unit_count,
+                CASE WHEN b.total_sum_insured   IS NOT NULL THEN 1.0 ELSE 0.0 END AS f_sum_insured,
+                CASE WHEN b.max_storeys         IS NOT NULL THEN 1.0 ELSE 0.0 END AS f_storeys,
+                CASE WHEN b.height_max_m        IS NOT NULL THEN 1.0 ELSE 0.0 END AS f_height,
+                CASE WHEN b.predominant_wall    IS NOT NULL THEN 1.0 ELSE 0.0 END AS f_wall,
+                CASE WHEN b.predominant_roof    IS NOT NULL THEN 1.0 ELSE 0.0 END AS f_roof,
+                CASE WHEN b.is_listed           IS NOT NULL THEN 1.0 ELSE 0.0 END AS f_is_listed,
+                -- FRA fields
+                CASE WHEN fra.assessment_date       IS NOT NULL THEN 1.0 ELSE 0.0 END AS f_fra_date,
+                CASE WHEN fra.has_sprinkler_system  IS NOT NULL THEN 1.0 ELSE 0.0 END AS f_sprinklers,
+                CASE WHEN fra.has_fire_alarm_system IS NOT NULL THEN 1.0 ELSE 0.0 END AS f_fire_alarms,
+                -- FRAEW fields
+                CASE WHEN fraew.has_combustible_cladding IS NOT NULL THEN 1.0 ELSE 0.0 END AS f_combustible,
+                CASE WHEN fraew.has_remedial_actions     IS NOT NULL THEN 1.0 ELSE 0.0 END AS f_remedial,
+                CASE WHEN fraew.building_height_m        IS NOT NULL THEN 1.0 ELSE 0.0 END AS f_fraew_height,
+                CASE WHEN fraew.pas_9980_compliant       IS NOT NULL THEN 1.0 ELSE 0.0 END AS f_pas9980
+
+            FROM silver.blocks b
+
+            LEFT JOIN LATERAL (
+                SELECT assessment_date, has_sprinkler_system, has_fire_alarm_system
+                FROM silver.fra_features
+                WHERE block_id = b.block_id
+                ORDER BY assessment_date DESC NULLS LAST, created_at DESC
+                LIMIT 1
+            ) fra ON TRUE
+
+            LEFT JOIN LATERAL (
+                SELECT has_combustible_cladding, has_remedial_actions,
+                       building_height_m, pas_9980_compliant
+                FROM silver.fraew_features
+                WHERE block_id = b.block_id
+                ORDER BY created_at DESC
+                LIMIT 1
+            ) fraew ON TRUE
+
+            WHERE b.ha_id = $1
+            """,
+            ha_id,
+        )
+
+        doc_b_field_keys = [
+            "block_name", "unit_count", "sum_insured", "storeys", "height",
+            "wall", "roof", "is_listed",
+            "fra_date", "sprinklers", "fire_alarms",
+            "combustible", "remedial", "fraew_height", "pas9980",
+        ]
+
+        if doc_b_rows:
+            # Average each field across all blocks
+            doc_b_detail = {
+                k: round(sum(float(r[f"f_{k}"]) for r in doc_b_rows) / len(doc_b_rows), 3)
+                for k in doc_b_field_keys
+            }
+            doc_b_pct = round(sum(doc_b_detail.values()) / len(doc_b_field_keys) * 100, 1)
+        else:
+            doc_b_detail = {k: 0.0 for k in doc_b_field_keys}
+            doc_b_pct = 0.0
+
+        return {
+            "portfolio_id":   portfolio_id,
+            "ha_id":          ha_id,
+            "portfolio_name": portfolio["portfolio_name"],
+            "doc_a": {
+                "total_properties": doc_a_row["total_properties"],
+                "total_fields":     len(doc_a_fields),
+                "completeness_pct": doc_a_pct,
+                "field_detail":     doc_a_detail,
+            },
+            "doc_b": {
+                "total_blocks":     len(doc_b_rows),
+                "total_fields":     len(doc_b_field_keys),
+                "completeness_pct": doc_b_pct,
+                "field_detail":     doc_b_detail,
+            },
         }

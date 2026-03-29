@@ -194,7 +194,7 @@ async def _fetch_blocks(db_pool, ha_id: str, portfolio_id: Optional[str]) -> lis
             COALESCE(SUM(p.units), COUNT(*))                AS units,
             MAX(p.storeys)                                  AS storeys,
             MAX(p.height_max_m)                             AS height_max_m,
-            MAX(p.build_year)                               AS build_year,
+            MAX(p.year_of_build)                            AS build_year,
             MAX(p.wall_construction)                        AS wall_construction,
             MAX(p.floor_construction)                       AS floor_construction,
             MAX(p.roof_construction)                        AS roof_construction,

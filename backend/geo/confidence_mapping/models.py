@@ -9,6 +9,10 @@ from pydantic import BaseModel, Field, field_validator
 import re
 
 
+class RawCandidate:
+    pass
+
+
 class ConfidenceBand(str, Enum):
     """Score interpretation bands. Never call anything "verified" without licensed data."""
     HIGH = "Green"          # ≥ 0.75: Strong evidence, low ambiguity

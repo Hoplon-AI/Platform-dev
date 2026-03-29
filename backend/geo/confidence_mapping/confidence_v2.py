@@ -14,7 +14,7 @@ from dataclasses import dataclass
 import re
 from typing import Optional
 
-from backend.geo import SignalBreakdown, UPRNCandidate, ConfidenceBand, AddressHint
+from backend.geo.confidence_mapping.models import SignalBreakdown, UPRNCandidate, ConfidenceBand, AddressHint
 
 
 @dataclass
