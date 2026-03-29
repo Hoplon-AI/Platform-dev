@@ -91,7 +91,7 @@ def _build_request_body(
 ) -> Dict[str, Any]:
     """Build provider-specific request body."""
 
-    if model_id.startswith("anthropic."):
+    if "anthropic." in model_id:
         # Anthropic Claude - Messages API
         messages: List[Dict[str, Any]] = [{"role": "user", "content": [{"type": "text", "text": prompt}]}]
         body: Dict[str, Any] = {
@@ -146,7 +146,7 @@ def _build_request_body(
 def _parse_response(model_id: str, response: Dict[str, Any]) -> str:
     """Parse provider-specific response."""
 
-    if model_id.startswith("anthropic."):
+    if "anthropic." in model_id:
         # Anthropic Claude response
         content = response.get("content") or []
         texts = [b["text"] for b in content if isinstance(b, dict) and b.get("type") == "text"]

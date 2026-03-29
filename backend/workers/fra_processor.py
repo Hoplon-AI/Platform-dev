@@ -1544,6 +1544,133 @@ class FRAExtractedFeatures:
 # LLM Prompt (concise — saves tokens)
 # ──────────────────────────────────────────────────────────────────────
 
+# ── Single-pass prompt (Gemini / Bedrock — full document, one call) ──────────
+
+FRA_SINGLE_PASS_PROMPT = """You are an expert UK fire safety engineer. Extract ALL structured data from this Fire Risk Assessment (FRA) document.
+Return ONLY valid JSON. Use null for missing fields. Dates must be YYYY-MM-DD.
+
+UK FRA documents vary widely in format — apply the rules below regardless of layout, template, or assessor company.
+
+━━━ RAG STATUS ━━━
+Derive from the overall risk rating using these mappings:
+  RED:   High | Very High | Intolerable | Substantial | Extreme | Critical | Serious | Unacceptable | Priority 1 | Grade D | Grade E
+  AMBER: Medium | Moderate | Significant | Tolerable with conditions | Further Action Required | Priority 2 | Grade C
+  GREEN: Low | Trivial | Negligible | Acceptable | Broadly Acceptable | Tolerable | No Further Action | Priority 3 | Grade A | Grade B
+  Numeric scores (likelihood × consequence): ≥15 → RED | 8–14 → AMBER | ≤7 → GREEN
+  If rag_status cannot be determined, return null.
+
+━━━ RISK RATING ━━━
+Copy the exact phrase used in the document (do not paraphrase).
+Look in: cover page, executive summary, conclusions, risk matrix table, summary box.
+
+━━━ DATES ━━━
+  assessment_date      = date the assessment was carried out or signed off
+  assessment_valid_until = explicit expiry date if stated; else null (do NOT calculate)
+  next_review_date     = recommended review date if stated; else null. If only month/year given (e.g. "May 2022"), use the first of that month (2022-05-01)
+
+━━━ EVACUATION STRATEGY ━━━
+Map to exactly one of: stay_put | simultaneous | phased | temporary_evacuation | null
+  stay_put = "defend in place", "simultaneous evacuation only for affected floor", AWLOF policy
+  simultaneous = full building evacuation on alarm
+  phased = progressive horizontal/vertical evacuation
+  temporary_evacuation = waking watch, interim measure pending remediation
+
+━━━ FIRE SYSTEMS ━━━
+Rules:
+  true  = system EXISTS on site (even if deficient, non-compliant, or in need of repair)
+  false = document explicitly states the system is NOT present, or states it is "not installed"
+  null  = system is not mentioned at all
+  IMPORTANT: "recommended for installation", "planned for future", "not yet installed", or "no X on means of escape" → false, NOT true.
+  A system mentioned only as a deficiency to be remedied (e.g. "install emergency lighting") → false until confirmed present.
+  Sprinkler / suppression / mist system                → has_sprinkler_system
+  Smoke detector / heat detector / AOV / L-system / M-system / CFD → has_smoke_detection
+  Fire alarm / manual call point / AFD / sounder       → has_fire_alarm_system
+  Fire door / FD30 / FD60 / flat entrance door         → has_fire_doors
+  Compartmentation / fire stopping / intumescent seal / cavity barrier → has_compartmentation
+  Emergency lighting / escape lighting                 → has_emergency_lighting
+  Fire extinguisher / hose reel / CO2 / foam           → has_fire_extinguishers
+  Firefighting shaft / firefighting lift / fire lift   → has_firefighting_shaft
+  Dry riser / DRM / dry rising main                    → has_dry_riser
+  Wet riser / WRM / wet rising main                    → has_wet_riser
+
+━━━ ACTION ITEMS ━━━
+Extract EVERY recommended action, deficiency, remedial measure, or outstanding issue.
+Documents use many layouts — recognise them all:
+  • Numbered reference cards with fields like "Action Required", "Due Date", "Responsible", "Status"
+  • Issue/finding tables with columns such as No. | Description | Priority | Target Date | By Whom | Completed
+  • Narrative paragraphs that recommend or require something ("should be", "must be", "it is recommended")
+  • Appendix lists of actions or significant findings
+
+For each action item capture:
+  issue_ref   = any reference number or code assigned to the action (null if none)
+  description = the full action text as written
+  hazard_type = closest match: Housekeeping | Means of Escape | Fire Spread | Detection | Signage | Emergency Plans | Fire Service Facilities | Structural | Other
+  priority    = high | medium | low | advisory
+    Infer if not stated: immediate/1 month → high | 3–6 months → medium | 12 months → low | no date → advisory
+  due_date    = target completion date (YYYY-MM-DD) or null
+  status      = outstanding | completed | overdue
+    Completed/closed/done → completed. Past due date and not done → overdue. Otherwise → outstanding.
+  responsible = named team, role, or person responsible (null if not stated)
+
+━━━ SIGNIFICANT FINDINGS ━━━
+List major fire safety concerns noted by the assessor that are not already captured as action items
+(e.g. structural deficiencies, lack of compartmentation, evacuation strategy concerns).
+
+Return ONLY this JSON — no markdown, no commentary:
+{{
+  "risk_rating": "exact phrase or null",
+  "rag_status": "RED or AMBER or GREEN or null",
+  "fra_assessment_type": "Type 1 / Type 2 / Type 3 / Type 4 — only if explicitly stated, else null",
+  "assessment_date": "YYYY-MM-DD or null",
+  "assessment_valid_until": "YYYY-MM-DD or null",
+  "next_review_date": "YYYY-MM-DD or null",
+  "assessor_name": "full name or null",
+  "assessor_company": "company name or null",
+  "assessor_qualification": "qualifications string or null",
+  "responsible_person": "responsible person or organisation or null",
+  "building_name": "building name or null",
+  "building_address": "full address or null",
+  "num_storeys": number or null,
+  "num_units": number or null,
+  "build_year": year as integer or null,
+  "evacuation_strategy": "stay_put or simultaneous or phased or temporary_evacuation or null",
+  "evacuation_strategy_changed": true or false,
+  "evacuation_strategy_notes": "brief note or null",
+  "has_accessibility_needs_noted": true or false,
+  "has_sprinkler_system": true or false or null,
+  "has_smoke_detection": true or false or null,
+  "has_fire_alarm_system": true or false or null,
+  "has_fire_doors": true or false or null,
+  "has_compartmentation": true or false or null,
+  "has_emergency_lighting": true or false or null,
+  "has_fire_extinguishers": true or false or null,
+  "has_firefighting_shaft": true or false or null,
+  "has_dry_riser": true or false or null,
+  "has_wet_riser": true or false or null,
+  "bsa_2022_applicable": true or false,
+  "accountable_person_noted": true or false,
+  "mandatory_occurrence_noted": true or false,
+  "action_items": [
+    {{
+      "issue_ref": "reference number or null",
+      "description": "full action text",
+      "hazard_type": "one of the 9 categories above",
+      "priority": "high or medium or low or advisory",
+      "due_date": "YYYY-MM-DD or null",
+      "status": "outstanding or completed or overdue",
+      "responsible": "team or person or null"
+    }}
+  ],
+  "significant_findings": [
+    {{"finding": "description", "location": "location or null", "severity": "high or medium or low"}}
+  ],
+  "extraction_confidence": 0.0 to 1.0
+}}
+
+FULL DOCUMENT:
+{document_text}"""
+
+
 # ── Pass 1: metadata prompt (header/systems only — NO actions) ───────────────
 
 FRA_METADATA_PROMPT = """Extract metadata from this UK Fire Risk Assessment excerpt.
@@ -1796,15 +1923,26 @@ class FRAProcessor:
 
         raw_json = await self._call_llm(text)
         features = self._parse_llm_response(raw_json)
-        logger.info(
-            "FRAProcessor parsed: risk=%s rag=%s actions=%d confidence=%.2f",
-            features.risk_rating,
-            self._normalise_rag_status(features.risk_rating),
-            len(features.action_items),
-            features.extraction_confidence,
-        )
 
-        rag_status    = self._normalise_rag_status(features.risk_rating)
+        # Use LLM-provided rag_status when available (single-pass prompt extracts it directly)
+        llm_rag    = (self._extract_json(raw_json) or {}).get("rag_status")
+        rag_status = self._normalise_rag_status(features.risk_rating, llm_rag=llm_rag)
+
+        # Auto-resolve block_id from LLM-extracted building name/address if not provided
+        if not block_id:
+            llm_data = self._extract_json(raw_json) or {}
+            block_id = await self._resolve_block_id(
+                ha_id,
+                llm_data.get("building_name"),
+                llm_data.get("building_address"),
+            )
+
+        logger.info(
+            "FRAProcessor parsed: risk=%s rag=%s actions=%d confidence=%.2f block_id=%s",
+            features.risk_rating, rag_status,
+            len(features.action_items),
+            features.extraction_confidence, block_id,
+        )
         is_in_date    = self._compute_is_in_date(features.assessment_valid_until)
         action_counts = self._count_actions(features.action_items)
 
@@ -1822,48 +1960,125 @@ class FRAProcessor:
             "extraction_confidence": features.extraction_confidence,
         }
 
+    # ── Block auto-detection ─────────────────────────────────────────
+
+    async def _resolve_block_id(
+        self,
+        ha_id: str,
+        building_name: Optional[str],
+        building_address: Optional[str],
+    ) -> Optional[str]:
+        """
+        Three-strategy block resolution:
+          1. Exact match on block name (e.g. LLM returns '02BR')
+          2. Substring match (block name appears inside building_name/address)
+          3. Address lookup via silver.properties → block_reference → block_id
+             (handles cases like '269 Holmlea Road' → property has block_ref '02BR')
+        """
+        candidates = [c.strip() for c in [building_name, building_address] if c and c.strip()]
+        if not candidates:
+            logger.info("FRAProcessor: no building_name/address extracted — block_id stays None")
+            return None
+
+        # ── Strategy 1: exact block name match ───────────────────────
+        for candidate in candidates:
+            row = await self.db.fetchrow(
+                "SELECT block_id::text FROM silver.blocks WHERE ha_id=$1 AND UPPER(name)=UPPER($2) LIMIT 1",
+                ha_id, candidate,
+            )
+            if row:
+                logger.info("FRAProcessor: resolved block_id=%s (exact name) from %r", row["block_id"], candidate)
+                return row["block_id"]
+
+        # ── Strategy 2: substring — block name inside candidate ───────
+        all_blocks = await self.db.fetch(
+            "SELECT block_id::text, name FROM silver.blocks WHERE ha_id=$1", ha_id
+        )
+        for candidate in candidates:
+            cu = candidate.upper()
+            for b in all_blocks:
+                bn = (b["name"] or "").upper()
+                if bn and (bn in cu or cu in bn):
+                    logger.info(
+                        "FRAProcessor: resolved block_id=%s (substring) block=%r from %r",
+                        b["block_id"], b["name"], candidate,
+                    )
+                    return b["block_id"]
+
+        # ── Strategy 3: address → silver.properties → block_reference ─
+        # Extract meaningful search tokens (street name words, postcode)
+        for candidate in candidates:
+            tokens = [t.strip() for t in re.split(r"[,\s]+", candidate) if len(t.strip()) >= 3]
+            if not tokens:
+                continue
+            # Build OR conditions — match any 2+ tokens to reduce false positives
+            for i in range(len(tokens)):
+                for j in range(i + 1, len(tokens)):
+                    row = await self.db.fetchrow(
+                        """
+                        SELECT b.block_id::text
+                        FROM silver.properties p
+                        JOIN silver.blocks b ON b.ha_id = p.ha_id AND UPPER(b.name) = UPPER(p.block_reference)
+                        WHERE p.ha_id = $1
+                          AND p.block_reference IS NOT NULL
+                          AND (
+                            (UPPER(p.address) LIKE '%' || UPPER($2) || '%'
+                             AND UPPER(p.address) LIKE '%' || UPPER($3) || '%')
+                            OR (UPPER(p.postcode) LIKE '%' || UPPER($2) || '%')
+                          )
+                        LIMIT 1
+                        """,
+                        ha_id, tokens[i], tokens[j],
+                    )
+                    if row:
+                        logger.info(
+                            "FRAProcessor: resolved block_id=%s (address lookup) tokens=%r",
+                            row["block_id"], [tokens[i], tokens[j]],
+                        )
+                        return row["block_id"]
+
+        logger.warning("FRAProcessor: could not resolve block from candidates %s", candidates)
+        return None
+
     # ── LLM call ─────────────────────────────────────────────────────
 
     async def _call_llm(self, text: str) -> str:
         """
-        Two-pass extraction to stay within Groq free tier TPM limits.
-
-        Groq free tier hard limit: 6,000 tokens/minute per request.
-        At ~4 chars/token, max safe document chunk = ~18,000 chars.
-
-        Pass 1 — Metadata prompt + first 18K chars of doc
-          → Extracts: risk rating, dates, assessor, fire systems, evacuation strategy
-
-        Pass 2 — Actions prompt + last 18K chars of doc
-          → Extracts: all action items + significant findings
-          → Uses the END of the document because Islington-style FRAs put
-            their structured Action Ref cards on the final pages.
-
-        Results are merged into a single JSON response.
+        Single-pass for Gemini/Bedrock (large context window).
+        Two-pass fallback for Groq (6K TPM free tier limit).
         """
-        # ~18,000 chars ≈ 4,500 tokens + ~400 token prompt = ~4,900 tokens (under 6K limit)
+        if self.llm.supports_large_context:
+            return await self._call_llm_single_pass(text)
+        return await self._call_llm_two_pass(text)
+
+    async def _call_llm_single_pass(self, text: str) -> str:
+        """Single LLM call with full document — for Gemini and Bedrock."""
+        logger.info("FRAProcessor: single-pass extraction (%d chars)", len(text))
+        prompt = FRA_SINGLE_PASS_PROMPT.format(document_text=text)
+        try:
+            raw = await self.llm.extract(prompt, max_tokens=16384)
+            logger.info("Single-pass returned %d chars", len(raw or ""))
+        except Exception as exc:
+            logger.error("Single-pass failed: %s", exc)
+            raise RuntimeError(f"LLM extraction failed (single pass): {exc}") from exc
+        self.last_raw_response = raw
+        return raw
+
+    async def _call_llm_two_pass(self, text: str) -> str:
+        """
+        Two-pass extraction for Groq free tier (6K TPM hard limit).
+        Pass 1 — first 18K chars: metadata + fire systems
+        Pass 2 — last 18K chars:  action items + findings
+        """
         CHUNK = 18_000
-
-        # Pass 1: header section for metadata
-        meta_chunk = text[:CHUNK]
-
-        # Pass 2: end of document for action cards
-        # Islington FRAs: Action Ref cards always at the end
-        # Eurosafe FRAs: action cards in the middle — take last CHUNK which
-        # typically includes action plan section + end-of-doc summary
-        if len(text) > CHUNK:
-            actions_chunk = text[-CHUNK:]
-        else:
-            actions_chunk = text  # short doc — use all of it for both passes
+        meta_chunk    = text[:CHUNK]
+        actions_chunk = text[-CHUNK:] if len(text) > CHUNK else text
 
         logger.info(
-            "FRAProcessor: two-pass LLM extraction — "
-            "meta_chunk=%d chars (chars 0-%d), actions_chunk=%d chars (chars %d-%d)",
-            len(meta_chunk), len(meta_chunk),
-            len(actions_chunk), max(0, len(text) - CHUNK), len(text),
+            "FRAProcessor: two-pass LLM — meta=%d chars, actions=%d chars",
+            len(meta_chunk), len(actions_chunk),
         )
 
-        # ── Pass 1: metadata ─────────────────────────────────────────
         meta_prompt = FRA_METADATA_PROMPT.format(document_text=meta_chunk)
         try:
             meta_raw = await self.llm.extract(meta_prompt)
@@ -1872,7 +2087,6 @@ class FRAProcessor:
             logger.error("Pass 1 (metadata) failed: %s", exc)
             raise RuntimeError(f"LLM extraction failed (metadata pass): {exc}") from exc
 
-        # ── Pass 2: actions ──────────────────────────────────────────
         actions_prompt = FRA_ACTIONS_PROMPT.format(document_text=actions_chunk)
         try:
             actions_raw = await self.llm.extract(actions_prompt)
@@ -1881,7 +2095,6 @@ class FRAProcessor:
             logger.error("Pass 2 (actions) failed: %s", exc)
             raise RuntimeError(f"LLM extraction failed (actions pass): {exc}") from exc
 
-        # ── Merge both responses ─────────────────────────────────────
         merged = self._merge_passes(meta_raw, actions_raw)
         self.last_raw_response = merged
         return merged
@@ -2138,25 +2351,48 @@ class FRAProcessor:
 
     # ── Derived fields ────────────────────────────────────────────────
 
-    def _normalise_rag_status(self, risk_rating: Optional[str]) -> Optional[str]:
+    def _normalise_rag_status(self, risk_rating: Optional[str], llm_rag: Optional[str] = None) -> Optional[str]:
+        """
+        Derive RED/AMBER/GREEN.
+        Uses LLM-provided rag_status directly when valid — falls back to keyword matching.
+        """
+        if llm_rag:
+            v = llm_rag.strip().upper()
+            if v in ("RED", "AMBER", "GREEN"):
+                return v
+
         if not risk_rating:
             return None
         lower = risk_rating.lower().strip()
-        if lower in ("n/a", "not assessed", "unknown", "tbc", "tbd", "none"):
+        if lower in ("n/a", "not assessed", "unknown", "tbc", "tbd", "none", ""):
             return None
-        for kw in ("intolerable", "substantial", "high", "critical", "priority 1",
-                   "very high", "grade e", "grade d", "4/5", "5/5", "serious"):
+
+        # RED
+        for kw in ("intolerable", "substantial", "very high", "critical", "serious",
+                   "extreme", "unacceptable", "not acceptable",
+                   "priority 1", "grade e", "grade d", "4/5", "5/5"):
             if kw in lower:
                 return "RED"
-        for kw in ("moderate", "medium", "significant", "tolerable but",
+        if lower == "high":
+            return "RED"
+
+        # AMBER
+        for kw in ("moderate", "medium", "significant", "tolerable but", "tolerable with",
+                   "further action", "further assessment",
                    "priority 2", "grade c", "3/5"):
             if kw in lower:
                 return "AMBER"
-        for kw in ("trivial", "low", "tolerable", "acceptable", "negligible",
+
+        # GREEN
+        for kw in ("trivial", "low", "acceptable", "broadly acceptable",
+                   "no further action", "negligible",
                    "priority 3", "grade a", "grade b", "1/5", "2/5"):
             if kw in lower:
                 return "GREEN"
-        logger.warning("Unknown risk rating '%s' → defaulting to AMBER", risk_rating)
+        if lower == "tolerable":
+            return "GREEN"
+
+        logger.warning("FRA: unknown risk rating '%s' → defaulting to AMBER", risk_rating)
         return "AMBER"
 
     def _compute_is_in_date(self, valid_until: Optional[date]) -> Optional[bool]:

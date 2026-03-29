@@ -1,7 +1,7 @@
 """
 FastAPI router for file uploads.
 """
-from fastapi import APIRouter, UploadFile, File, Depends, HTTPException, Query, status
+from fastapi import APIRouter, UploadFile, File, Depends, HTTPException, Query, status, BackgroundTasks
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi.responses import JSONResponse
 from typing import Optional, List, Tuple, Literal
@@ -683,10 +683,15 @@ def _make_serializable(obj):
 
 @router.post("/ingest", summary="Unified ingestion — SoV (Excel) or FRA/FRAEW (PDF)")
 async def ingest_document(
+    background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
     document_type: Literal["sov", "fra", "fraew"] = Query(
         ...,
         description="Select document type: 'sov' for Schedule of Values (Excel), 'fra' for Fire Risk Assessment (PDF), 'fraew' for Fire Risk Appraisal of External Walls (PDF)",
+    ),
+    block_reference: Optional[str] = Query(
+        None,
+        description="Block reference (e.g. '02BR') to link FRA/FRAEW to a specific block. If omitted, auto-resolved from block name in PDF.",
     ),
     tenant: Tuple[str, str] = Depends(get_tenant_info),
 ):
@@ -764,7 +769,7 @@ async def ingest_document(
 
     # ── Step 5: Process based on user selection ───────────────────────────
 
-    # SoV → sov_processor_v2
+    # SoV → sov_processor_v2 → auto-enrich (background, limit 50)
     if document_type == "sov":
         pool = DatabasePool.get_pool()
         await process_sov_to_silver(
@@ -774,6 +779,12 @@ async def ingest_document(
             upload_id=upload_id,
             db_pool=pool,
         )
+
+        # Auto-trigger enrichment in background (limit 50 for now)
+        from backend.workers.enrichment_worker import enrich_portfolio
+        background_tasks.add_task(enrich_portfolio, ha_id, limit=50)
+        logger.info("[INGEST] SoV done — enrichment queued for ha_id=%s limit=50", ha_id)
+
         return JSONResponse(content=_make_serializable({
             "status": "success",
             "document_type": "sov",
@@ -784,7 +795,7 @@ async def ingest_document(
             "auto_detected": auto_detected.value,
             "user_selected": document_type,
             "detection_warning": detection_warning,
-            "message": "SoV processed and written to silver.properties",
+            "message": "SoV processed and written to silver.properties. Enrichment running in background (limit 50).",
         }))
 
     # FRA / FRAEW → pdfplumber text extraction → Bedrock LLM → silver.*
@@ -807,6 +818,23 @@ async def ingest_document(
 
     pool = DatabasePool.get_pool()
     async with pool.acquire() as conn:
+
+        # Resolve block_id: explicit block_reference param takes priority,
+        # then fall back to matching by block name in silver.blocks
+        resolved_block_id: Optional[str] = None
+        if block_reference:
+            row = await conn.fetchrow(
+                "SELECT block_id::text FROM silver.blocks WHERE ha_id=$1 AND name=$2 LIMIT 1",
+                ha_id, block_reference.strip().upper(),
+            )
+            if row:
+                resolved_block_id = row["block_id"]
+            else:
+                logger.warning(
+                    "block_reference '%s' not found in silver.blocks for ha_id=%s — block_id will be NULL",
+                    block_reference, ha_id,
+                )
+
         processor = None
         try:
             if document_type == "fra":
@@ -815,7 +843,7 @@ async def ingest_document(
                 result = await processor.process(
                     text=text,
                     upload_id=str(upload_id),
-                    block_id=None,
+                    block_id=resolved_block_id,
                     ha_id=ha_id,
                     s3_path=s3_key,
                 )
@@ -825,7 +853,7 @@ async def ingest_document(
                 result = await processor.process(
                     text=text,
                     upload_id=str(upload_id),
-                    block_id=None,
+                    block_id=resolved_block_id,
                     ha_id=ha_id,
                     s3_path=s3_key,
                 )
@@ -847,6 +875,7 @@ async def ingest_document(
         "document_type": document_type,
         "upload_id": upload_id,
         "feature_id": result.get("feature_id"),
+        "block_id": resolved_block_id,
         "filename": filename,
         "file_size": len(file_content),
         "s3_key": s3_key,

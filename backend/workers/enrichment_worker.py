@@ -169,12 +169,13 @@ def _call_address_confidence(original: str, returned: str) -> dict | None:
 
 
 # ─────────────────────────────────────────────────────────────────
-# SoV-Priority Merge — ONLY update NULL fields
+# API-Priority Merge — API data overwrites SoV where API has a value
 # ─────────────────────────────────────────────────────────────────
 
 def _merge_sov_priority(existing_row: dict, api_data: dict, field_map: dict) -> dict:
     """
-    Returns dict of {db_column: api_value} ONLY for columns where existing is NULL.
+    Returns dict of {db_column: api_value} for all fields where API has a value.
+    API data takes priority over SoV data.
 
     Args:
         existing_row: current silver.properties row (SoV data)
@@ -186,10 +187,8 @@ def _merge_sov_priority(existing_row: dict, api_data: dict, field_map: dict) -> 
         api_val = api_data.get(api_key)
         if api_val is None:
             continue
-        existing_val = existing_row.get(db_col)
-        # SoV priority: only write if existing is NULL or empty string
-        if existing_val is None or (isinstance(existing_val, str) and not existing_val.strip()):
-            updates[db_col] = api_val
+        # API priority: always write if API has a value
+        updates[db_col] = api_val
     return updates
 
 
@@ -328,44 +327,100 @@ def enrich_single_property(
 # Block Detection — uses EXISTING silver.blocks table
 # ─────────────────────────────────────────────────────────────────
 
-def run_block_detection(ha_id: str) -> dict:
+def run_block_detection(ha_id: str, places_key: str = "") -> dict:
     """
-    After enrichment, group properties by PARENT_UPRN.
-    Updates the EXISTING silver.blocks table with enrichment data.
-    Also fills NULL block_reference on properties.
+    After enrichment, group properties into blocks using detect_block_properties().
+
+    Replaces the old SQL GROUP BY parent_uprn approach with the new block_detection
+    module which handles:
+      - Nested hierarchies (flat → block → estate) via batch API traversal
+      - Block-level records (a property whose UPRN is referenced as a parent)
+      - DPA/LPI UPRN mismatches via post-grouping address substring matching
+
+    Steps:
+      1. Fetch all enriched properties with a UPRN from the DB
+      2. Convert to OS Places format (uppercase keys) for detect_block_properties()
+      3. Call detect_block_properties() — returns root_parent_uprn grouped blocks
+      4. For each block group, aggregate stats from DB (sum_insured, storeys, etc.)
+      5. Upsert silver.blocks, fill NULL block_reference on properties
     """
+    from backend.geo.uprn_maps.block_detection import detect_block_properties
+
+    places_key = places_key or DEFAULT_PLACES_KEY
+
     conn = _get_db_conn()
     try:
+        # ── Step 1: fetch all enriched properties that have a UPRN ──────────
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute("""
+                SELECT uprn, parent_uprn, address, property_id
+                FROM silver.properties
+                WHERE ha_id = %s
+                  AND uprn IS NOT NULL
+                  AND uprn != ''
+            """, (ha_id,))
+            enriched_rows = cur.fetchall()
+
+        if not enriched_rows:
+            logger.info(f"Block detection: no enriched properties for ha_id={ha_id}")
+            return {"blocks_upserted": 0, "block_refs_filled": 0}
+
+        # ── Step 2: convert to OS Places format ─────────────────────────────
+        os_format_props = [
+            {
+                "UPRN": str(r["uprn"]),
+                "PARENT_UPRN": str(r["parent_uprn"]) if r["parent_uprn"] else None,
+                "ADDRESS": r["address"] or "",
+            }
+            for r in enriched_rows
+        ]
+
+        # ── Step 3: detect blocks (handles nested hierarchy + DPA mismatch) ─
+        logger.info(f"Block detection: running detect_block_properties() on "
+                    f"{len(os_format_props)} properties (api_key={'set' if places_key else 'not set'})")
+        detection_result = detect_block_properties(os_format_props, api_key=places_key or None)
+        detected_blocks = detection_result.get("blocks", {})
+        standalone_count = len(detection_result.get("standalone", []))
+        logger.info(f"Block detection: {len(detected_blocks)} blocks, "
+                    f"{standalone_count} standalone properties")
+
+        # ── Step 4 & 5: aggregate stats + upsert silver.blocks ──────────────
+        upserted = 0
+        filled = 0
+
         with conn:
             with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
-                cur.execute("""
-                    SELECT
-                        parent_uprn,
-                        COUNT(*) as unit_count,
-                        SUM(COALESCE(sum_insured, 0)) as total_si,
-                        MAX(storeys) as max_storeys,
-                        MODE() WITHIN GROUP (ORDER BY wall_construction) as wall,
-                        MODE() WITHIN GROUP (ORDER BY roof_construction) as roof,
-                        MAX(height_max_m) as height,
-                        BOOL_OR(is_listed) as listed,
-                        MAX(listed_grade) as grade,
-                        COALESCE(
-                            MODE() WITHIN GROUP (ORDER BY block_reference),
-                            MIN(address)
-                        ) as block_name
-                    FROM silver.properties
-                    WHERE ha_id = %s
-                      AND parent_uprn IS NOT NULL
-                      AND parent_uprn != ''
-                    GROUP BY parent_uprn
-                    HAVING COUNT(*) > 1
-                """, (ha_id,))
+                for block_data in detected_blocks.values():
+                    root_parent_uprn = block_data["root_parent_uprn"]
+                    member_uprns = block_data["properties"]
 
-                blocks = cur.fetchall()
-                logger.info(f"Block detection: {len(blocks)} blocks for ha_id={ha_id}")
+                    if len(member_uprns) < 2:
+                        continue  # skip single-property "blocks"
 
-                upserted = 0
-                for b in blocks:
+                    # Aggregate block stats from DB for all member UPRNs
+                    cur.execute("""
+                        SELECT
+                            COUNT(*)                                        AS unit_count,
+                            SUM(COALESCE(sum_insured, 0))                   AS total_si,
+                            MAX(storeys)                                    AS max_storeys,
+                            MODE() WITHIN GROUP (ORDER BY wall_construction) AS wall,
+                            MODE() WITHIN GROUP (ORDER BY roof_construction) AS roof,
+                            MAX(height_max_m)                               AS height,
+                            BOOL_OR(is_listed)                              AS listed,
+                            MAX(listed_grade)                               AS grade,
+                            COALESCE(
+                                MODE() WITHIN GROUP (ORDER BY block_reference),
+                                MIN(address)
+                            )                                               AS block_name
+                        FROM silver.properties
+                        WHERE ha_id = %s
+                          AND uprn = ANY(%s)
+                    """, (ha_id, member_uprns))
+                    agg = cur.fetchone()
+
+                    if not agg or not agg["block_name"]:
+                        continue
+
                     cur.execute("""
                         INSERT INTO silver.blocks (
                             ha_id, name,
@@ -377,24 +432,25 @@ def run_block_detection(ha_id: str) -> dict:
                         )
                         ON CONFLICT (ha_id, name)
                         DO UPDATE SET
-                            parent_uprn = EXCLUDED.parent_uprn,
-                            unit_count = EXCLUDED.unit_count,
+                            parent_uprn       = EXCLUDED.parent_uprn,
+                            unit_count        = EXCLUDED.unit_count,
                             total_sum_insured = EXCLUDED.total_sum_insured,
-                            max_storeys = EXCLUDED.max_storeys,
-                            predominant_wall = EXCLUDED.predominant_wall,
-                            predominant_roof = EXCLUDED.predominant_roof,
-                            height_max_m = EXCLUDED.height_max_m,
-                            is_listed = EXCLUDED.is_listed,
-                            listed_grade = EXCLUDED.listed_grade,
-                            updated_at = NOW()
+                            max_storeys       = EXCLUDED.max_storeys,
+                            predominant_wall  = EXCLUDED.predominant_wall,
+                            predominant_roof  = EXCLUDED.predominant_roof,
+                            height_max_m      = EXCLUDED.height_max_m,
+                            is_listed         = EXCLUDED.is_listed,
+                            listed_grade      = EXCLUDED.listed_grade,
+                            updated_at        = NOW()
                     """, (
-                        ha_id, b["block_name"],
-                        b["parent_uprn"], b["unit_count"], b["total_si"],
-                        b["max_storeys"], b["wall"], b["roof"],
-                        b["height"], b["listed"], b["grade"],
+                        ha_id, agg["block_name"],
+                        root_parent_uprn, agg["unit_count"], agg["total_si"],
+                        agg["max_storeys"], agg["wall"], agg["roof"],
+                        agg["height"], agg["listed"], agg["grade"],
                     ))
                     upserted += 1
 
+                # Fill NULL block_reference on properties via parent_uprn match
                 cur.execute("""
                     UPDATE silver.properties p
                     SET block_reference = blk.name
@@ -406,9 +462,8 @@ def run_block_detection(ha_id: str) -> dict:
                 """, (ha_id, ha_id))
                 filled = cur.rowcount
 
-                logger.info(f"Block detection: {upserted} blocks upserted, "
-                            f"{filled} NULL block_refs filled")
-
+        logger.info(f"Block detection: {upserted} blocks upserted, "
+                    f"{filled} NULL block_refs filled")
         return {"blocks_upserted": upserted, "block_refs_filled": filled}
     finally:
         conn.close()
@@ -546,7 +601,7 @@ async def enrich_portfolio(
     # Block detection
     block_result = {}
     try:
-        block_result = run_block_detection(ha_id)
+        block_result = run_block_detection(ha_id, places_key=places_key)
     except Exception as exc:
         logger.error(f"[ENRICH] Block detection failed: {exc}")
         block_result = {"error": str(exc)}

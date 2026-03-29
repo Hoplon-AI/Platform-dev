@@ -264,18 +264,28 @@ ANTHROPIC_MODEL = "claude-haiku-4-5-20251001"
 # AWS Bedrock
 BEDROCK_MODEL_ID = "eu.anthropic.claude-haiku-4-5-20251001-v1:0"
 
+# Google Gemini
+GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-3.1-flash-lite-preview")
+
 
 class LLMClient:
     """
-    Async wrapper around Groq, Anthropic, or AWS Bedrock.
-    All three share the same interface: await client.extract(prompt)
+    Async wrapper around Groq, Anthropic, AWS Bedrock, or Google Gemini.
+    All four share the same interface: await client.extract(prompt)
+
+    LLM_PROVIDER=groq     → GROQ_API_KEY        (free tier, local dev)
+    LLM_PROVIDER=anthropic → ANTHROPIC_API_KEY   (paid)
+    LLM_PROVIDER=bedrock  → AWS IAM role         (production)
+    LLM_PROVIDER=gemini   → GEMINI_API_KEY       (Google AI Studio)
     """
 
-    def __init__(self, provider, groq_client=None, anthropic_client=None, bedrock_client=None):
+    def __init__(self, provider, groq_client=None, anthropic_client=None,
+                 bedrock_client=None, gemini_client=None):
         self._provider  = provider
         self._groq      = groq_client
         self._anthropic = anthropic_client
         self._bedrock   = bedrock_client
+        self._gemini    = gemini_client
 
     @classmethod
     def from_env(cls) -> "LLMClient":
@@ -286,8 +296,10 @@ class LLMClient:
             return cls._create_anthropic_client()
         elif provider == "bedrock":
             return cls._create_bedrock_client()
+        elif provider == "gemini":
+            return cls._create_gemini_client()
         else:
-            raise ValueError(f"Unknown LLM_PROVIDER='{provider}'. Use: groq, anthropic, or bedrock")
+            raise ValueError(f"Unknown LLM_PROVIDER='{provider}'. Use: groq, anthropic, bedrock, or gemini")
 
     @classmethod
     def _create_groq_client(cls) -> "LLMClient":
@@ -333,6 +345,35 @@ class LLMClient:
         logger.info("LLMClient: Bedrock model=%s region=%s", BEDROCK_MODEL_ID, region)
         return cls(provider="bedrock", bedrock_client=client)
 
+    @classmethod
+    def _create_gemini_client(cls) -> "LLMClient":
+        try:
+            from google import genai
+        except ImportError:
+            raise ImportError(
+                "google-genai package not installed. Run: pip install google-genai"
+            )
+        api_key = os.getenv("GEMINI_API_KEY")
+        if not api_key:
+            raise EnvironmentError(
+                "GEMINI_API_KEY not set.\n"
+                "1. Go to https://aistudio.google.com\n"
+                "2. Click 'Get API Key' → Create API key\n"
+                "3. Set GEMINI_API_KEY=AIzaSy... in your environment"
+            )
+        client = genai.Client(api_key=api_key)
+        logger.info("LLMClient: Gemini model=%s", GEMINI_MODEL)
+        return cls(provider="gemini", gemini_client=client)
+
+    @property
+    def supports_large_context(self) -> bool:
+        """
+        True for providers that handle full documents in one pass.
+        Gemini: 1M token context. Bedrock/Anthropic: 200K token context.
+        Groq free tier: 6K TPM hard limit — must use two-pass chunking.
+        """
+        return self._provider in ("gemini", "bedrock", "anthropic")
+
     async def extract(self, prompt: str, max_tokens: int = 4096) -> str:
         if self._provider == "groq":
             return await self._call_groq(prompt, max_tokens)
@@ -340,6 +381,8 @@ class LLMClient:
             return await self._call_anthropic(prompt, max_tokens)
         elif self._provider == "bedrock":
             return await self._call_bedrock(prompt, max_tokens)
+        elif self._provider == "gemini":
+            return await self._call_gemini(prompt, max_tokens)
         else:
             raise RuntimeError(f"Unknown provider: {self._provider}")
 
@@ -376,3 +419,22 @@ class LLMClient:
             return _json.loads(response["body"].read())
         result = await loop.run_in_executor(None, _invoke)
         return result["content"][0]["text"]
+
+    async def _call_gemini(self, prompt: str, max_tokens: int) -> str:
+        # google-genai SDK is synchronous — run in executor to avoid blocking FastAPI
+        # Gemini 2.5 Flash has thinking mode ON by default — thinking tokens eat into
+        # the output budget and truncate JSON responses. Disable thinking for extraction.
+        loop = asyncio.get_event_loop()
+        def _invoke():
+            from google.genai import types
+            response = self._gemini.models.generate_content(
+                model=GEMINI_MODEL,
+                contents=prompt,
+                config=types.GenerateContentConfig(
+                    max_output_tokens=16384,
+                    temperature=0.1,
+                    thinking_config=types.ThinkingConfig(thinking_budget=0),
+                ),
+            )
+            return response.text
+        return await loop.run_in_executor(None, _invoke)

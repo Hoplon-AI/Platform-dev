@@ -147,6 +147,130 @@ class FRAEWExtractedFeatures:
 # Pass 1: Metadata prompt  (first 18K chars of document)
 # ──────────────────────────────────────────────────────────────────────
 
+FRAEW_SINGLE_PASS_PROMPT = """You are an expert UK fire safety engineer specialising in PAS 9980:2022 external wall assessments.
+Extract ALL structured data from this Fire Risk Appraisal of External Walls (FRAEW) document.
+Return ONLY valid JSON. Use null for missing fields. Dates: YYYY-MM-DD.
+
+This document follows PAS 9980:2022 methodology and may use various risk rating conventions:
+
+━━━ RAG STATUS — derive from the overall building risk rating ━━━
+  RED:   High | Intolerable | Not Acceptable | Category B2 | Category C | Extreme | Unacceptable
+  AMBER: Medium | Tolerable (with conditions) | Further Action Required | Further Assessment Required | Category B1
+  GREEN: Low | Broadly Acceptable | Tolerable | No Further Action | Category A | Negligible
+
+━━━ BUILDING RISK RATING ━━━
+Extract the EXACT phrase from the Conclusion or Summary section.
+Common phrases: "Broadly Acceptable", "Tolerable", "Tolerable but not Acceptable",
+"Not Acceptable", "No Further Action Required", "Further Assessment Required",
+"High", "Medium", "Low", "Category A", "Category B1", "Category B2", "Category C"
+
+━━━ WALL TYPES ━━━
+Extract EVERY distinct wall type or zone assessed. Each may include:
+- A type reference (e.g. "Wall Type 1", "Zone A", "Category A", "Balconies")
+- Material description (insulation type, render type, cladding)
+- PAS 9980 Step 5 risk scores (spread risk, entry risk, occupant risk, overall risk)
+- Remedial requirements
+
+Insulation types: eps | mineral_wool | pir | phenolic | unknown
+Render types: cement | acrylic | silicone | unknown
+  acrylic render → render_combustible = true
+  cement render  → render_combustible = false
+  EPS/polystyrene → insulation_combustible = true
+  Mineral wool   → insulation_combustible = false
+Risk levels: low | medium | high
+
+━━━ COMPLIANCE ━━━
+  BS 8414 test → bs8414_test_evidence
+  BRE 135 criteria → br135_criteria_met
+  ADB (Approved Document B) → adb_compliant: compliant | non_compliant | uncertain | not_applicable
+
+Return ONLY this JSON:
+{{
+  "building_name": "building name or block reference (e.g. 02BR, Elizabeth Court) or null",
+  "building_address": "full postal address of the building or null",
+  "report_reference": "e.g. JL/230504 or null",
+  "assessment_date": "YYYY-MM-DD (site investigation date) or null",
+  "report_date": "YYYY-MM-DD (date report issued) or null",
+  "assessment_valid_until": "YYYY-MM-DD (typically 5 years from report_date) or null",
+
+  "assessor_name": "report writer full name or null",
+  "assessor_company": "report writer company or null",
+  "assessor_qualification": "e.g. IFE, MRICS, CEng or null",
+  "fire_engineer_name": "fire engineer name if Clause 14 used, else null",
+  "fire_engineer_company": "fire engineer company or null",
+  "fire_engineer_qualification": "fire engineer qualifications or null",
+  "clause_14_applied": true or false,
+
+  "building_height_m": height in metres as number or null,
+  "building_height_category": "under_11m or 11_to_18m or 18_to_30m or over_30m or null",
+  "num_storeys": number or null,
+  "num_units": number of residential units or null,
+  "build_year": year as number or null,
+  "construction_frame_type": "e.g. structural concrete, steel frame, timber frame or null",
+  "external_wall_base_construction": "e.g. double masonry cavity wall or null",
+  "retrofit_year": year cladding/insulation was added as number or null,
+
+  "pas_9980_version": "2022",
+  "pas_9980_compliant": true or false or null,
+  "building_risk_rating": "overall conclusion — exact phrase from Conclusion section or null",
+  "rag_status": "RED or AMBER or GREEN or null",
+
+  "cavity_barriers_present": true or false or null,
+  "cavity_barriers_windows": true or false or null,
+  "cavity_barriers_floors": true or false or null,
+  "fire_breaks_floor_level": true or false or null,
+  "fire_breaks_party_walls": true or false or null,
+  "dry_riser_present": true or false or null,
+  "wet_riser_present": true or false or null,
+  "evacuation_strategy": "stay_put or simultaneous or phased or null",
+
+  "bs8414_test_evidence": true or false or null,
+  "br135_criteria_met": true or false or null,
+  "adb_compliant": "compliant or non_compliant or uncertain or not_applicable or null",
+
+  "height_survey_recommended": true or false,
+  "fire_door_survey_recommended": true or false,
+  "intrusive_investigation_recommended": true or false,
+  "asbestos_suspected": true or false,
+
+  "interim_measures_required": true or false,
+  "interim_measures_detail": "description or null",
+  "has_remedial_actions": true or false,
+  "remedial_actions": [
+    {{
+      "action": "what needs to be done",
+      "priority": "advisory or low or medium or high",
+      "due_date": "YYYY-MM-DD or null",
+      "responsible": "landlord or contractor or null",
+      "status": "outstanding or completed"
+    }}
+  ],
+
+  "wall_types": [
+    {{
+      "type_ref": "e.g. Wall Type 1 or Balconies or Category A",
+      "description": "material description or null",
+      "coverage_percent": percentage as number or null,
+      "insulation_type": "eps or mineral_wool or pir or phenolic or unknown or null",
+      "insulation_combustible": true or false or null,
+      "render_type": "cement or acrylic or silicone or unknown or null",
+      "render_combustible": true or false or null,
+      "spread_risk": "low or medium or high or null",
+      "entry_risk": "low or medium or high or null",
+      "occupant_risk": "low or medium or high or null",
+      "overall_risk": "low or medium or high or null",
+      "remedial_required": true or false,
+      "remedial_detail": "description or null"
+    }}
+  ],
+
+  "extraction_confidence": 0.0 to 1.0
+}}
+
+FULL DOCUMENT:
+{{document_text}}"""
+
+
 FRAEW_METADATA_PROMPT = """Extract metadata from this UK FRAEW (Fire Risk Appraisal of External Walls) document.
 Return ONLY valid JSON. Use null for missing fields. Dates: YYYY-MM-DD.
 
@@ -291,6 +415,8 @@ class FRAEWProcessor:
         self.db  = db_conn
         self.llm = llm_client
         self.last_raw_response: Optional[str] = None
+        self.last_pass1_response: Optional[str] = None
+        self.last_pass2_response: Optional[str] = None
 
     # ── Public entry point ────────────────────────────────────────────
 
@@ -298,23 +424,33 @@ class FRAEWProcessor:
         self,
         text: str,
         upload_id: str,
-        block_id: str,
+        block_id: Optional[str],
         ha_id: str,
         s3_path: str,
     ) -> dict[str, Any]:
         logger.info("FRAEWProcessor.process() block_id=%s ha_id=%s", block_id, ha_id)
 
-        raw_json        = await self._call_llm(text)
-        features        = self._parse_llm_response(raw_json)
-        rag_status      = self._normalise_rag_status(features.building_risk_rating)
+        raw_json   = await self._call_llm(text)
+        features   = self._parse_llm_response(raw_json)
+        llm_rag    = (self._extract_json(raw_json) or {}).get("rag_status")
+        rag_status = self._normalise_rag_status(features.building_risk_rating, llm_rag=llm_rag)
         is_in_date      = self._compute_is_in_date(features.assessment_valid_until)
         height_category = self._derive_height_category(features)
         material_flags  = self._derive_material_flags(features.wall_types)
 
+        # Auto-resolve block_id from LLM-extracted building name/address if not provided
+        if not block_id:
+            llm_data = self._extract_json(raw_json) or {}
+            block_id = await self._resolve_block_id(
+                ha_id,
+                llm_data.get("building_name"),
+                llm_data.get("building_address"),
+            )
+
         logger.info(
-            "FRAEWProcessor parsed: risk=%s rag=%s wall_types=%d confidence=%.2f",
+            "FRAEWProcessor parsed: risk=%s rag=%s wall_types=%d confidence=%.2f block_id=%s",
             features.building_risk_rating, rag_status,
-            len(features.wall_types), features.extraction_confidence,
+            len(features.wall_types), features.extraction_confidence, block_id,
         )
 
         feature_id, fraew_id = await self._write_to_db(
@@ -332,41 +468,120 @@ class FRAEWProcessor:
             "wall_types_count":      len(features.wall_types),
         }
 
+    # ── Block auto-detection ─────────────────────────────────────────
+
+    async def _resolve_block_id(
+        self,
+        ha_id: str,
+        building_name: Optional[str],
+        building_address: Optional[str],
+    ) -> Optional[str]:
+        """
+        Three-strategy block resolution:
+          1. Exact match on block name (e.g. LLM returns '02BR')
+          2. Substring match (block name appears inside building_name/address)
+          3. Address lookup via silver.properties → block_reference → block_id
+             (handles cases like '269 Holmlea Road' → property has block_ref '02BR')
+        """
+        candidates = [c.strip() for c in [building_name, building_address] if c and c.strip()]
+        if not candidates:
+            logger.info("FRAEWProcessor: no building_name/address extracted — block_id stays None")
+            return None
+
+        # ── Strategy 1: exact block name match ───────────────────────
+        for candidate in candidates:
+            row = await self.db.fetchrow(
+                "SELECT block_id::text FROM silver.blocks WHERE ha_id=$1 AND UPPER(name)=UPPER($2) LIMIT 1",
+                ha_id, candidate,
+            )
+            if row:
+                logger.info("FRAEWProcessor: resolved block_id=%s (exact name) from %r", row["block_id"], candidate)
+                return row["block_id"]
+
+        # ── Strategy 2: substring — block name inside candidate ───────
+        all_blocks = await self.db.fetch(
+            "SELECT block_id::text, name FROM silver.blocks WHERE ha_id=$1", ha_id
+        )
+        for candidate in candidates:
+            cu = candidate.upper()
+            for b in all_blocks:
+                bn = (b["name"] or "").upper()
+                if bn and (bn in cu or cu in bn):
+                    logger.info(
+                        "FRAEWProcessor: resolved block_id=%s (substring) block=%r from %r",
+                        b["block_id"], b["name"], candidate,
+                    )
+                    return b["block_id"]
+
+        # ── Strategy 3: address → silver.properties → block_reference ─
+        # Extract meaningful search tokens (street name words, postcode)
+        for candidate in candidates:
+            tokens = [t.strip() for t in re.split(r"[,\s]+", candidate) if len(t.strip()) >= 3]
+            if not tokens:
+                continue
+            for i in range(len(tokens)):
+                for j in range(i + 1, len(tokens)):
+                    row = await self.db.fetchrow(
+                        """
+                        SELECT b.block_id::text
+                        FROM silver.properties p
+                        JOIN silver.blocks b ON b.ha_id = p.ha_id AND UPPER(b.name) = UPPER(p.block_reference)
+                        WHERE p.ha_id = $1
+                          AND p.block_reference IS NOT NULL
+                          AND (
+                            (UPPER(p.address) LIKE '%' || UPPER($2) || '%'
+                             AND UPPER(p.address) LIKE '%' || UPPER($3) || '%')
+                            OR (UPPER(p.postcode) LIKE '%' || UPPER($2) || '%')
+                          )
+                        LIMIT 1
+                        """,
+                        ha_id, tokens[i], tokens[j],
+                    )
+                    if row:
+                        logger.info(
+                            "FRAEWProcessor: resolved block_id=%s (address lookup) tokens=%r",
+                            row["block_id"], [tokens[i], tokens[j]],
+                        )
+                        return row["block_id"]
+
+        logger.warning("FRAEWProcessor: could not resolve block from candidates %s", candidates)
+        return None
+
     # ── LLM call — two pass ───────────────────────────────────────────
 
     async def _call_llm(self, text: str) -> str:
-        """
-        Two-pass extraction to stay within Groq free tier TPM limits.
+        """Single-pass for Gemini/Bedrock. Two-pass fallback for Groq."""
+        if self.llm.supports_large_context:
+            return await self._call_llm_single_pass(text)
+        return await self._call_llm_two_pass(text)
 
-        Groq free tier hard limit: 6,000 tokens per request.
-        At ~4 chars/token, max safe document chunk = ~18,000 chars.
+    async def _call_llm_single_pass(self, text: str) -> str:
+        """Single LLM call with full document — for Gemini and Bedrock."""
+        logger.info("FRAEWProcessor: single-pass extraction (%d chars)", len(text))
+        prompt = FRAEW_SINGLE_PASS_PROMPT.replace("{{document_text}}", text)
+        try:
+            raw = await self.llm.extract(prompt, max_tokens=16384)
+            logger.info("Single-pass returned %d chars", len(raw or ""))
+        except Exception as exc:
+            logger.error("Single-pass failed: %s", exc)
+            raise RuntimeError(f"LLM extraction failed (single pass): {exc}") from exc
+        self.last_pass1_response = raw
+        self.last_pass2_response = None
+        self.last_raw_response = raw
+        return raw
 
-        Pass 1 — first 18K chars + metadata prompt
-          → Extracts: report metadata, building description, fire safety
-            features, overall risk rating, compliance fields
-
-        Pass 2 — last 18K chars + wall types prompt
-          → Extracts: ALL wall type assessments + remedial actions
-          → Uses the END of the document because FRAEW conclusions
-            and full wall type tables typically appear in the latter half.
-
-        Results are merged: metadata from pass 1, wall_types/remedial
-        from pass 2 (with deduplication if both passes found wall types).
-        """
+    async def _call_llm_two_pass(self, text: str) -> str:
+        """Two-pass extraction for Groq free tier (6K TPM hard limit)."""
         CHUNK = 18_000
-
         meta_chunk    = text[:CHUNK]
         actions_chunk = text[-CHUNK:] if len(text) > CHUNK else text
 
         logger.info(
-            "FRAEWProcessor: two-pass LLM — "
-            "meta_chunk=%d chars (0-%d), wall_chunk=%d chars (%d-%d)",
-            len(meta_chunk), len(meta_chunk),
-            len(actions_chunk), max(0, len(text) - CHUNK), len(text),
+            "FRAEWProcessor: two-pass LLM — meta=%d chars, wall=%d chars",
+            len(meta_chunk), len(actions_chunk),
         )
 
-        # Pass 1: metadata
-        meta_prompt = FRAEW_METADATA_PROMPT.replace("{document_text}", meta_chunk)
+        meta_prompt = FRAEW_METADATA_PROMPT.replace("{{document_text}}", meta_chunk)
         try:
             meta_raw = await self.llm.extract(meta_prompt)
             logger.info("Pass 1 (metadata) returned %d chars", len(meta_raw or ""))
@@ -374,8 +589,7 @@ class FRAEWProcessor:
             logger.error("Pass 1 (metadata) failed: %s", exc)
             raise RuntimeError(f"LLM extraction failed (metadata pass): {exc}") from exc
 
-        # Pass 2: wall types + remedial
-        wall_prompt = FRAEW_WALL_TYPES_PROMPT.replace("{document_text}", actions_chunk)
+        wall_prompt = FRAEW_WALL_TYPES_PROMPT.replace("{{document_text}}", actions_chunk)
         try:
             wall_raw = await self.llm.extract(wall_prompt)
             logger.info("Pass 2 (wall types) returned %d chars", len(wall_raw or ""))
@@ -383,6 +597,8 @@ class FRAEWProcessor:
             logger.error("Pass 2 (wall types) failed: %s", exc)
             raise RuntimeError(f"LLM extraction failed (wall types pass): {exc}") from exc
 
+        self.last_pass1_response = meta_raw
+        self.last_pass2_response = wall_raw
         merged = self._merge_passes(meta_raw, wall_raw)
         self.last_raw_response = merged
         return merged
@@ -549,8 +765,16 @@ class FRAEWProcessor:
             adb = None
 
         height_cat = data.get("building_height_category")
-        if height_cat not in ("under_11m", "11_to_18m", "18_to_30m", "over_30m", "unknown"):
+        if height_cat not in ("under_11m", "11_to_18m", "18_to_30m", "over_30m"):
             height_cat = None
+        # Derive from numeric height if LLM returned wrong enum value (e.g. "over_18m")
+        if height_cat is None:
+            h = data.get("building_height_m")
+            if isinstance(h, (int, float)):
+                if h < 11:    height_cat = "under_11m"
+                elif h <= 18: height_cat = "11_to_18m"
+                elif h <= 30: height_cat = "18_to_30m"
+                else:         height_cat = "over_30m"
 
         return FRAEWExtractedFeatures(
             report_reference        = data.get("report_reference"),
@@ -609,37 +833,50 @@ class FRAEWProcessor:
 
     # ── Derived fields ────────────────────────────────────────────────
 
-    def _normalise_rag_status(self, building_risk_rating: Optional[str]) -> Optional[str]:
-        """Map PAS 9980 risk rating text → GREEN / AMBER / RED / None."""
+    def _normalise_rag_status(self, building_risk_rating: Optional[str], llm_rag: Optional[str] = None) -> Optional[str]:
+        """
+        Map PAS 9980 risk rating → GREEN / AMBER / RED.
+        Uses LLM-provided rag_status directly when valid — falls back to keyword matching.
+        """
+        if llm_rag:
+            v = llm_rag.strip().upper()
+            if v in ("RED", "AMBER", "GREEN"):
+                return v
+
         if not building_risk_rating:
             return None
         lower = building_risk_rating.lower().strip()
 
-        if lower in ("n/a", "not assessed", "unknown", "tbc", "tbd", "none"):
+        if lower in ("n/a", "not assessed", "unknown", "tbc", "tbd", "none", ""):
             return None
 
-        # Multi-word phrases first (order matters)
+        # RED — unacceptable risk
+        if "not acceptable" in lower or "unacceptable" in lower:
+            return "RED"
+        for kw in ("high", "intolerable", "extreme", "critical",
+                   "category b2", "category c"):
+            if kw in lower:
+                return "RED"
+
+        # GREEN — acceptable / no action needed
         if "no further action" in lower or "broadly acceptable" in lower:
             return "GREEN"
-        if "not acceptable" in lower:
-            return "RED"
+        for kw in ("low", "negligible", "category a"):
+            if kw in lower:
+                return "GREEN"
+        if lower == "tolerable":
+            return "GREEN"
+
+        # AMBER — tolerable with conditions / further work needed
         if "tolerable but" in lower or "tolerable with" in lower:
             return "AMBER"
         if "further action" in lower or "further assessment" in lower:
             return "AMBER"
-
-        # Single keywords
-        for kw in ("high", "intolerable", "unacceptable", "extreme", "critical"):
-            if kw in lower:
-                return "RED"
-        for kw in ("medium", "moderate", "significant"):
+        for kw in ("medium", "moderate", "significant", "category b1"):
             if kw in lower:
                 return "AMBER"
-        for kw in ("low", "tolerable", "acceptable", "negligible"):
-            if kw in lower:
-                return "GREEN"
 
-        logger.warning("Unknown FRAEW risk rating '%s' → defaulting to AMBER", building_risk_rating)
+        logger.warning("FRAEW: unknown risk rating '%s' → defaulting to AMBER", building_risk_rating)
         return "AMBER"
 
     def _compute_is_in_date(self, valid_until_str: Optional[str]) -> Optional[bool]:

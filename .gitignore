@@ -283,3 +283,10 @@ backend/geo/os_dh_fun_keys
 
 # Claude session docs (internal dev notes)
 .claude/docs/
+
+# Internal dev notes and docs (not for repo)
+claude/
+
+# Ad-hoc debug / test scripts (not production code)
+check_bedrock_models.py
+check_gemini_models.py

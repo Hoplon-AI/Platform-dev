@@ -36,10 +36,10 @@ DOC_A_COLUMNS = [
     ("Property Reference",                      "property_reference"),
     ("Block Reference",                         "block_reference"),
     ("Occupancy Type",                          "occupancy_type"),
-    ("Deductible",                              None),               # insurer
-    ("Flood Deductible",                        None),               # insurer
-    ("Storm Deductible",                        None),               # insurer
-    ("Basis of Deductible (EEL/SEC)",           None),               # insurer
+    ("Deductible",                              "deductible"),
+    ("Flood Deductible",                        None),               # no separate DB column
+    ("Storm Deductible",                        None),               # no separate DB column
+    ("Basis of Deductible (EEL/SEC)",           "basis_of_deductible"),
     ("Address 1",                               "address"),
     ("Address 2",                               "address_2"),
     ("Address 3",                               "address_3"),
@@ -52,7 +52,7 @@ DOC_A_COLUMNS = [
     ("Wall Construction",                       "wall_construction"),
     ("Roof Construction",                       "roof_construction"),
     ("Floor Construction",                      "floor_construction"),
-    ("Year of Build",                           "build_year"),
+    ("Year of Build",                           "year_of_build"),
     ("Age Banding",                             "age_banding"),
     ("Number of Bedrooms",                      "num_bedrooms"),
     ("Number of Storeys",                       "storeys"),
@@ -152,6 +152,8 @@ async def _fetch_properties(db_pool, ha_id: str, portfolio_id: Optional[str]) ->
         p.property_reference,
         p.block_reference,
         p.occupancy_type,
+        p.deductible,
+        p.basis_of_deductible,
         p.address,
         p.address_2,
         p.address_3,
@@ -164,7 +166,7 @@ async def _fetch_properties(db_pool, ha_id: str, portfolio_id: Optional[str]) ->
         p.wall_construction,
         p.roof_construction,
         p.floor_construction,
-        p.build_year,
+        p.year_of_build,
         p.age_banding,
         p.num_bedrooms,
         p.storeys,
@@ -206,7 +208,11 @@ def _write_header_row(ws, ha_name: str):
 
 
 def _write_data_rows(ws, rows, ha_name: str):
+    from openpyxl.styles import PatternFill
+    AUTO_FILL = PatternFill(start_color="FFF2CC", end_color="FFF2CC", fill_type="solid")  # amber
+
     for row_idx, db_row in enumerate(rows, start=2):
+        is_auto = str(db_row.get("property_reference", "")).startswith("AUTO_")
         fill = ALT_ROW_FILL if row_idx % 2 == 0 else DATA_FILL
 
         for col_idx, (header, db_field) in enumerate(DOC_A_COLUMNS, start=1):
@@ -217,13 +223,17 @@ def _write_data_rows(ws, rows, ha_name: str):
             else:
                 value = db_row[db_field] if db_field in db_row.keys() else None
 
+            # Flag AUTO rows in the Property Reference cell
+            if header == "Property Reference" and is_auto:
+                value = f"{value} ⚠ No ref in SoV"
+
             # Format booleans nicely
             if isinstance(value, bool):
                 value = "Yes" if value else "No"
 
             cell = ws.cell(row=row_idx, column=col_idx, value=value)
             cell.font = NORMAL_FONT
-            cell.fill = INSURER_FILL if (col_idx - 1) in INSURER_COLS else fill
+            cell.fill = INSURER_FILL if (col_idx - 1) in INSURER_COLS else (AUTO_FILL if is_auto else fill)
             cell.alignment = Alignment(vertical="center")
             cell.border = THIN_BORDER
 

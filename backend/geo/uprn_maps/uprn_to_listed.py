@@ -118,6 +118,43 @@ def _is_scotland(place: dict) -> bool:
     return place.get("COUNTRY_CODE") == "S"
 
 
+def get_listed_building_statuses(
+    uprns_with_places: list[tuple[str, dict]],
+    places_api_key: str,
+) -> dict[str, dict]:
+    """Check listed building status for multiple properties using pre-resolved place records.
+
+    Accepts (uprn, place_record) tuples so coordinates don't need to be
+    looked up again from OS Places. Each place_record must contain
+    X_COORDINATE, Y_COORDINATE, and COUNTRY_CODE.
+
+    Args:
+        uprns_with_places: List of (uprn_str, place_record_dict) tuples.
+        places_api_key: OS Data Hub API key (not used for API calls here,
+            kept for interface consistency).
+
+    Returns:
+        Dict mapping each UPRN to its listed building status dict.
+    """
+    results: dict[str, dict] = {}
+
+    for uprn, place in uprns_with_places:
+        x = place.get("X_COORDINATE")
+        y = place.get("Y_COORDINATE")
+        if x is None or y is None:
+            results[str(uprn)] = {"is_listed": None, "error": "No coordinates for this UPRN."}
+            continue
+
+        x, y = float(x), float(y)
+
+        if _is_scotland(place):
+            results[str(uprn)] = _check_scotland(x, y)
+        else:
+            results[str(uprn)] = _check_england(x, y)
+
+    return results
+
+
 def get_listed_building_status(
     uprn: str | int,
     places_api_key: str,

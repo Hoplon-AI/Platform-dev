@@ -196,6 +196,7 @@ FIELD_KEYWORDS: dict[str, list[str]] = {
     "flood_insured": ["flood"],
     "storm_insured": ["storm"],
     "deductible": ["deductible", "excess"],
+    "basis_of_deductible": ["basis of deductible", "basis of ded", "eel/sec", "eel sec"],
     "insure_flag": ["insure yes", "insure y/n", "insured yes"],
 }
 
@@ -1267,6 +1268,7 @@ def _stage_c_extract(ws, sheet_info: dict, join_data: dict | None,
                 "flood_insured":      _to_bool(get("flood_insured")),
                 "storm_insured":      _to_bool(get("storm_insured")),
                 "deductible":         _clean_numeric(get("deductible")),
+                "basis_of_deductible": _clamp(_clean_str(get("basis_of_deductible")), 20),
                 "enrichment_status":  "pending",
                 "metadata":           metadata,
             }
@@ -1311,7 +1313,7 @@ INSERT INTO silver.properties (
     wall_construction, roof_construction, floor_construction,
     year_of_build, age_banding, num_bedrooms, storeys, units,
     basement, is_listed, security_features, fire_protection,
-    alarms, flood_insured, storm_insured, deductible,
+    alarms, flood_insured, storm_insured, deductible, basis_of_deductible,
     enrichment_status, metadata, created_at, updated_at
 )
 VALUES (
@@ -1322,7 +1324,7 @@ VALUES (
     %(wall_construction)s, %(roof_construction)s, %(floor_construction)s,
     %(year_of_build)s, %(age_banding)s, %(num_bedrooms)s, %(storeys)s, %(units)s,
     %(basement)s, %(is_listed)s, %(security_features)s, %(fire_protection)s,
-    %(alarms)s, %(flood_insured)s, %(storm_insured)s, %(deductible)s,
+    %(alarms)s, %(flood_insured)s, %(storm_insured)s, %(deductible)s, %(basis_of_deductible)s,
     %(enrichment_status)s, %(metadata)s::jsonb, NOW(), NOW()
 )
 ON CONFLICT (ha_id, property_reference)
@@ -1353,6 +1355,7 @@ DO UPDATE SET
     flood_insured      = EXCLUDED.flood_insured,
     storm_insured      = EXCLUDED.storm_insured,
     deductible         = EXCLUDED.deductible,
+    basis_of_deductible = EXCLUDED.basis_of_deductible,
     submission_id      = EXCLUDED.submission_id,
     enrichment_status  = CASE
                            WHEN silver.properties.enrichment_status = 'enriched'
