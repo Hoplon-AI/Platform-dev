@@ -231,25 +231,25 @@ class AuditLogger:
     ):
         """Store upload audit record in database."""
         await self.db_adapter.execute(
-            """
-            INSERT INTO upload_audit (
-                upload_id, ha_id, file_type, filename, s3_key,
-                checksum, file_size, user_id, status, metadata, stepfn_execution_arn
-            )
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
-            """,
-            uuid.UUID(upload_id),
-            ha_id,
-            file_type,
-            filename,
-            s3_key,
-            checksum,
-            file_size,
-            user_id,
-            status,
-            json.dumps(metadata) if metadata else None,
-            stepfn_execution_arn,
-        )
+    """
+    INSERT INTO upload_audit (
+        upload_id, ha_id, file_type, filename, s3_key,
+        checksum, file_size, user_id, status, metadata, stepfn_execution_arn
+    )
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+    """,
+    str(upload_id),
+    ha_id,
+    file_type,
+    filename,
+    s3_key,
+    checksum,
+    file_size,
+    user_id,
+    status,
+    json.dumps(metadata) if metadata else None,
+    stepfn_execution_arn,
+)
     
     async def _store_processing_audit(
         self,

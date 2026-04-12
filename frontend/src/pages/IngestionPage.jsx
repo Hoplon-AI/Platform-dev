@@ -1,5 +1,34 @@
-// src/pages/IngestionPage.jsx
-import React, { useCallback, useRef, useState } from "react";
+import React, { useCallback, useMemo, useRef, useState } from "react";
+
+function StepCard({ number, title, subtitle, state = "upcoming" }) {
+  return (
+    <div className={`step ${state === "active" ? "step-active" : ""} ${state === "done" ? "step-done" : ""}`}>
+      <div className="step-dot">{number}</div>
+      <div className="step-meta">
+        <div className="step-title">{title}</div>
+        <div className="step-sub">{subtitle}</div>
+      </div>
+    </div>
+  );
+}
+
+function SummaryTile({ label, value, wide = false }) {
+  return (
+    <div className={`summary-item ${wide ? "summary-wide" : ""}`}>
+      <div className="summary-k">{label}</div>
+      <div className="summary-v">{value}</div>
+    </div>
+  );
+}
+
+function ChecklistItem({ children }) {
+  return (
+    <li className="mini-list-item">
+      <span className="mini-list-dot" />
+      <span>{children}</span>
+    </li>
+  );
+}
 
 export default function IngestionPage({
   onFilesSelected,
@@ -11,78 +40,105 @@ export default function IngestionPage({
   const inputRef = useRef(null);
   const [dragActive, setDragActive] = useState(false);
 
-  const pickFiles = () => inputRef.current?.click();
+  const steps = useMemo(
+    () => [
+      {
+        n: 1,
+        title: "Upload portfolio",
+        sub: "Submit SoV spreadsheet",
+      },
+      {
+        n: 2,
+        title: "Backend ingestion",
+        sub: "Normalize and validate rows",
+      },
+      {
+        n: 3,
+        title: "Portfolio overview",
+        sub: "Map, blocks, and review",
+      },
+    ],
+    []
+  );
 
-  const handleInput = (e) => {
-    const files = e.target.files;
-    if (files && files.length) onFilesSelected?.(files);
-    e.target.value = ""; // allow selecting same file twice
+  const pickFiles = () => {
+    if (!isUploading) inputRef.current?.click();
+  };
+
+  const handleInput = (event) => {
+    const files = event.target.files;
+    if (files && files.length) {
+      onFilesSelected?.(files);
+    }
+    event.target.value = "";
   };
 
   const onDrop = useCallback(
-    (e) => {
-      e.preventDefault();
-      e.stopPropagation();
+    (event) => {
+      event.preventDefault();
+      event.stopPropagation();
       setDragActive(false);
 
-      const files = e.dataTransfer?.files;
-      if (files && files.length) onFilesSelected?.(files);
+      const files = event.dataTransfer?.files;
+      if (files && files.length) {
+        onFilesSelected?.(files);
+      }
     },
     [onFilesSelected]
   );
 
-  const onDrag = (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    if (e.type === "dragenter" || e.type === "dragover") setDragActive(true);
-    if (e.type === "dragleave") setDragActive(false);
-  };
+  const onDrag = (event) => {
+    event.preventDefault();
+    event.stopPropagation();
 
-  const stepIndex = 0; // Upload SoV page
-  const steps = [
-    { n: 1, title: "Upload SoV", sub: "Drop your file below" },
-    { n: 2, title: "Portfolio Overview", sub: "Readiness + map" },
-    { n: 3, title: "Data Quality", sub: "Evidence gaps (later)" },
-  ];
+    if (isUploading) return;
+
+    if (event.type === "dragenter" || event.type === "dragover") {
+      setDragActive(true);
+    }
+    if (event.type === "dragleave") {
+      setDragActive(false);
+    }
+  };
 
   return (
     <div className="page pad-xl">
       <div className="ingestion-shell">
-        {/* Header */}
         <div className="ingestion-head">
-          <div className="ingestion-kicker">Uploads</div>
-          <h1 className="ingestion-title">Upload Your Portfolio Data</h1>
+          <div className="ingestion-kicker">Portfolio ingestion</div>
+          <h1 className="ingestion-title">Upload your portfolio data</h1>
           <p className="ingestion-subtitle">
-            Upload an SOV-style file. We’ll normalise key fields and compute submission readiness.
+            Keep the same workflow, but align the experience to the backend:
+            upload the SoV, let the API ingest it, then move directly into
+            portfolio and block analysis.
           </p>
-          <span className="pill pill-soft">Supported: CSV, XLSX</span>
+          <div className="ingestion-head-tags">
+            <span className="pill pill-soft">CSV</span>
+            <span className="pill pill-soft">XLSX</span>
+            <span className="pill pill-soft">Backend-connected</span>
+          </div>
         </div>
 
-        {/* Stepper */}
         <div className="stepper">
-          {steps.map((s, idx) => {
-            const active = idx === stepIndex;
-            const done = idx < stepIndex;
-            return (
-              <div key={s.n} className={`step ${active ? "step-active" : ""} ${done ? "step-done" : ""}`}>
-                <div className="step-dot">{s.n}</div>
-                <div className="step-meta">
-                  <div className="step-title">{s.title}</div>
-                  <div className="step-sub">{s.sub}</div>
-                </div>
-              </div>
-            );
-          })}
+          <StepCard number={1} title={steps[0].title} subtitle={steps[0].sub} state="active" />
+          <StepCard number={2} title={steps[1].title} subtitle={steps[1].sub} state={isUploading ? "active" : "upcoming"} />
+          <StepCard
+            number={3}
+            title={steps[2].title}
+            subtitle={steps[2].sub}
+            state={ingestionSummary ? "done" : "upcoming"}
+          />
         </div>
 
-        {/* Dropzone card */}
-        <div className="card card-lg">
-          <div className="card-header">
+        <div className="card card-lg ingestion-main-card">
+          <div className="card-header row-between">
             <div>
               <div className="card-title">Upload SoV</div>
-              <div className="card-muted">Drag & drop your file, or browse from your computer.</div>
+              <div className="card-subtitle">
+                Drag and drop a schedule of values file, or browse from your computer.
+              </div>
             </div>
-            <div className="pill">CSV / XLSX</div>
+            <span className="pill pill-muted">Excel / CSV</span>
           </div>
 
           <div className="card-body">
@@ -95,139 +151,182 @@ export default function IngestionPage({
             />
 
             <div
-              className={`dropzone ${dragActive ? "dropzone-active" : ""} ${isUploading ? "dropzone-busy" : ""}`}
+              className={[
+                "dropzone",
+                dragActive ? "dropzone-active" : "",
+                isUploading ? "dropzone-busy" : "",
+              ].join(" ")}
               onDragEnter={onDrag}
               onDragOver={onDrag}
               onDragLeave={onDrag}
               onDrop={onDrop}
-              onClick={() => !isUploading && pickFiles()}
+              onClick={pickFiles}
               role="button"
               tabIndex={0}
             >
               <div className="dropzone-inner">
                 <div className="dropzone-icon">⤒</div>
+
                 <div className="dropzone-text">
                   <div className="dropzone-title">Drag &amp; drop your file here</div>
-                  <div className="dropzone-sub">or click to browse from your computer</div>
+                  <div className="dropzone-sub">
+                    or click to browse from your computer
+                  </div>
                 </div>
 
                 <div className="dropzone-actions">
-                  <button className="btn btn-primary" onClick={(e) => (e.stopPropagation(), pickFiles())} disabled={isUploading}>
+                  <button
+                    type="button"
+                    className="btn btn-primary"
+                    disabled={isUploading}
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      pickFiles();
+                    }}
+                  >
                     {isUploading ? "Uploading…" : "Browse files"}
                   </button>
                 </div>
               </div>
 
               <div className="dropzone-foot">
-                Supported: Excel (.xlsx/.xls), CSV
+                Supported: Excel (.xlsx / .xls) and CSV
               </div>
             </div>
 
-            {/* Error */}
-            {uploadError && <div className="alert alert-error">{uploadError}</div>}
+            {uploadError ? (
+              <div className="alert alert-error" style={{ marginTop: 16 }}>
+                {uploadError}
+              </div>
+            ) : null}
 
-            {/* Tip + pipeline */}
             <div className="ingestion-grid">
               <div className="card card-soft">
                 <div className="card-body">
-                  <div className="mini-title">What to include for best results</div>
+                  <div className="mini-title">Best results when your SoV includes</div>
                   <ul className="mini-list">
-                    <li>latitude + longitude (UK bounds)</li>
-                    <li>height_m (for building context)</li>
-                    <li>sum_insured / declared value</li>
-                    <li>UPRN column if available</li>
+                    <ChecklistItem>address line, town / city, and postcode</ChecklistItem>
+                    <ChecklistItem>sum insured and property type</ChecklistItem>
+                    <ChecklistItem>height / storeys where available</ChecklistItem>
+                    <ChecklistItem>UPRN or block reference if you already have it</ChecklistItem>
                   </ul>
                 </div>
               </div>
 
               <div className="card card-soft">
                 <div className="card-body">
-                  <div className="mini-title">Pipeline</div>
+                  <div className="mini-title">Pipeline status</div>
+
                   <div className="pipeline-row">
-                    <span className={`pill ${isUploading ? "pill-warn" : "pill-good"}`}>
-                      {isUploading ? "Processing" : pipelineStep ? "Running" : "Ready"}
+                    <span
+                      className={`pill ${
+                        isUploading
+                          ? "pill-warn"
+                          : ingestionSummary
+                          ? "pill-good"
+                          : "pill-muted"
+                      }`}
+                    >
+                      {isUploading
+                        ? "Processing"
+                        : ingestionSummary
+                        ? "Ready"
+                        : "Waiting"}
                     </span>
-                    <span className="pipeline-step">{pipelineStep || "Waiting for upload"}</span>
+
+                    <span className="pipeline-step">
+                      {pipelineStep || "Waiting for upload"}
+                    </span>
                   </div>
+
                   <div className="mini-muted">
-                    We normalise headers, coerce types, score readiness, and validate coordinates.
+                    The backend validates format, normalizes fields, writes the
+                    ingested rows, and prepares the portfolio dashboard.
                   </div>
                 </div>
               </div>
             </div>
 
-            {/* Upload summary */}
             <div className="section">
               <div className="section-head">
-                <div className="section-title">Upload Summary</div>
-                {ingestionSummary && <span className="pill pill-good">Ready</span>}
+                <div className="section-title">Upload summary</div>
+                {ingestionSummary ? (
+                  <span className="pill pill-good">Portfolio loaded</span>
+                ) : null}
               </div>
 
               {!ingestionSummary ? (
                 <div className="mini-muted">
-                  Upload a file to generate a summary (rows, mappable locations, readiness, UPRN match).
+                  Upload a file to generate a summary of rows, mappable properties,
+                  readiness, and UPRN coverage before you move to the dashboard.
                 </div>
               ) : (
-                <div className="summary-grid">
-                  <div className="summary-item summary-wide">
-                    <div className="summary-k">Source</div>
-                    <div className="summary-v">{ingestionSummary.source}</div>
+                <>
+                  <div className="summary-grid">
+                    <SummaryTile label="Source" value={ingestionSummary.source} wide />
+                    <SummaryTile label="Rows" value={ingestionSummary.propertyCount} />
+                    <SummaryTile label="Mappable" value={ingestionSummary.mappableCount} />
+                    <SummaryTile
+                      label="Invalid coords"
+                      value={ingestionSummary.skippedInvalidCoords}
+                    />
+                    <SummaryTile
+                      label="Avg readiness"
+                      value={`${ingestionSummary.avgReadiness ?? 0}/100`}
+                    />
+                    <SummaryTile
+                      label="UPRN match"
+                      value={`${ingestionSummary.uprnMatchPct ?? 0}%`}
+                    />
+                    <SummaryTile
+                      label="Blocks detected"
+                      value={ingestionSummary.blockCount ?? 0}
+                    />
+                    <SummaryTile
+                      label="Total insured value"
+                      value={`£${Number(
+                        ingestionSummary.totalValue || 0
+                      ).toLocaleString(undefined, {
+                        maximumFractionDigits: 0,
+                      })}`}
+                    />
                   </div>
 
-                  <div className="summary-item">
-                    <div className="summary-k">Rows</div>
-                    <div className="summary-v">{ingestionSummary.propertyCount}</div>
+                  <div className="mini-muted" style={{ marginTop: 10 }}>
+                    Once uploaded, the app automatically routes into the Portfolio Overview.
                   </div>
-
-                  <div className="summary-item">
-                    <div className="summary-k">Mappable</div>
-                    <div className="summary-v">{ingestionSummary.mappableCount}</div>
-                  </div>
-
-                  <div className="summary-item">
-                    <div className="summary-k">Invalid coords</div>
-                    <div className="summary-v">{ingestionSummary.skippedInvalidCoords}</div>
-                  </div>
-
-                  <div className="summary-item">
-                    <div className="summary-k">Avg readiness</div>
-                    <div className="summary-v">{ingestionSummary.avgReadiness ?? "—"}/100</div>
-                  </div>
-
-                  <div className="summary-item">
-                    <div className="summary-k">UPRN match</div>
-                    <div className="summary-v">{ingestionSummary.uprnMatchPct ?? "0"}%</div>
-                  </div>
-                </div>
-              )}
-
-              {ingestionSummary && (
-                <div className="mini-muted" style={{ marginTop: 10 }}>
-                  After upload, you’ll be taken to the Portfolio Overview automatically.
-                </div>
+                </>
               )}
             </div>
 
-            {/* Small features row (nice like the reference) */}
             <div className="feature-row">
               <div className="feature">
-                <div className="feature-title">Smart ingestion</div>
-                <div className="feature-sub">Header aliasing, type coercion, UK bounds validation.</div>
+                <div className="feature-title">Backend-led ingestion</div>
+                <div className="feature-sub">
+                  The frontend now follows the backend contract rather than relying on local-only parsing.
+                </div>
               </div>
+
               <div className="feature">
-                <div className="feature-title">Data quality checks</div>
-                <div className="feature-sub">Readiness scoring & missing core fields.</div>
+                <div className="feature-title">Portfolio-first flow</div>
+                <div className="feature-sub">
+                  Uploading is the entry point into block analysis, mapping, and underwriting review.
+                </div>
               </div>
+
               <div className="feature">
-                <div className="feature-title">Fast iteration</div>
-                <div className="feature-sub">Upload new files any time (no backend required).</div>
+                <div className="feature-title">Geo-ready model</div>
+                <div className="feature-sub">
+                  The dashboard can consume UPRN, block, coordinate, and enrichment fields as they arrive.
+                </div>
               </div>
             </div>
           </div>
         </div>
 
         <div className="mini-muted" style={{ marginTop: 10 }}>
-          Tip: keep columns simple (address_line_1, post_code, city, latitude, longitude, sum_insured, height_m).
+          Tip: keep your SoV columns clear and consistent. The backend can normalize aliases,
+          but cleaner data produces better portfolio and geo analysis.
         </div>
       </div>
     </div>
