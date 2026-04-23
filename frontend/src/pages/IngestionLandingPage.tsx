@@ -1,511 +1,1209 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Link, useLocation } from "react-router-dom";
-import { apiFetch } from "../services/apiClient";
+import React, { useMemo, useRef, useState } from "react";
 
-// Icons as inline SVGs
-const Icons = {
-  Upload: () => (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-      <polyline points="17 8 12 3 7 8" />
-      <line x1="12" y1="3" x2="12" y2="15" />
-    </svg>
-  ),
-  Clock: () => (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-      <circle cx="12" cy="12" r="10" />
-      <polyline points="12 6 12 12 16 14" />
-    </svg>
-  ),
-  Home: () => (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-      <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
-      <polyline points="9 22 9 12 15 12 15 22" />
-    </svg>
-  ),
-  FileText: () => (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-      <polyline points="14 2 14 8 20 8" />
-      <line x1="16" y1="13" x2="8" y2="13" />
-      <line x1="16" y1="17" x2="8" y2="17" />
-    </svg>
-  ),
-  Download: () => (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-      <polyline points="7 10 12 15 17 10" />
-      <line x1="12" y1="15" x2="12" y2="3" />
-    </svg>
-  ),
-  Check: () => (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-      <polyline points="20 6 9 17 4 12" />
-    </svg>
-  ),
-  AlertCircle: () => (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-      <circle cx="12" cy="12" r="10" />
-      <line x1="12" y1="8" x2="12" y2="12" />
-      <line x1="12" y1="16" x2="12.01" y2="16" />
-    </svg>
-  ),
-  Zap: () => (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-      <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
-    </svg>
-  ),
-  Shield: () => (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-      <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
-    </svg>
-  ),
-  RefreshCw: () => (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-      <polyline points="23 4 23 10 17 10" />
-      <polyline points="1 20 1 14 7 14" />
-      <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
-    </svg>
-  ),
-  BarChart: () => (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-      <line x1="18" y1="20" x2="18" y2="10" />
-      <line x1="12" y1="20" x2="12" y2="4" />
-      <line x1="6" y1="20" x2="6" y2="14" />
-    </svg>
-  ),
-  Link: () => (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-      <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
-      <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
-    </svg>
-  ),
-  ChevronRight: () => (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-      <polyline points="9 18 15 12 9 6" />
-    </svg>
-  ),
+type IngestionStep = {
+  key: string;
+  label: string;
+  state: "pending" | "active" | "complete";
 };
 
-type Submission = {
-  upload_id: string;
-  ha_id: string;
-  filename: string;
-  file_type: string;
-  status: string;
-  uploaded_at: string;
-  file_size: number;
-  checksum: string;
-  metadata?: unknown;
+type IngestionStats = {
+  properties?: number | string;
+  totalValue?: number | string;
+  dataPassed?: number | string;
+  missingCore?: number | string;
 };
 
-type ListResponse = {
-  items: Submission[];
+type IngestionLandingPageProps = {
+  accountName?: string;
+  renewalLabel?: string;
+  isProcessing?: boolean;
+  processingTitle?: string;
+  processingStepLabel?: string;
+  steps?: IngestionStep[];
+  stats?: IngestionStats;
+  onFilesSelected?: (files: File[]) => void;
+  onDownloadTemplate?: () => void;
+  onRequestIntegration?: () => void;
 };
 
-type BatchUploadResponse = {
-  total_files: number;
-  successful: number;
-  failed: number;
-  results: Array<{
-    upload_id: string;
-    filename: string;
-    file_type: string;
-    s3_key: string;
-    manifest_s3_key?: string | null;
-    metadata_s3_key?: string | null;
-    checksum: string;
-    file_size: number;
-  }>;
-  errors: Array<{ filename: string; error: string; error_type?: string }>;
+const defaultSteps: IngestionStep[] = [
+  { key: "validating", label: "Validating", state: "complete" },
+  { key: "verifying", label: "Verifying UPRN", state: "active" },
+  { key: "cleansing", label: "Cleansing", state: "pending" },
+  { key: "normalising", label: "Normalising", state: "pending" },
+  { key: "complete", label: "Complete", state: "pending" },
+];
+
+const fmtStat = (value?: number | string) => {
+  if (value === undefined || value === null || value === "") return "---";
+  if (typeof value === "number") return value.toLocaleString("en-GB");
+  return value;
 };
 
-function formatDateTime(iso: string) {
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return iso;
-  return d.toLocaleString();
-}
+const fmtMoney = (value?: number | string) => {
+  if (value === undefined || value === null || value === "") return "---";
+  const num = Number(value);
+  if (!Number.isFinite(num)) return String(value);
+  return `£${num.toLocaleString("en-GB", { maximumFractionDigits: 0 })}`;
+};
 
-function formatBytes(n: number) {
-  if (!Number.isFinite(n)) return "-";
-  const units = ["B", "KB", "MB", "GB"];
-  let i = 0;
-  let v = n;
-  while (v >= 1024 && i < units.length - 1) {
-    v /= 1024;
-    i += 1;
-  }
-  return `${v.toFixed(i === 0 ? 0 : 1)} ${units[i]}`;
-}
-
-function getFileTypeLabel(fileType: string): string {
-  const labels: Record<string, string> = {
-    property_schedule: "Property Schedule",
-    fra_document: "Fire Risk Assessment",
-    fraew_document: "EWS1 / PAS 9980",
-    scr_document: "Safety Case Report",
-    epc_data: "EPC Data",
-  };
-  return labels[fileType] || fileType;
-}
-
-export function IngestionLandingPage() {
-  const location = useLocation();
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const [items, setItems] = useState<Submission[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [uploading, setUploading] = useState(false);
-  const [uploadResult, setUploadResult] = useState<BatchUploadResponse | null>(null);
-  const [dragOver, setDragOver] = useState(false);
-
-  const sorted = useMemo(() => {
-    return [...items].sort(
-      (a, b) => new Date(b.uploaded_at).getTime() - new Date(a.uploaded_at).getTime()
-    );
-  }, [items]);
-
-  const refresh = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const res = await apiFetch("/api/v1/upload/submissions?limit=50");
-      const data = (await res.json()) as ListResponse;
-      setItems(data.items ?? []);
-    } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : String(e));
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    void refresh();
-  }, [refresh]);
-
-  async function onUpload(files: FileList | null) {
-    if (!files || files.length === 0) return;
-    setUploading(true);
-    setUploadResult(null);
-    setError(null);
-    try {
-      const form = new FormData();
-      Array.from(files).forEach((f) => form.append("files", f));
-      const res = await apiFetch("/api/v1/upload/batch", {
-        method: "POST",
-        body: form,
-      });
-      const data = (await res.json()) as BatchUploadResponse;
-      setUploadResult(data);
-      await refresh();
-    } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : String(e));
-    } finally {
-      setUploading(false);
-    }
-  }
-
-  const handleDragOver = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    setDragOver(true);
-  }, []);
-
-  const handleDragLeave = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    setDragOver(false);
-  }, []);
-
-  const handleDrop = useCallback(
-    (e: React.DragEvent) => {
-      e.preventDefault();
-      setDragOver(false);
-      const files = e.dataTransfer.files;
-      if (files.length > 0) {
-        void onUpload(files);
-      }
-    },
-    [onUpload]
+function IconUpload() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <path d="M7 16a4 4 0 0 1-.88-7.903A5 5 0 1 1 15.9 6L16 6a5 5 0 0 1 1 9.9" />
+      <path d="M12 12v9" />
+      <path d="m9 15 3-3 3 3" />
+    </svg>
   );
+}
 
-  const handleBrowseClick = () => {
+function IconDownload() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <path d="M12 3v12" />
+      <path d="m7 10 5 5 5-5" />
+      <path d="M5 21h14" />
+    </svg>
+  );
+}
+
+function IconDoc() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <path d="M14 2H7a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z" />
+      <path d="M14 2v6h6" />
+      <path d="M9 13h6" />
+      <path d="M9 17h6" />
+    </svg>
+  );
+}
+
+function IconInfo() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <circle cx="12" cy="12" r="9" />
+      <path d="M12 10v6" />
+      <path d="M12 7h.01" />
+    </svg>
+  );
+}
+
+function IconCheck() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <path d="m5 13 4 4L19 7" />
+    </svg>
+  );
+}
+
+function IconShield() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <path d="M12 3s6 2 8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6c2-1 8-3 8-3Z" />
+      <path d="m9 12 2 2 4-4" />
+    </svg>
+  );
+}
+
+function IconBolt() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <path d="M13 2 4 14h6l-1 8 9-12h-6l1-8Z" />
+    </svg>
+  );
+}
+
+function IconClock() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <circle cx="12" cy="12" r="9" />
+      <path d="M12 7v5l3 3" />
+    </svg>
+  );
+}
+
+function IconDatabase() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <ellipse cx="12" cy="5" rx="7" ry="3" />
+      <path d="M5 5v6c0 1.657 3.134 3 7 3s7-1.343 7-3V5" />
+      <path d="M5 11v8c0 1.657 3.134 3 7 3s7-1.343 7-3v-8" />
+    </svg>
+  );
+}
+
+function IconArrowRight() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <path d="M5 12h14" />
+      <path d="m13 5 7 7-7 7" />
+    </svg>
+  );
+}
+
+function LogoMark() {
+  return (
+    <svg viewBox="0 0 40 40" fill="none">
+      <path d="M20 8L32 16L20 20L8 16L20 8Z" fill="#c41e3a" />
+      <path d="M20 14L32 22L20 26L8 22L20 14Z" fill="#d64456" />
+      <path d="M20 20L32 28L20 32L8 28L20 20Z" fill="#e85a6b" />
+    </svg>
+  );
+}
+
+export default function IngestionLandingPage({
+  accountName = "Example Housing Association",
+  renewalLabel = "2025 Renewal",
+  isProcessing = false,
+  processingTitle = "Processing your files...",
+  processingStepLabel = "Step 2 of 5",
+  steps = defaultSteps,
+  stats,
+  onFilesSelected,
+  onDownloadTemplate,
+  onRequestIntegration,
+}: IngestionLandingPageProps) {
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const [isDragOver, setIsDragOver] = useState(false);
+
+  const activeJourneyIndex = useMemo(() => {
+    return isProcessing ? 1 : 0;
+  }, [isProcessing]);
+
+  const handleFiles = (files: FileList | File[] | null) => {
+    if (!files || files.length === 0) return;
+    onFilesSelected?.(Array.from(files));
+  };
+
+  const browseFiles = () => {
     fileInputRef.current?.click();
   };
 
-  const navLinks = [
-    { path: "/", label: "Uploads", icon: Icons.Upload },
-    { path: "/previous", label: "Previous Uploads", icon: Icons.Clock },
-    { path: "/portfolio", label: "Portfolio Overview", icon: Icons.Home },
-    { path: "/data-quality", label: "Data Quality", icon: Icons.FileText },
-    { path: "/exports", label: "Exports", icon: Icons.Download },
-  ];
-
   return (
-    <div className="app-layout">
-      {/* Sidebar */}
-      <aside className="sidebar">
-        <div className="sidebar-logo">
-          <Icons.Shield />
-          EquiRisk
-        </div>
-        <nav className="sidebar-nav">
-          <div className="sidebar-section">Navigation</div>
-          {navLinks.map((link) => (
-            <Link
-              key={link.path}
-              to={link.path}
-              className={`sidebar-link ${location.pathname === link.path ? "active" : ""}`}
-            >
-              <link.icon />
-              {link.label}
-            </Link>
-          ))}
-        </nav>
-      </aside>
+    <div style={styles.page}>
+      <style>{css}</style>
 
-      {/* Main content */}
-      <main className="main-content">
-        {/* Header */}
-        <header className="top-header">
-          <span className="header-org">Example Housing Association - 2025 Renewal</span>
-          <span className="header-badge">
-            <Icons.Shield />
-            Asset data only - GDPR compliant
-          </span>
-        </header>
+      <div className="ingestion-shell">
+        <aside className="ingestion-sidebar">
+          <div className="brand-row">
+            <div className="brand-mark">
+              <LogoMark />
+            </div>
+            <div className="brand-text">EquiRisk</div>
+          </div>
 
-        {/* Page content */}
-        <div className="page-content">
-          {/* Title */}
-          <div className="page-title">
+          <div className="nav-label">Navigation</div>
+
+          <button className="nav-item active" type="button">
+            <IconUpload />
+            <span>Uploads</span>
+          </button>
+
+          <button className="nav-item" type="button">
+            <IconClock />
+            <span>Previous Uploads</span>
+          </button>
+
+          <button className="nav-item" type="button">
+            <IconDatabase />
+            <span>Portfolio Overview</span>
+          </button>
+
+          <button className="nav-item" type="button">
+            <IconCheck />
+            <span>Data Quality</span>
+          </button>
+
+          <button className="nav-item" type="button">
+            <IconDownload />
+            <span>Exports</span>
+          </button>
+
+          <div className="sidebar-footer">
+            <button className="settings-btn" type="button">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 0 0 2.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 0 0 1.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 0 0-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 0 0-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 0 0-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 0 0-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 0 0 1.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065Z" />
+                <path d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
+              </svg>
+            </button>
+          </div>
+        </aside>
+
+        <main className="ingestion-main">
+          <div className="top-bar">
+            <div className="top-bar-left">
+              <strong>{accountName}</strong>
+              <span>•</span>
+              <span>{renewalLabel}</span>
+            </div>
+
+            <div className="gdpr-badge">
+              <IconShield />
+              <span>Asset data only • GDPR compliant</span>
+            </div>
+          </div>
+
+          <div className="page-header">
             <h1>Upload Your Portfolio Data</h1>
-            <div className="subtitle">Premium Intelligence</div>
-            <p className="description">
-              Get your insurance submission ready in three simple steps
-            </p>
+            <div className="strapline">Premium Intelligence</div>
+            <p>Get your insurance submission ready in three simple steps</p>
           </div>
 
-          {/* Steps */}
-          <div className="steps-container">
-            <div className="step">
-              <div className="step-number active">1</div>
-              <div className="step-title">Upload SoV</div>
-              <div className="step-desc">
-                Drop your Schedule of Values and supporting documents
-              </div>
-            </div>
-            <div className="step">
-              <div className="step-number inactive">2</div>
-              <div className="step-title">Portfolio Overview</div>
-              <div className="step-desc">See your readiness score and TIV summary</div>
-            </div>
-            <div className="step">
-              <div className="step-number inactive">3</div>
-              <div className="step-title">Data Quality</div>
-              <div className="step-desc">Review gaps and add missing documentation</div>
-            </div>
+          <div className="journey-steps">
+            {[
+              {
+                title: "Upload SoV",
+                description: "Drop your Schedule of Values and supporting documents",
+              },
+              {
+                title: "Portfolio Overview",
+                description: "See your readiness score and TIV summary",
+              },
+              {
+                title: "Data Quality",
+                description: "Review gaps and add missing documentation",
+              },
+            ].map((item, idx) => {
+              const state =
+                idx < activeJourneyIndex
+                  ? "complete"
+                  : idx === activeJourneyIndex
+                  ? "active"
+                  : "pending";
+
+              return (
+                <div className="journey-step" key={item.title}>
+                  <div className={`step-number ${state}`}>
+                    {state === "complete" ? "✓" : idx + 1}
+                  </div>
+                  <div className="step-title">{item.title}</div>
+                  <div className="step-description">{item.description}</div>
+                  {idx < 2 ? <div className={`step-line ${idx < activeJourneyIndex ? "active" : ""}`} /> : null}
+                </div>
+              );
+            })}
           </div>
 
-          {/* Upload zone */}
-          <div
-            className={`upload-zone ${dragOver ? "dragover" : ""} ${uploading ? "uploading" : ""}`}
-            onDragOver={handleDragOver}
-            onDragLeave={handleDragLeave}
-            onDrop={handleDrop}
-            onClick={handleBrowseClick}
-          >
-            <div className="upload-icon-prominent">
-              <Icons.Upload />
-            </div>
-            <h3>Drag & drop your files here</h3>
-            <p>or click to browse from your computer</p>
-            <div className="upload-formats">Supported: Excel (.xlsx, .xls), CSV, PDF, DOCX, ZIP</div>
+          <div className="upload-card">
             <input
               ref={fileInputRef}
               type="file"
               multiple
               style={{ display: "none" }}
-              onChange={(e) => void onUpload(e.target.files)}
-              accept=".xlsx,.xls,.csv,.pdf,.docx,.zip"
+              onChange={(e) => handleFiles(e.target.files)}
             />
+
+            <div
+              className={`upload-zone ${isDragOver ? "dragover" : ""}`}
+              onClick={browseFiles}
+              onDragOver={(e) => {
+                e.preventDefault();
+                setIsDragOver(true);
+              }}
+              onDragLeave={() => setIsDragOver(false)}
+              onDrop={(e) => {
+                e.preventDefault();
+                setIsDragOver(false);
+                handleFiles(e.dataTransfer.files);
+              }}
+              role="button"
+              tabIndex={0}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") browseFiles();
+              }}
+            >
+              <div className="upload-icon">
+                <IconUpload />
+              </div>
+
+              <div className="upload-title">Drag &amp; drop your files here</div>
+              <div className="upload-subtitle">or click to browse from your computer</div>
+
+              <div className="upload-actions">
+                <button
+                  className="btn btn-primary"
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    browseFiles();
+                  }}
+                >
+                  <IconUpload />
+                  Browse Files
+                </button>
+
+                <button
+                  className="btn btn-secondary"
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onDownloadTemplate?.();
+                  }}
+                >
+                  <IconDownload />
+                  Download Template
+                </button>
+              </div>
+
+              <div className="upload-formats">
+                Supported: Excel (.xlsx, .xls), CSV, PDF, DOCX, ZIP
+              </div>
+            </div>
+
+            <div className="what-to-upload">
+              <div className="what-to-upload-title">
+                <IconInfo />
+                <span>What to upload for best results</span>
+              </div>
+
+              <div className="upload-items">
+                <div className="upload-item">
+                  <IconDoc />
+                  <span>
+                    Schedule of Values (SoV) <span className="required">REQUIRED</span>
+                  </span>
+                </div>
+                <div className="upload-item">
+                  <IconDoc />
+                  <span>Fire Risk Assessments (FRAs)</span>
+                </div>
+                <div className="upload-item">
+                  <IconDoc />
+                  <span>EICR Certificates</span>
+                </div>
+                <div className="upload-item">
+                  <IconDoc />
+                  <span>EWS1 / PAS 9980 reports</span>
+                </div>
+                <div className="upload-item">
+                  <IconDoc />
+                  <span>Gas Safety Certificates</span>
+                </div>
+                <div className="upload-item">
+                  <IconDoc />
+                  <span>Asbestos Register</span>
+                </div>
+              </div>
+            </div>
           </div>
 
-          {/* Upload progress/result */}
-          {uploading && (
-            <div className="upload-result">
-              <h4>Uploading...</h4>
-              <p>Please wait while your files are being uploaded.</p>
+          <div className="ams-card">
+            <div className="ams-icon">
+              <IconDatabase />
             </div>
-          )}
 
-          {uploadResult && !uploading && (
-            <div className={`upload-result ${uploadResult.failed > 0 ? "error" : ""}`}>
-              <h4>
-                {uploadResult.failed === 0
-                  ? "Upload Complete"
-                  : `Upload completed with ${uploadResult.failed} error(s)`}
-              </h4>
-              <p>
-                Successfully uploaded {uploadResult.successful} of {uploadResult.total_files}{" "}
-                file(s).
-              </p>
-              {uploadResult.errors?.length > 0 && (
-                <ul>
-                  {uploadResult.errors.map((err, idx) => (
-                    <li key={idx}>
-                      {err.filename}: {err.error}
-                    </li>
-                  ))}
-                </ul>
-              )}
+            <div className="ams-copy">
+              <div className="ams-title">Connect Your Asset Management System</div>
+              <div className="ams-description">
+                Reduce manual uploads by connecting directly to your AMS. We support Civica
+                CX, NEC Housing, MRI Software, and others. Our team will work with your IT
+                to set up a secure connection.
+              </div>
             </div>
-          )}
 
-          {error && (
-            <div className="upload-result error">
-              <h4>Error</h4>
-              <p>{error}</p>
-            </div>
-          )}
-
-          {/* Info box */}
-          <div className="info-box-yellow">
-            <div className="info-box-header">
-              What to upload for best results
-            </div>
-            <div className="info-box-grid">
-              <div className="info-item">
-                <Icons.FileText />
-                Schedule of Values (SoV) <span className="required">Required</span>
-              </div>
-              <div className="info-item">
-                <Icons.FileText />
-                Fire Risk Assessments (FRAs)
-              </div>
-              <div className="info-item muted">
-                <Icons.FileText />
-                EICR Certificates <span className="coming-soon">Coming soon</span>
-              </div>
-              <div className="info-item">
-                <Icons.FileText />
-                EWS1 / PAS 9980 reports
-              </div>
-              <div className="info-item muted">
-                <Icons.FileText />
-                Gas Safety Certificates <span className="coming-soon">Coming soon</span>
-              </div>
-              <div className="info-item muted">
-                <Icons.FileText />
-                Asbestos Register <span className="coming-soon">Coming soon</span>
-              </div>
-            </div>
-          </div>
-
-          {/* Integration box */}
-          <div className="integration-box">
-            <div className="integration-icon">
-              <Icons.Link />
-            </div>
-            <div className="integration-content">
-              <h4>Connect Your Asset Management System</h4>
-              <p>
-                Reduce manual uploads by connecting directly to your AMS. We support Civica CX,
-                NEC Housing, MRI Software, and others. Our team will work with your IT to set
-                up a secure connection.
-              </p>
-            </div>
-            <button className="btn-outline">
+            <button className="btn btn-ams" type="button" onClick={onRequestIntegration}>
               Request Integration
-              <Icons.ChevronRight />
+              <IconArrowRight />
             </button>
           </div>
 
-          {/* Feature cards */}
-          <div className="features-grid">
-            <div className="feature-card">
-              <div className="feature-icon green">
-                <Icons.Zap />
+          <div className="info-cards">
+            <div className="info-card">
+              <div className="info-icon blue">
+                <IconBolt />
               </div>
-              <h4>Smart Ingestion</h4>
-              <ul className="feature-list">
-                <li>
-                  <Icons.Check />
-                  Address normalisation
-                </li>
-                <li>
-                  <Icons.Check />
-                  UPRN verification
-                </li>
-                <li>
-                  <Icons.Check />
-                  AI document extraction
-                </li>
+              <div className="info-title">Smart Ingestion</div>
+              <ul>
+                <li><IconCheck /> Address normalisation</li>
+                <li><IconCheck /> UPRN verification</li>
+                <li><IconCheck /> AI document extraction</li>
               </ul>
             </div>
-            <div className="feature-card">
-              <div className="feature-icon blue">
-                <Icons.Shield />
+
+            <div className="info-card">
+              <div className="info-icon green">
+                <IconShield />
               </div>
-              <h4>Data Quality Checks</h4>
-              <ul className="feature-list">
-                <li>
-                  <Icons.Check />
-                  Coverage by domain
-                </li>
-                <li>
-                  <Icons.Check />
-                  Missing document flags
-                </li>
-                <li>
-                  <Icons.Check />
-                  Policy impact warnings
-                </li>
+              <div className="info-title">Data Quality Checks</div>
+              <ul>
+                <li><IconCheck /> Coverage by domain</li>
+                <li><IconCheck /> Missing document flags</li>
+                <li><IconCheck /> Policy impact warnings</li>
               </ul>
             </div>
-            <div className="feature-card">
-              <div className="feature-icon purple">
-                <Icons.RefreshCw />
+
+            <div className="info-card">
+              <div className="info-icon purple">
+                <IconClock />
               </div>
-              <h4>Fast Processing</h4>
-              <ul className="feature-list">
-                <li>
-                  <Icons.Check />
-                  Real-time progress
-                </li>
-                <li>
-                  <Icons.Check />
-                  Instant overview
-                </li>
+              <div className="info-title">Fast Processing</div>
+              <ul>
+                <li><IconCheck /> 2-5 mins for 1,000 units</li>
+                <li><IconCheck /> Real-time progress</li>
+                <li><IconCheck /> Instant overview</li>
               </ul>
             </div>
           </div>
 
-          {/* Recent submissions */}
-          {sorted.length > 0 && (
-            <div className="submissions-section">
-              <div className="submissions-header">
-                <h3>Recent Uploads</h3>
-                <button className="btn btn-secondary" onClick={refresh} disabled={loading}>
-                  {loading ? <div className="spinner" /> : <Icons.RefreshCw />}
-                  Refresh
-                </button>
-              </div>
-              {sorted.slice(0, 5).map((s) => (
-                <div key={s.upload_id} className="submission-card">
-                  <div className="submission-info">
-                    <h4>{s.filename}</h4>
-                    <div className="submission-meta">
-                      <span>{getFileTypeLabel(s.file_type)}</span>
-                      <span>{formatBytes(s.file_size)}</span>
-                      <span className={`status-badge ${s.status}`}>{s.status}</span>
-                    </div>
-                  </div>
-                  <div className="submission-time">{formatDateTime(s.uploaded_at)}</div>
+          {isProcessing ? (
+            <div className="ingestion-progress">
+              <div className="ingestion-progress-header">
+                <div className="ingestion-progress-title">
+                  <span className="status-dot" />
+                  {processingTitle}
                 </div>
-              ))}
+                <div className="ingestion-progress-step">{processingStepLabel}</div>
+              </div>
+
+              <div className="mini-steps">
+                {steps.map((step) => (
+                  <div key={step.key} className={`mini-step ${step.state}`}>
+                    {step.label}
+                  </div>
+                ))}
+              </div>
+
+              <div className="progress-stats">
+                <div className="progress-stat">
+                  <div className="progress-stat-value">{fmtStat(stats?.properties)}</div>
+                  <div className="progress-stat-label">Properties</div>
+                </div>
+                <div className="progress-stat">
+                  <div className="progress-stat-value">{fmtMoney(stats?.totalValue)}</div>
+                  <div className="progress-stat-label">Total Value</div>
+                </div>
+                <div className="progress-stat">
+                  <div className="progress-stat-value">{fmtStat(stats?.dataPassed)}</div>
+                  <div className="progress-stat-label">Data Passed</div>
+                </div>
+                <div className="progress-stat">
+                  <div className="progress-stat-value">{fmtStat(stats?.missingCore)}</div>
+                  <div className="progress-stat-label">Missing Core</div>
+                </div>
+              </div>
+
+              <div className="progress-note">
+                <IconBolt />
+                Typical ingestion: <strong>2-5 minutes</strong> for portfolios under 1,000 units
+              </div>
             </div>
-          )}
-        </div>
-      </main>
+          ) : null}
+        </main>
+      </div>
     </div>
   );
 }
+
+const styles = {
+  page: {
+    minHeight: "100vh",
+    background: "#f9fafb",
+  },
+};
+
+const css = `
+  * { box-sizing: border-box; }
+
+  .ingestion-shell {
+    display: flex;
+    min-height: 100vh;
+    font-family: Inter, "DM Sans", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+    color: #1f2937;
+    background: #f9fafb;
+  }
+
+  .ingestion-sidebar {
+    width: 220px;
+    background: #ffffff;
+    border-right: 1px solid #e5e7eb;
+    padding: 20px 0;
+    display: flex;
+    flex-direction: column;
+    flex-shrink: 0;
+  }
+
+  .brand-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 0 20px;
+    margin-bottom: 28px;
+  }
+
+  .brand-mark {
+    width: 34px;
+    height: 34px;
+  }
+
+  .brand-mark svg {
+    width: 34px;
+    height: 34px;
+    display: block;
+  }
+
+  .brand-text {
+    font-weight: 700;
+    font-size: 18px;
+    color: #1a2b4a;
+    letter-spacing: -0.5px;
+  }
+
+  .nav-label {
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: #9ca3af;
+    padding: 0 20px;
+    margin-bottom: 8px;
+  }
+
+  .nav-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 20px;
+    border: 0;
+    background: transparent;
+    color: #4b5563;
+    font-size: 14px;
+    font-weight: 500;
+    text-align: left;
+    cursor: pointer;
+  }
+
+  .nav-item:hover {
+    background: #f9fafb;
+    color: #111827;
+  }
+
+  .nav-item.active {
+    background: #e8f0fe;
+    color: #1a56db;
+    border-right: 3px solid #1a56db;
+  }
+
+  .nav-item svg,
+  .settings-btn svg,
+  .gdpr-badge svg,
+  .upload-icon svg,
+  .btn svg,
+  .what-to-upload-title svg,
+  .upload-item svg,
+  .ams-icon svg,
+  .info-icon svg,
+  .info-card li svg,
+  .progress-note svg {
+    width: 18px;
+    height: 18px;
+    flex-shrink: 0;
+  }
+
+  .sidebar-footer {
+    margin-top: auto;
+    padding: 16px 20px;
+  }
+
+  .settings-btn {
+    width: 36px;
+    height: 36px;
+    border-radius: 8px;
+    border: 0;
+    background: #f3f4f6;
+    color: #6b7280;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+  }
+
+  .settings-btn:hover {
+    background: #e5e7eb;
+  }
+
+  .ingestion-main {
+  flex: 1;
+  padding: 0 28px 40px;
+  overflow-y: auto;
+  margin-top: -120px;
+}
+
+  .top-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 24px;
+  }
+
+  .top-bar-left {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 14px;
+    color: #4b5563;
+  }
+
+  .top-bar-left strong {
+    color: #111827;
+  }
+
+  .gdpr-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 14px;
+    background: #d1fae5;
+    border: 1px solid #10b981;
+    border-radius: 8px;
+    font-size: 12px;
+    font-weight: 600;
+    color: #10b981;
+  }
+
+ .page-header {
+  text-align: center;
+  margin-bottom: 22px;
+}
+
+  .page-header h1 {
+    margin: 0 0 4px;
+    font-size: 28px;
+    font-weight: 800;
+    color: #111827;
+    letter-spacing: -0.02em;
+  }
+
+  .strapline {
+    font-size: 14px;
+    font-weight: 600;
+    color: #1a56db;
+    letter-spacing: 0.4px;
+    margin-bottom: 8px;
+  }
+
+  .page-header p {
+    margin: 0 auto;
+    max-width: 500px;
+    font-size: 16px;
+    color: #6b7280;
+  }
+
+.journey-steps {
+
+  display: flex;
+
+  justify-content: center;
+
+  align-items: flex-start;
+
+  gap: 24px;
+
+  margin: 0 auto 28px;
+
+  max-width: 860px;
+
+  padding: 0 20px;
+
+}
+
+  .journey-step {
+    position: relative;
+    flex: 1;
+    max-width: 220px;
+    text-align: center;
+  }
+
+  .step-number {
+    width: 48px;
+    height: 48px;
+    margin: 0 auto 12px;
+    border-radius: 999px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 20px;
+    font-weight: 800;
+    position: relative;
+    z-index: 2;
+  }
+
+  .step-number.active {
+    background: #1a56db;
+    color: #fff;
+  }
+
+  .step-number.pending {
+    background: #e5e7eb;
+    color: #6b7280;
+  }
+
+  .step-number.complete {
+    background: #10b981;
+    color: #fff;
+  }
+
+  .step-title {
+    font-size: 14px;
+    font-weight: 700;
+    color: #1f2937;
+    margin-bottom: 4px;
+  }
+
+  .step-description {
+    font-size: 12px;
+    line-height: 1.4;
+    color: #6b7280;
+  }
+
+  .step-line {
+    position: absolute;
+    top: 24px;
+    left: calc(50% + 40px);
+    width: calc(100% - 28px);
+    height: 2px;
+    background: #e5e7eb;
+    z-index: 1;
+  }
+
+  .step-line.active {
+    background: #1a56db;
+  }
+
+  .upload-card {
+    background: #fff;
+    border: 2px solid #1a56db;
+    border-radius: 16px;
+    box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.08), 0 4px 6px -4px rgb(0 0 0 / 0.08);
+    padding: 40px;
+    max-width: 700px;
+    margin: 0 auto 32px;
+  }
+
+  .upload-zone {
+    border: 2px dashed #d1d5db;
+    border-radius: 12px;
+    background: #f9fafb;
+    padding: 48px 32px;
+    text-align: center;
+    transition: 0.2s ease;
+    cursor: pointer;
+  }
+
+  .upload-zone:hover,
+  .upload-zone.dragover {
+    border-color: #1a56db;
+    background: #e8f0fe;
+  }
+
+  .upload-icon {
+    width: 64px;
+    height: 64px;
+    margin: 0 auto 16px;
+    border-radius: 16px;
+    background: #e8f0fe;
+    color: #1a56db;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .upload-icon svg {
+    width: 32px;
+    height: 32px;
+  }
+
+  .upload-title {
+    font-size: 18px;
+    font-weight: 700;
+    color: #1f2937;
+    margin-bottom: 8px;
+  }
+
+  .upload-subtitle {
+    font-size: 14px;
+    color: #6b7280;
+    margin-bottom: 20px;
+  }
+
+  .upload-actions {
+    display: flex;
+    justify-content: center;
+    gap: 16px;
+    flex-wrap: wrap;
+  }
+
+  .btn {
+    border: 0;
+    border-radius: 8px;
+    padding: 12px 24px;
+    font-size: 14px;
+    font-weight: 700;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+    transition: 0.15s ease;
+  }
+
+  .btn-primary {
+    background: #1a56db;
+    color: #fff;
+  }
+
+  .btn-primary:hover {
+    background: #1e40af;
+  }
+
+  .btn-secondary {
+    background: #fff;
+    color: #1a56db;
+    border: 1px solid #1a56db;
+  }
+
+  .btn-secondary:hover {
+    background: #e8f0fe;
+  }
+
+  .upload-formats {
+    margin-top: 20px;
+    font-size: 12px;
+    color: #9ca3af;
+  }
+
+  .what-to-upload {
+    margin-top: 24px;
+    background: #fef3c7;
+    border: 1px solid #f59e0b;
+    border-radius: 10px;
+    padding: 20px 24px;
+  }
+
+  .what-to-upload-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: #d97706;
+    font-size: 14px;
+    font-weight: 700;
+    margin-bottom: 12px;
+  }
+
+  .upload-items {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px 24px;
+  }
+
+  .upload-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    color: #374151;
+  }
+
+  .upload-item svg {
+    color: #d97706;
+    width: 16px;
+    height: 16px;
+  }
+
+  .required {
+    font-size: 10px;
+    font-weight: 800;
+    color: #ef4444;
+    margin-left: 4px;
+  }
+
+  .ams-card {
+    max-width: 700px;
+    margin: 0 auto 32px;
+    padding: 20px 24px;
+    border: 1px solid #e5e7eb;
+    border-radius: 12px;
+    background: #fff;
+    display: flex;
+    align-items: center;
+    gap: 20px;
+  }
+
+  .ams-icon {
+    width: 48px;
+    height: 48px;
+    border-radius: 10px;
+    background: #e0e7ff;
+    color: #6366f1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+
+  .ams-copy {
+    flex: 1;
+  }
+
+  .ams-title {
+    font-size: 15px;
+    font-weight: 700;
+    color: #111827;
+    margin-bottom: 4px;
+  }
+
+  .ams-description {
+    font-size: 13px;
+    color: #6b7280;
+    line-height: 1.5;
+  }
+
+  .btn-ams {
+    background: #fff;
+    color: #6366f1;
+    border: 1px solid #6366f1;
+    white-space: nowrap;
+  }
+
+  .btn-ams:hover {
+    background: #6366f1;
+    color: #fff;
+  }
+
+  .info-cards {
+    max-width: 900px;
+    margin: 0 auto 32px;
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 20px;
+  }
+
+  .info-card {
+    background: #fff;
+    border: 1px solid #e5e7eb;
+    border-radius: 12px;
+    padding: 24px;
+  }
+
+  .info-icon {
+    width: 44px;
+    height: 44px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 16px;
+  }
+
+  .info-icon.blue {
+    background: #e8f0fe;
+    color: #1a56db;
+  }
+
+  .info-icon.green {
+    background: #d1fae5;
+    color: #10b981;
+  }
+
+  .info-icon.purple {
+    background: #e0e7ff;
+    color: #6366f1;
+  }
+
+  .info-title {
+    font-size: 15px;
+    font-weight: 700;
+    color: #111827;
+    margin-bottom: 8px;
+  }
+
+  .info-card ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+  }
+
+  .info-card li {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 0;
+    font-size: 13px;
+    color: #4b5563;
+  }
+
+  .info-card li svg {
+    width: 14px;
+    height: 14px;
+    color: #10b981;
+  }
+
+  .ingestion-progress {
+    max-width: 700px;
+    margin: 0 auto;
+    padding: 24px;
+    background: #fff;
+    border: 1px solid #e5e7eb;
+    border-radius: 12px;
+  }
+
+  .ingestion-progress-header {
+    display: flex;
+    justify-content: space-between;
+    gap: 16px;
+    margin-bottom: 20px;
+    align-items: center;
+  }
+
+  .ingestion-progress-title {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 16px;
+    font-weight: 700;
+    color: #1f2937;
+  }
+
+  .status-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 999px;
+    background: #f59e0b;
+    display: inline-block;
+    animation: pulse 1.5s infinite;
+  }
+
+  .ingestion-progress-step {
+    font-size: 13px;
+    font-weight: 600;
+    color: #4b5563;
+  }
+
+  .mini-steps {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+  }
+
+  .mini-step {
+    font-size: 11px;
+    color: #9ca3af;
+    position: relative;
+    padding-left: 16px;
+  }
+
+  .mini-step::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 4px;
+    width: 8px;
+    height: 8px;
+    border-radius: 999px;
+    background: #d1d5db;
+  }
+
+  .mini-step.active {
+    color: #1a56db;
+    font-weight: 700;
+  }
+
+  .mini-step.active::before {
+    background: #1a56db;
+  }
+
+  .mini-step.complete {
+    color: #10b981;
+    font-weight: 700;
+  }
+
+  .mini-step.complete::before {
+    background: #10b981;
+  }
+
+  .progress-stats {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 16px;
+    padding-top: 16px;
+    border-top: 1px solid #f3f4f6;
+  }
+
+  .progress-stat {
+    text-align: center;
+  }
+
+  .progress-stat-value {
+    font-size: 20px;
+    font-weight: 800;
+    color: #111827;
+  }
+
+  .progress-stat-label {
+    font-size: 11px;
+    color: #6b7280;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+  }
+
+  .progress-note {
+    margin-top: 16px;
+    text-align: center;
+    font-size: 12px;
+    color: #6b7280;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.45; }
+  }
+
+  @media (max-width: 1100px) {
+    .ingestion-sidebar {
+      display: none;
+    }
+
+    .ingestion-main {
+      padding: 20px;
+    }
+  }
+
+  @media (max-width: 900px) {
+    .info-cards {
+      grid-template-columns: 1fr;
+    }
+
+    .upload-items {
+      grid-template-columns: 1fr;
+    }
+
+    .progress-stats {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .journey-steps {
+      flex-direction: column;
+      align-items: center;
+      gap: 18px;
+    }
+
+    .step-line {
+      display: none;
+    }
+
+    .ams-card {
+      flex-direction: column;
+      align-items: flex-start;
+    }
+
+    .top-bar {
+      flex-direction: column;
+      align-items: flex-start;
+    }
+  }
+`;

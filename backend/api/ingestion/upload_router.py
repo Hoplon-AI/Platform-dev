@@ -432,6 +432,104 @@ def _queue_enrichment_background(
         return f"Enrichment not queued: {exc}"
 
 
+def _build_fire_risk_payload(
+    *,
+    document_type: str,
+    upload_id: str,
+    feature_id: Optional[str] = None,
+    block_id: Optional[str] = None,
+    property_id: Optional[str] = None,
+    fra_data: Optional[dict] = None,
+    fraew_data: Optional[dict] = None,
+    extraction_errors: Optional[list[str]] = None,
+    raw_llm_response: Any = None,
+) -> dict:
+    return {
+        "document_type": document_type,
+        "upload_id": upload_id,
+        "feature_id": feature_id,
+        "block_id": block_id,
+        "property_id": property_id,
+        "fra": fra_data or {},
+        "fraew": fraew_data or {},
+        "documents": {
+            "fra_uploaded": document_type == "fra" and feature_id is not None,
+            "fraew_uploaded": document_type == "fraew" and feature_id is not None,
+        },
+        "extraction_errors": extraction_errors or [],
+        "raw_llm_response": raw_llm_response,
+    }
+
+
+def _safe_number(value: Any) -> Optional[float]:
+    try:
+        if value is None or value == "":
+            return None
+        return float(value)
+    except Exception:
+        return None
+
+
+def _safe_bool(value: Any) -> Optional[bool]:
+    if isinstance(value, bool):
+        return value
+    if value is None:
+        return None
+    if isinstance(value, str):
+        lower = value.strip().lower()
+        if lower in {"true", "yes", "y", "1"}:
+            return True
+        if lower in {"false", "no", "n", "0"}:
+            return False
+    return None
+
+
+def _normalize_fra_result(result: dict) -> dict:
+    return {
+        "risk_level": result.get("risk_rating") or result.get("risk_level"),
+        "assessment_date": result.get("assessment_date"),
+        "assessment_valid_until": result.get("assessment_valid_until"),
+        "next_review_date": result.get("next_review_date"),
+        "evacuation_strategy": result.get("evacuation_strategy"),
+        "fire_doors": _safe_bool(result.get("has_fire_doors")),
+        "compartmentation": _safe_bool(result.get("has_compartmentation")),
+        "fire_alarm_system": _safe_bool(result.get("has_fire_alarm_system")),
+        "smoke_detection": _safe_bool(result.get("has_smoke_detection")),
+        "sprinkler_system": _safe_bool(result.get("has_sprinkler_system")),
+        "significant_findings": result.get("significant_findings") or [],
+        "recommendations": result.get("action_items") or [],
+        "responsible_person": result.get("responsible_person"),
+        "assessor_name": result.get("assessor_name"),
+        "assessor_company": result.get("assessor_company"),
+        "extraction_confidence": _safe_number(result.get("extraction_confidence")),
+    }
+
+
+def _normalize_fraew_result(result: dict) -> dict:
+    return {
+        "risk_level": result.get("building_risk_rating") or result.get("risk_level"),
+        "external_wall_risk": result.get("building_risk_rating") or result.get("external_wall_risk"),
+        "building_height": _safe_number(result.get("building_height_m")),
+        "building_height_category": result.get("building_height_category"),
+        "num_storeys": result.get("num_storeys"),
+        "num_units": result.get("num_units"),
+        "cladding_type": result.get("external_wall_base_construction") or result.get("cladding_type"),
+        "pas_9980_version": result.get("pas_9980_version"),
+        "pas_9980_compliant": _safe_bool(result.get("pas_9980_compliant")),
+        "interim_measures_required": _safe_bool(result.get("interim_measures_required")),
+        "interim_measures_detail": result.get("interim_measures_detail"),
+        "remediation_required": _safe_bool(result.get("has_remedial_actions")),
+        "recommendations": result.get("remedial_actions") or [],
+        "wall_types": result.get("wall_types") or [],
+        "cavity_barriers_present": _safe_bool(result.get("cavity_barriers_present")),
+        "dry_riser_present": _safe_bool(result.get("dry_riser_present")),
+        "wet_riser_present": _safe_bool(result.get("wet_riser_present")),
+        "evacuation_strategy": result.get("evacuation_strategy"),
+        "adb_compliant": result.get("adb_compliant"),
+        "extraction_confidence": _safe_number(result.get("extraction_confidence")),
+    }
+
+
 async def get_tenant_info(
     credentials: Optional[HTTPAuthorizationCredentials] = Depends(security),
 ) -> Tuple[str, str]:
@@ -837,6 +935,10 @@ async def ingest_document(
         None,
         description="Block reference (e.g. '02BR') to link FRA/FRAEW to a specific block. If omitted, auto-resolved from block name in PDF.",
     ),
+    property_id: Optional[str] = Query(
+        None,
+        description="Optional property_id to link a PDF document directly to a specific property.",
+    ),
     tenant: Tuple[str, str] = Depends(get_ingest_tenant_info),
 ):
     """
@@ -907,6 +1009,8 @@ async def ingest_document(
         metadata={
             "auto_detected": auto_detected.value,
             "user_selected": document_type,
+            "block_reference": block_reference,
+            "property_id": property_id,
             **storage_meta,
         },
         checksum=checksum,
@@ -1081,6 +1185,17 @@ async def ingest_document(
                     ha_id=ha_id,
                     s3_path=s3_key or "",
                 )
+                fire_risk_payload = _build_fire_risk_payload(
+                    document_type=document_type,
+                    upload_id=str(upload_id),
+                    feature_id=result.get("feature_id"),
+                    block_id=resolved_block_id,
+                    property_id=property_id,
+                    fra_data=_normalize_fra_result(result),
+                    fraew_data=None,
+                    extraction_errors=[],
+                    raw_llm_response=getattr(processor, "last_raw_response", None),
+                )
             else:
                 from backend.workers.fraew_processor import FRAEWProcessor
 
@@ -1092,6 +1207,18 @@ async def ingest_document(
                     ha_id=ha_id,
                     s3_path=s3_key or "",
                 )
+                fire_risk_payload = _build_fire_risk_payload(
+                    document_type=document_type,
+                    upload_id=str(upload_id),
+                    feature_id=result.get("feature_id"),
+                    block_id=resolved_block_id,
+                    property_id=property_id,
+                    fra_data=None,
+                    fraew_data=_normalize_fraew_result(result),
+                    extraction_errors=[],
+                    raw_llm_response=getattr(processor, "last_raw_response", None),
+                )
+
         except Exception as exc:
             raw_llm = getattr(processor, "last_raw_response", None) if processor else None
             logger.exception("Processor failed for %s", filename)
@@ -1107,6 +1234,17 @@ async def ingest_document(
                         "raw_llm_response": raw_llm,
                         "detection_warning": detection_warning,
                         "block_lookup_warning": block_lookup_warning,
+                        "fire_risk_payload": _build_fire_risk_payload(
+                            document_type=document_type,
+                            upload_id=str(upload_id),
+                            feature_id=None,
+                            block_id=resolved_block_id,
+                            property_id=property_id,
+                            fra_data=None,
+                            fraew_data=None,
+                            extraction_errors=[str(exc)],
+                            raw_llm_response=raw_llm,
+                        ),
                     }
                 ),
             )
@@ -1119,6 +1257,7 @@ async def ingest_document(
                 "upload_id": upload_id,
                 "feature_id": result.get("feature_id"),
                 "block_id": resolved_block_id,
+                "property_id": property_id,
                 "filename": filename,
                 "file_size": len(file_content),
                 "s3_key": s3_key,
@@ -1129,6 +1268,7 @@ async def ingest_document(
                 "block_lookup_warning": block_lookup_warning,
                 "storage": storage_meta,
                 "message": f"{document_type.upper()} extracted by Bedrock and written to silver.{document_type}_features",
+                "fire_risk_payload": fire_risk_payload,
             }
         )
     )

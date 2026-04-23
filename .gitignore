@@ -290,3 +290,7 @@ claude/
 # Ad-hoc debug / test scripts (not production code)
 check_bedrock_models.py
 check_gemini_models.py
+*.gpkg
+*.geojson
+frontend/public/*.geojson
+frontend/*.gpkg
