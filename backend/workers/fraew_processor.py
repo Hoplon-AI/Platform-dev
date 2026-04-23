@@ -27,6 +27,14 @@ from typing import Any, Optional
 
 logger = logging.getLogger(__name__)
 
+# Address tokens too generic to use alone in block matching (Strategy 3)
+_ADDR_STOP_WORDS = frozenset({
+    "road", "street", "avenue", "lane", "way", "close", "drive", "court",
+    "house", "block", "flat", "floor", "place", "gardens", "grove", "park",
+    "rise", "walk", "terrace", "crescent", "square", "mews", "row",
+    "the", "and", "for", "with", "ltd", "limited",
+})
+
 
 def _to_date(value) -> Optional[date]:
     """Convert YYYY-MM-DD string (or date/None) to date object for asyncpg."""
@@ -186,7 +194,8 @@ Risk levels: low | medium | high
 
 Return ONLY this JSON:
 {{
-  "building_name": "building name or block reference (e.g. 02BR, Elizabeth Court) or null",
+  "block_reference": "short block/property code ONLY if explicitly labelled in the document (e.g. 'Property Name: 02BR', 'Block Reference: BLK-A') — null otherwise. Do NOT extract organisation names here.",
+  "building_name": "building name or street address — do NOT put a short block code here (use block_reference for codes)",
   "building_address": "full postal address of the building or null",
   "report_reference": "e.g. JL/230504 or null",
   "assessment_date": "YYYY-MM-DD (site investigation date) or null",
@@ -445,6 +454,7 @@ class FRAEWProcessor:
                 ha_id,
                 llm_data.get("building_name"),
                 llm_data.get("building_address"),
+                llm_data.get("block_reference"),
             )
 
         logger.info(
@@ -475,14 +485,48 @@ class FRAEWProcessor:
         ha_id: str,
         building_name: Optional[str],
         building_address: Optional[str],
+        block_reference: Optional[str] = None,
     ) -> Optional[str]:
         """
-        Three-strategy block resolution:
-          1. Exact match on block name (e.g. LLM returns '02BR')
-          2. Substring match (block name appears inside building_name/address)
+        Four-strategy block resolution:
+          0. Exact/substring match on block_reference (LLM-extracted short code,
+             e.g. '02BR' from 'Property Name: 02BR' on CDHA FRAEW template)
+          1. Exact match on block name using building_name/address candidates
+          2. Substring match — block name appears inside candidate (min 4 chars
+             required to avoid generic single-word false matches)
           3. Address lookup via silver.properties → block_reference → block_id
-             (handles cases like '269 Holmlea Road' → property has block_ref '02BR')
+             (handles '269 Holmlea Road' → property block_ref '02BR')
+             Stop-words filtered; ORDER BY b.name for determinism.
         """
+        all_blocks: list | None = None  # lazy-loaded once
+
+        # ── Strategy 0: explicit block_reference from LLM ────────────
+        if block_reference and block_reference.strip():
+            br = block_reference.strip()
+            row = await self.db.fetchrow(
+                "SELECT block_id::text FROM silver.blocks WHERE ha_id=$1 AND UPPER(name)=UPPER($2) LIMIT 1",
+                ha_id, br,
+            )
+            if row:
+                logger.info(
+                    "FRAEWProcessor: resolved block_id=%s (block_reference exact) from %r",
+                    row["block_id"], br,
+                )
+                return row["block_id"]
+            # Substring fallback — block name may contain the reference
+            all_blocks = await self.db.fetch(
+                "SELECT block_id::text, name FROM silver.blocks WHERE ha_id=$1", ha_id
+            )
+            br_upper = br.upper()
+            for b in all_blocks:
+                bn = (b["name"] or "").upper()
+                if bn and (br_upper in bn or bn in br_upper):
+                    logger.info(
+                        "FRAEWProcessor: resolved block_id=%s (block_reference substring) block=%r from %r",
+                        b["block_id"], b["name"], br,
+                    )
+                    return b["block_id"]
+
         candidates = [c.strip() for c in [building_name, building_address] if c and c.strip()]
         if not candidates:
             logger.info("FRAEWProcessor: no building_name/address extracted — block_id stays None")
@@ -495,18 +539,24 @@ class FRAEWProcessor:
                 ha_id, candidate,
             )
             if row:
-                logger.info("FRAEWProcessor: resolved block_id=%s (exact name) from %r", row["block_id"], candidate)
+                logger.info(
+                    "FRAEWProcessor: resolved block_id=%s (exact name) from %r",
+                    row["block_id"], candidate,
+                )
                 return row["block_id"]
 
         # ── Strategy 2: substring — block name inside candidate ───────
-        all_blocks = await self.db.fetch(
-            "SELECT block_id::text, name FROM silver.blocks WHERE ha_id=$1", ha_id
-        )
+        if all_blocks is None:
+            all_blocks = await self.db.fetch(
+                "SELECT block_id::text, name FROM silver.blocks WHERE ha_id=$1", ha_id
+            )
         for candidate in candidates:
             cu = candidate.upper()
             for b in all_blocks:
                 bn = (b["name"] or "").upper()
-                if bn and (bn in cu or cu in bn):
+                # Require block name ≥ 4 chars — prevents single generic words
+                # like "Cathcart" matching across all blocks in the same estate
+                if bn and len(bn) >= 4 and (bn in cu or cu in bn):
                     logger.info(
                         "FRAEWProcessor: resolved block_id=%s (substring) block=%r from %r",
                         b["block_id"], b["name"], candidate,
@@ -514,10 +564,12 @@ class FRAEWProcessor:
                     return b["block_id"]
 
         # ── Strategy 3: address → silver.properties → block_reference ─
-        # Extract meaningful search tokens (street name words, postcode)
         for candidate in candidates:
-            tokens = [t.strip() for t in re.split(r"[,\s]+", candidate) if len(t.strip()) >= 3]
-            if not tokens:
+            tokens = [
+                t.strip() for t in re.split(r"[,\s]+", candidate)
+                if len(t.strip()) >= 3 and t.strip().lower() not in _ADDR_STOP_WORDS
+            ]
+            if len(tokens) < 2:
                 continue
             for i in range(len(tokens)):
                 for j in range(i + 1, len(tokens)):
@@ -533,6 +585,7 @@ class FRAEWProcessor:
                              AND UPPER(p.address) LIKE '%' || UPPER($3) || '%')
                             OR (UPPER(p.postcode) LIKE '%' || UPPER($2) || '%')
                           )
+                        ORDER BY b.name
                         LIMIT 1
                         """,
                         ha_id, tokens[i], tokens[j],

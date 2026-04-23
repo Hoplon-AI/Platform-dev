@@ -288,13 +288,30 @@ async def _fetch_blocks(db_pool, ha_id: str, portfolio_id: Optional[str]) -> lis
         fra.assessment_date        AS fra_date,
         fra.has_sprinkler_system   AS sprinklers_common,
         fra.has_fire_alarm_system  AS fire_alarms_common,
-        fra.has_fire_extinguishers AS other_fire_protection,
+        -- Q39: build readable text from multiple protection booleans instead of a bare boolean
+        NULLIF(concat_ws(', ',
+            CASE WHEN fra.has_dry_riser          THEN 'Dry riser'          END,
+            CASE WHEN fra.has_wet_riser          THEN 'Wet riser'          END,
+            CASE WHEN fra.has_firefighting_shaft THEN 'Firefighting shaft' END,
+            CASE WHEN fra.has_fire_extinguishers THEN 'Fire extinguishers' END,
+            CASE WHEN fra.has_emergency_lighting THEN 'Emergency lighting' END
+        ), '') AS other_fire_protection,
         -- FRAEW fields (Q41-Q58)
         fraew.has_combustible_cladding AS combustible_materials,
         fraew.has_remedial_actions     AS remediation_required,
         fraew.interim_measures_detail  AS interim_measures_detail,
-        fraew.eps_insulation_present   AS insulation_type,
-        fraew.has_combustible_cladding AS cladding_present,
+        -- Q53: derive insulation type text from individual boolean flags
+        NULLIF(concat_ws(' / ',
+            CASE WHEN fraew.eps_insulation_present          THEN 'EPS'          END,
+            CASE WHEN fraew.mineral_wool_insulation_present THEN 'Mineral Wool' END,
+            CASE WHEN fraew.pir_insulation_present          THEN 'PIR/PUR'      END,
+            CASE WHEN fraew.phenolic_insulation_present     THEN 'Phenolic'     END
+        ), '') AS insulation_type,
+        -- Q49: any cladding type present (distinct from Q41 combustible-only check)
+        (COALESCE(fraew.aluminium_composite_cladding, false)
+         OR COALESCE(fraew.hpl_cladding_present,        false)
+         OR COALESCE(fraew.timber_cladding_present,     false)
+         OR COALESCE(fraew.has_combustible_cladding,    false)) AS cladding_present,
         fraew.has_remedial_actions     AS ews_remediation_required
     FROM block_agg       a
     LEFT JOIN block_occ           o  USING (block_reference)
