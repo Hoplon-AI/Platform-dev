@@ -2414,7 +2414,7 @@ class FRAProcessor:
             "no_date_action_count":       no_date,
         }
 
-    # ── Write to DB ───────────────────────────────────────────────────
+        # ── Write to DB ───────────────────────────────────────────────────
 
     async def _write_to_db(
         self,
@@ -2452,26 +2452,39 @@ class FRAProcessor:
             "fra_assessment_type":    features.fra_assessment_type,
             "assessment_date":        _date_to_str(features.assessment_date),
             "assessment_valid_until": _date_to_str(features.assessment_valid_until),
+            "next_review_date":       _date_to_str(features.next_review_date),
             "evacuation_strategy":    features.evacuation_strategy,
             "bsa_2022_applicable":    features.bsa_2022_applicable,
+            "action_items":           json.loads(action_items_json),
+            "significant_findings":   json.loads(significant_findings_json),
         })
 
-        async with self.db.transaction():
+        def _normalize_for_dashboard(value: Optional[str]) -> Optional[str]:
+            if not value:
+                return None
+            return value.strip().lower()
 
+        normalized_risk = _normalize_for_dashboard(features.risk_rating)
+        normalized_rag  = _normalize_for_dashboard(rag_status)
+
+        async with self.db.transaction():
             await self.db.execute("""
                 INSERT INTO silver.document_features (
                     feature_id, ha_id, upload_id, block_id, document_type,
                     assessment_date, assessor_company, features_json,
                     processed_at, created_at, updated_at
                 )
-                VALUES ($1, $2, $3::uuid, $4::uuid, 'fra_document', $5, $6,
-                        $7::jsonb, $8, $9, $10)
+                VALUES (
+                    $1::uuid, $2::text, $3::text, $4::text,
+                    'fra_document', $5, $6::text, $7::jsonb, $8, $9, $10
+                )
                 ON CONFLICT (feature_id) DO NOTHING
             """,
                 feature_id, ha_id, upload_id, block_id,
                 features.assessment_date,
                 features.assessor_company or assessor_company,
-                raw_features_json, now, now, now,
+                raw_features_json,
+                now, now, now,
             )
 
             await self.db.execute("""
@@ -2492,8 +2505,11 @@ class FRAProcessor:
                     extraction_confidence, raw_features, created_at, updated_at
                 )
                 VALUES (
-                    $1,$2,$3,$4, $5,$6,$7, $8,$9,$10,$11,
-                    $12,$13,$14,$15, $16,$17,$18,$19,
+                    $1::uuid,$2::uuid,$3::text,$4::text,
+                    $5,$6,$7,
+                    $8,$9,$10,$11,
+                    $12,$13,$14,$15,
+                    $16,$17,$18,$19,
                     $20,$21,$22,$23,$24,$25,$26,$27,$28,$29,
                     $30::jsonb,$31::jsonb,
                     $32,$33,$34,$35,$36,
@@ -2501,7 +2517,7 @@ class FRAProcessor:
                 )
             """,
                 fra_id, feature_id, ha_id, block_id,
-                features.risk_rating, rag_status, features.fra_assessment_type,
+                normalized_risk, normalized_rag, features.fra_assessment_type,
                 features.assessment_date, features.assessment_valid_until,
                 features.next_review_date, is_in_date,
                 features.assessor_name, features.assessor_company or assessor_company,

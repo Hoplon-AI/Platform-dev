@@ -9,85 +9,24 @@ const fmtMoney = (n) => {
   return x.toLocaleString(undefined, { maximumFractionDigits: 0 });
 };
 
-const toNumberOrNull = (value) => {
-  const n = Number(value);
-  return Number.isFinite(n) ? n : null;
-};
-
-const readinessColor = (bandOrScore) => {
-  const b = String(bandOrScore || "").toLowerCase();
-  if (b.includes("green")) return "#22c55e";
-  if (b.includes("amber") || b.includes("yellow")) return "#f59e0b";
-  return "#ef4444";
-};
-
-const bandFromScore = (score) => {
-  const s = Number(score) || 0;
-  if (s >= 80) return "Green";
-  if (s >= 50) return "Amber";
-  return "Red";
-};
-
-const riskBandFromFireDocs = (propertyOrBlock) => {
-  const fra = propertyOrBlock?.latest_fra ?? propertyOrBlock?.fire_documents?.fra ?? null;
-  const fraew = propertyOrBlock?.latest_fraew ?? propertyOrBlock?.fire_documents?.fraew ?? null;
-
-  const fraRisk = String(
-    fra?.risk_level ?? fra?.rag_status ?? fra?.raw_rating ?? ""
-  ).toLowerCase();
-
-  const fraewRisk = String(
-    fraew?.risk_level ?? fraew?.rag_status ?? fraew?.raw_rating ?? ""
-  ).toLowerCase();
-
-  const combined = `${fraRisk} ${fraewRisk}`;
-
-  if (
-    combined.includes("red") ||
-    combined.includes("high") ||
-    combined.includes("not acceptable") ||
-    combined.includes("intolerable")
-  ) {
-    return "Red";
-  }
-
-  if (
-    combined.includes("amber") ||
-    combined.includes("medium") ||
-    combined.includes("moderate") ||
-    combined.includes("tolerable")
-  ) {
-    return "Amber";
-  }
-
-  if (
-    combined.includes("green") ||
-    combined.includes("low") ||
-    combined.includes("acceptable") ||
-    combined.includes("broadly acceptable")
-  ) {
-    return "Green";
-  }
-
-  return null;
-};
-
 const hasValidLatLon = (lat, lon) =>
   Number.isFinite(Number(lat)) &&
   Number.isFinite(Number(lon)) &&
   Number(lat) !== 0 &&
   Number(lon) !== 0;
 
+const normaliseKey = (value) => String(value ?? "").trim().toLowerCase();
+
 const sameProperty = (a, b) => {
   if (!a || !b) return false;
 
   return (
-    (a.id && b.id && a.id === b.id) ||
-    (a.property_id && b.property_id && a.property_id === b.property_id) ||
+    (a.id && b.id && String(a.id) === String(b.id)) ||
+    (a.property_id && b.property_id && String(a.property_id) === String(b.property_id)) ||
     (a.property_reference &&
       b.property_reference &&
-      a.property_reference === b.property_reference) ||
-    (a.uprn && b.uprn && a.uprn === b.uprn)
+      String(a.property_reference) === String(b.property_reference)) ||
+    (a.uprn && b.uprn && String(a.uprn) === String(b.uprn))
   );
 };
 
@@ -95,11 +34,14 @@ const sameBlock = (a, b) => {
   if (!a || !b) return false;
 
   return (
-    (a.id && b.id && a.id === b.id) ||
-    (a.block_id && b.block_id && a.block_id === b.block_id) ||
-    (a.label && b.label && a.label === b.label) ||
-    (a.name && b.name && a.name === b.name) ||
-    (a.parent_uprn && b.parent_uprn && a.parent_uprn === b.parent_uprn)
+    (a.id && b.id && String(a.id) === String(b.id)) ||
+    (a.block_id && b.block_id && String(a.block_id) === String(b.block_id)) ||
+    (a.label && b.label && String(a.label) === String(b.label)) ||
+    (a.name && b.name && String(a.name) === String(b.name)) ||
+    (a.block_reference &&
+      b.block_reference &&
+      String(a.block_reference) === String(b.block_reference)) ||
+    (a.parent_uprn && b.parent_uprn && String(a.parent_uprn) === String(b.parent_uprn))
   );
 };
 
@@ -157,6 +99,194 @@ const buildBreakdown = (items, keyFn, valueFn) => {
   });
 };
 
+const normaliseActions = (value) => {
+  if (Array.isArray(value)) return value.filter(Boolean).map(String);
+  if (!value) return [];
+  return [String(value)];
+};
+
+const getFireDocumentRisk = (doc) =>
+  doc?.risk_level ??
+  doc?.rag_status ??
+  doc?.raw_rating ??
+  doc?.external_wall_risk ??
+  doc?.building_risk_rating ??
+  doc?.overall_risk_rating ??
+  doc?.risk_rating ??
+  null;
+
+const getFireRiskBand = (doc) => {
+  const text = String(getFireDocumentRisk(doc) ?? "").toLowerCase();
+  if (
+    text.includes("red") ||
+    text.includes("high") ||
+    text.includes("intolerable") ||
+    text.includes("not acceptable")
+  ) {
+    return "Red";
+  }
+  if (
+    text.includes("amber") ||
+    text.includes("medium") ||
+    text.includes("moderate") ||
+    text.includes("tolerable")
+  ) {
+    return "Amber";
+  }
+  if (
+    text.includes("green") ||
+    text.includes("low") ||
+    text.includes("acceptable") ||
+    text.includes("broadly acceptable")
+  ) {
+    return "Green";
+  }
+  return "Unknown";
+};
+
+const riskBadgeStyle = (band) => {
+  if (band === "Red") return { background: "#fee2e2", color: "#991b1b" };
+  if (band === "Amber") return { background: "#fef3c7", color: "#92400e" };
+  if (band === "Green") return { background: "#dcfce7", color: "#166534" };
+  return { background: "#e2e8f0", color: "#475569" };
+};
+
+const normaliseFirePayloadToDocument = (payload, fallbackIndex = 0) => {
+  if (!payload) return null;
+
+  const firePayload = payload.fire_risk_payload ?? payload;
+  const documentType = String(firePayload.document_type ?? payload.document_type ?? "").toUpperCase();
+  const fra = firePayload.fra ?? null;
+  const fraew = firePayload.fraew ?? null;
+  const primary = documentType === "FRAEW" ? fraew : fra || fraew || firePayload;
+
+  const riskLevel = getFireDocumentRisk(primary);
+  const actions = normaliseActions(
+    primary?.recommendations ??
+      primary?.actions ??
+      primary?.significant_findings ??
+      primary?.remedial_actions ??
+      primary?.action_items
+  );
+
+  return {
+    id:
+      firePayload.id ??
+      firePayload.upload_id ??
+      firePayload.feature_id ??
+      `${documentType || "FIRE"}-${fallbackIndex + 1}`,
+    upload_id: firePayload.upload_id ?? payload.upload_id ?? "",
+    feature_id: firePayload.feature_id ?? payload.feature_id ?? "",
+    filename: firePayload.filename ?? payload.filename ?? "Uploaded PDF",
+    document_type: documentType || "FIRE",
+    block_id: firePayload.block_id ?? payload.block_id ?? "",
+    block_reference:
+      firePayload.block_reference ??
+      firePayload.block_id ??
+      payload.block_reference ??
+      payload.block_id ??
+      "",
+    property_id: firePayload.property_id ?? payload.property_id ?? "",
+    risk_level: riskLevel,
+    rag_status: riskLevel,
+    summary:
+      primary?.summary ??
+      primary?.executive_summary ??
+      primary?.findings_summary ??
+      primary?.interim_measures_detail ??
+      "No summary extracted.",
+    actions,
+    fra,
+    fraew,
+    raw: firePayload,
+    created_at: payload.created_at ?? new Date().toISOString(),
+  };
+};
+
+const collectFireDocumentsFromIngestion = (ingestionResult, latestFireRiskPayload) => {
+  const docs = [];
+
+  const sourceItems = Array.isArray(ingestionResult?.fire_documents)
+    ? ingestionResult.fire_documents
+    : Array.isArray(ingestionResult?.raw?.fire_documents)
+    ? ingestionResult.raw.fire_documents
+    : [];
+
+  sourceItems.forEach((item, index) => {
+    const normalised = normaliseFirePayloadToDocument(item, index);
+    if (normalised) docs.push(normalised);
+  });
+
+  (ingestionResult?.properties || []).forEach((property, propertyIndex) => {
+    const fra = property.latest_fra ?? property.fire_documents?.fra ?? null;
+    const fraew = property.latest_fraew ?? property.fire_documents?.fraew ?? null;
+
+    if (fra) {
+      docs.push({
+        id: `property-fra-${property.id ?? propertyIndex}`,
+        filename: fra.filename ?? "Linked FRA",
+        document_type: "FRA",
+        block_reference: property.block_reference ?? property.parent_uprn ?? "",
+        property_id: property.property_id ?? property.id ?? property.uprn ?? "",
+        risk_level: getFireDocumentRisk(fra),
+        rag_status: getFireDocumentRisk(fra),
+        summary: fra.summary ?? fra.executive_summary ?? "Linked FRA data from portfolio.",
+        actions: normaliseActions(fra.recommendations ?? fra.actions ?? fra.significant_findings),
+        fra,
+        fraew: null,
+        raw: fra,
+      });
+    }
+
+    if (fraew) {
+      docs.push({
+        id: `property-fraew-${property.id ?? propertyIndex}`,
+        filename: fraew.filename ?? "Linked FRAEW",
+        document_type: "FRAEW",
+        block_reference: property.block_reference ?? property.parent_uprn ?? "",
+        property_id: property.property_id ?? property.id ?? property.uprn ?? "",
+        risk_level: getFireDocumentRisk(fraew),
+        rag_status: getFireDocumentRisk(fraew),
+        summary: fraew.summary ?? fraew.interim_measures_detail ?? "Linked FRAEW data from portfolio.",
+        actions: normaliseActions(fraew.recommendations ?? fraew.actions ?? fraew.remedial_actions),
+        fra: null,
+        fraew,
+        raw: fraew,
+      });
+    }
+  });
+
+  const latest = normaliseFirePayloadToDocument(latestFireRiskPayload, docs.length);
+  if (latest) docs.unshift(latest);
+
+  const seen = new Set();
+  return docs.filter((doc) => {
+    const key = [doc.document_type, doc.upload_id, doc.feature_id, doc.property_id, doc.block_reference, doc.filename]
+      .map(normaliseKey)
+      .join("|");
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+};
+
+function RiskBadge({ band }) {
+  return (
+    <span
+      style={{
+        ...riskBadgeStyle(band),
+        borderRadius: 999,
+        padding: "6px 10px",
+        fontSize: 12,
+        fontWeight: 800,
+        whiteSpace: "nowrap",
+      }}
+    >
+      {band}
+    </span>
+  );
+}
+
 function KpiCard({ title, value, subtitle, tone = "default" }) {
   return (
     <div className={`dashboard-card dashboard-card-${tone}`}>
@@ -167,62 +297,11 @@ function KpiCard({ title, value, subtitle, tone = "default" }) {
   );
 }
 
-function ConfidenceBar({ label, value }) {
-  const safeValue = Math.max(0, Math.min(100, Number(value) || 0));
-
-  return (
-    <div className="bar">
-      <div className="bar-top">
-        <div className="bar-label">{label}</div>
-        <div className="bar-value">{safeValue}%</div>
-      </div>
-      <div className="bar-track">
-        <div className="bar-fill" style={{ width: `${safeValue}%` }} />
-      </div>
-    </div>
-  );
-}
-
-function WorkspaceTabs({ activeTab, onChange }) {
-  const tabs = [
-    { id: "overview", label: "Portfolio overview" },
-    { id: "block-analysis", label: "Block analysis" },
-  ];
-
-  return (
-    <div
-      className="card"
-      style={{
-        padding: 12,
-        display: "flex",
-        gap: 8,
-        alignItems: "center",
-        flexWrap: "wrap",
-      }}
-    >
-      {tabs.map((tab) => {
-        const active = activeTab === tab.id;
-        return (
-          <button
-            key={tab.id}
-            className={`btn ${active ? "btn-primary" : ""}`}
-            onClick={() => onChange(tab.id)}
-          >
-            {tab.label}
-          </button>
-        );
-      })}
-    </div>
-  );
-}
-
 function PortfolioCompositionCard({ properties, blocks }) {
   const totalUnits = properties.length;
-
   const houses = properties.filter((p) => inferPortfolioClass(p) === "Houses");
   const flats = properties.filter((p) => inferPortfolioClass(p) === "Flats");
   const other = properties.filter((p) => inferPortfolioClass(p) === "Other");
-
   const blockCount = blocks.length;
   const thirdPartyLikeBlocks = blocks.filter(
     (block) => !block.parent_uprn && block.count > 1
@@ -285,13 +364,12 @@ function PortfolioCompositionCard({ properties, blocks }) {
   };
 
   return (
-    <div className="card">
+    <div className="card" style={{ height: "100%" }}>
       <div className="card-header row-between">
         <div>
           <div className="card-title">Portfolio Composition</div>
           <div className="card-subtitle">
-            Summary split for the whole ingested SoV rather than raw row-by-row
-            tables.
+            Summary split for the whole ingested SoV rather than raw row-by-row tables.
           </div>
         </div>
         <span className="pill pill-muted">{totalUnits} units</span>
@@ -319,144 +397,10 @@ function PortfolioCompositionCard({ properties, blocks }) {
         >
           <div style={{ fontWeight: 600, marginBottom: 4 }}>Other asset types</div>
           <div className="muted">
-            {other.length} properties could not be cleanly classified as houses
-            or flats from the current SoV fields.
+            {other.length} properties could not be cleanly classified as houses or flats from the current SoV fields.
           </div>
         </div>
       ) : null}
-    </div>
-  );
-}
-
-function FireRiskOverviewCard({ blocks }) {
-  const redBlocks = blocks.filter((b) => riskBandFromFireDocs(b) === "Red").length;
-  const amberBlocks = blocks.filter((b) => riskBandFromFireDocs(b) === "Amber").length;
-  const greenBlocks = blocks.filter((b) => riskBandFromFireDocs(b) === "Green").length;
-  const unassessedBlocks = blocks.length - redBlocks - amberBlocks - greenBlocks;
-
-  const overdueActions = blocks.reduce((sum, block) => {
-    const fra = block.latest_fra ?? block.fire_documents?.fra;
-    return sum + (Number(fra?.overdue_actions ?? fra?.overdue_action_count) || 0);
-  }, 0);
-
-  const noDateActions = blocks.reduce((sum, block) => {
-    const fra = block.latest_fra ?? block.fire_documents?.fra;
-    return sum + (Number(fra?.no_date_actions ?? fra?.no_date_action_count) || 0);
-  }, 0);
-
-  const inProgressActions = blocks.reduce((sum, block) => {
-    const fra = block.latest_fra ?? block.fire_documents?.fra;
-    return sum + (Number(fra?.outstanding_actions ?? fra?.outstanding_action_count) || 0);
-  }, 0);
-
-  const itemStyle = (tone) => ({
-    padding: 12,
-    borderRadius: 12,
-    background: `${tone}16`,
-    border: `1px solid ${tone}33`,
-  });
-
-  return (
-    <div className="card">
-      <div className="card-header row-between">
-        <div>
-          <div className="card-title">FRA Status & Remediation</div>
-          <div className="card-subtitle">
-            Portfolio-level summary of linked FRA and FRAEW extraction results.
-          </div>
-        </div>
-        <span className="pill pill-muted">{blocks.length} blocks</span>
-      </div>
-
-      <div style={{ display: "grid", gap: 10 }}>
-        <div
-          style={{
-            padding: 12,
-            borderRadius: 12,
-            background: "rgba(239,68,68,0.12)",
-            border: "1px solid rgba(239,68,68,0.2)",
-            display: "flex",
-            justifyContent: "space-between",
-            gap: 12,
-          }}
-        >
-          <div style={{ fontWeight: 700 }}>RED</div>
-          <div>{redBlocks} blocks</div>
-        </div>
-
-        <div
-          style={{
-            padding: 12,
-            borderRadius: 12,
-            background: "rgba(245,158,11,0.12)",
-            border: "1px solid rgba(245,158,11,0.2)",
-            display: "flex",
-            justifyContent: "space-between",
-            gap: 12,
-          }}
-        >
-          <div style={{ fontWeight: 700 }}>AMBER</div>
-          <div>{amberBlocks} blocks</div>
-        </div>
-
-        <div
-          style={{
-            padding: 12,
-            borderRadius: 12,
-            background: "rgba(34,197,94,0.12)",
-            border: "1px solid rgba(34,197,94,0.2)",
-            display: "flex",
-            justifyContent: "space-between",
-            gap: 12,
-          }}
-        >
-          <div style={{ fontWeight: 700 }}>GREEN</div>
-          <div>{greenBlocks} blocks</div>
-        </div>
-
-        <div
-          style={{
-            padding: 12,
-            borderRadius: 12,
-            background: "rgba(100,116,139,0.10)",
-            border: "1px solid rgba(100,116,139,0.15)",
-            display: "flex",
-            justifyContent: "space-between",
-            gap: 12,
-          }}
-        >
-          <div style={{ fontWeight: 700 }}>UNASSESSED</div>
-          <div>{unassessedBlocks} blocks</div>
-        </div>
-      </div>
-
-      <div
-        style={{
-          marginTop: 16,
-          display: "grid",
-          gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
-          gap: 12,
-        }}
-      >
-        <div style={itemStyle("#ef4444")}>
-          <div className="dashboard-card-value" style={{ fontSize: 24 }}>
-            {overdueActions}
-          </div>
-          <div className="muted">Overdue</div>
-        </div>
-        <div style={itemStyle("#f59e0b")}>
-          <div className="dashboard-card-value" style={{ fontSize: 24 }}>
-            {noDateActions}
-          </div>
-          <div className="muted">No date</div>
-        </div>
-        <div style={itemStyle("#64748b")}>
-          <div className="dashboard-card-value" style={{ fontSize: 24 }}>
-            {inProgressActions}
-          </div>
-          <div className="muted">In progress</div>
-        </div>
-      </div>
     </div>
   );
 }
@@ -472,11 +416,7 @@ function MiniSummaryTable({ title, subtitle, rows, columns }) {
       }}
     >
       <div style={{ fontWeight: 700, marginBottom: 4 }}>{title}</div>
-      {subtitle ? (
-        <div className="muted" style={{ marginBottom: 10 }}>
-          {subtitle}
-        </div>
-      ) : null}
+      {subtitle ? <div className="muted" style={{ marginBottom: 10 }}>{subtitle}</div> : null}
 
       {!rows.length ? (
         <div className="muted">No data available.</div>
@@ -510,20 +450,14 @@ function MiniSummaryTable({ title, subtitle, rows, columns }) {
   );
 }
 
-function PortfolioAnalysisWindow({
-  tenancyRows,
-  blockRows,
-  propertyTypeRows,
-  ageBandRows,
-}) {
+function PortfolioAnalysisWindow({ tenancyRows, blockRows, propertyTypeRows, ageBandRows }) {
   return (
     <div className="card">
       <div className="card-header row-between">
         <div>
           <div className="card-title">Portfolio Analysis</div>
           <div className="card-subtitle">
-            Compact whole-portfolio analysis for tenancy, block reference,
-            property type, and age.
+            Compact whole-portfolio analysis for tenancy, block reference, property type, and age.
           </div>
         </div>
         <span className="pill pill-muted">Whole SoV summary</span>
@@ -542,11 +476,7 @@ function PortfolioAnalysisWindow({
           columns={[
             { key: "label", label: "Type" },
             { key: "count", label: "Units" },
-            {
-              key: "totalValue",
-              label: "Sum insured",
-              render: (row) => `£${fmtMoney(row.totalValue)}`,
-            },
+            { key: "totalValue", label: "Sum insured", render: (row) => `£${fmtMoney(row.totalValue)}` },
           ]}
         />
 
@@ -556,11 +486,7 @@ function PortfolioAnalysisWindow({
           columns={[
             { key: "label", label: "Block" },
             { key: "count", label: "Units" },
-            {
-              key: "totalValue",
-              label: "TIV",
-              render: (row) => `£${fmtMoney(row.totalValue)}`,
-            },
+            { key: "totalValue", label: "TIV", render: (row) => `£${fmtMoney(row.totalValue)}` },
           ]}
         />
 
@@ -570,11 +496,7 @@ function PortfolioAnalysisWindow({
           columns={[
             { key: "label", label: "Type" },
             { key: "count", label: "Units" },
-            {
-              key: "totalValue",
-              label: "Sum insured",
-              render: (row) => `£${fmtMoney(row.totalValue)}`,
-            },
+            { key: "totalValue", label: "Sum insured", render: (row) => `£${fmtMoney(row.totalValue)}` },
           ]}
         />
 
@@ -584,11 +506,7 @@ function PortfolioAnalysisWindow({
           columns={[
             { key: "label", label: "Age" },
             { key: "count", label: "Units" },
-            {
-              key: "totalValue",
-              label: "Sum insured",
-              render: (row) => `£${fmtMoney(row.totalValue)}`,
-            },
+            { key: "totalValue", label: "Sum insured", render: (row) => `£${fmtMoney(row.totalValue)}` },
           ]}
         />
       </div>
@@ -596,199 +514,164 @@ function PortfolioAnalysisWindow({
   );
 }
 
-function FireDocsPanel({
-  latestFireRiskPayload,
-  fireDocumentsLoading,
-  selectedProperty,
-  selectedBlock,
-}) {
-  const fra =
-    latestFireRiskPayload?.fra ||
-    selectedProperty?.latest_fra ||
-    selectedProperty?.fire_documents?.fra ||
-    selectedBlock?.latest_fra ||
-    selectedBlock?.fire_documents?.fra ||
-    null;
-
-  const fraew =
-    latestFireRiskPayload?.fraew ||
-    selectedProperty?.latest_fraew ||
-    selectedProperty?.fire_documents?.fraew ||
-    selectedBlock?.latest_fraew ||
-    selectedBlock?.fire_documents?.fraew ||
-    null;
-
-  const extractionErrors = latestFireRiskPayload?.extraction_errors || [];
-
-  if (!fra && !fraew && !fireDocumentsLoading && !latestFireRiskPayload) {
-    return (
-      <div className="card">
-        <div className="card-header row-between">
-          <div>
-            <div className="card-title">Fire risk documents</div>
-            <div className="card-subtitle">
-              Upload FRA or FRAEW PDFs to surface extracted fire-risk data here.
-            </div>
-          </div>
-          <span className="pill pill-muted">Awaiting PDF</span>
-        </div>
-        <div className="muted">
-          No FRA or FRAEW results are attached yet for the current selection.
-        </div>
-      </div>
-    );
-  }
+function FireEvidencePanel({ fireDocuments, loading, onUploadNew }) {
+  const fireRiskSummary = useMemo(() => {
+    const totals = { Red: 0, Amber: 0, Green: 0, Unknown: 0 };
+    fireDocuments.forEach((doc) => {
+      totals[getFireRiskBand(doc)] += 1;
+    });
+    return totals;
+  }, [fireDocuments]);
 
   return (
     <div className="card">
       <div className="card-header row-between">
         <div>
-          <div className="card-title">Fire risk documents</div>
+          <div className="card-title">Fire risk evidence</div>
           <div className="card-subtitle">
-            FRA and FRAEW extraction results linked to the selected block or
-            property.
+            Upload FRA and FRAEW evidence after the SoV so documents can be matched against existing blocks and properties.
           </div>
         </div>
         <span className="pill pill-muted">
-          {fireDocumentsLoading ? "Loading…" : "PDF linked"}
+          {loading ? "Refreshing…" : `${fireDocuments.length} documents`}
         </span>
       </div>
-
-      {extractionErrors.length > 0 && (
-        <div className="pill band-red" style={{ marginBottom: 12 }}>
-          {extractionErrors.join(" · ")}
-        </div>
-      )}
 
       <div
         style={{
           display: "grid",
-          gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+          gridTemplateColumns: "minmax(0, 1.4fr) minmax(280px, 0.9fr)",
           gap: 16,
+          alignItems: "stretch",
+          marginBottom: 16,
         }}
       >
-        <div className="details-block">
-          <div className="details-h">FRA</div>
-          <div className="details-sub">
-            <b>Risk:</b>{" "}
-            {fra?.risk_level || fra?.rag_status || fra?.raw_rating || "—"}
-          </div>
-          <div className="details-sub">
-            <b>Assessment date:</b> {fra?.assessment_date || "—"}
-          </div>
-          <div className="details-sub">
-            <b>Valid until:</b> {fra?.assessment_valid_until || "—"}
-          </div>
-          <div className="details-sub">
-            <b>In date:</b>{" "}
-            {fra?.is_in_date === true ? "Yes" : fra?.is_in_date === false ? "No" : "—"}
-          </div>
-          <div className="details-sub">
-            <b>Assessor:</b> {fra?.assessor_name || "—"}
-          </div>
-          <div className="details-sub">
-            <b>Company:</b> {fra?.assessor_company || "—"}
-          </div>
-          <div className="details-sub">
-            <b>Evacuation:</b> {fra?.evacuation_strategy || "—"}
-          </div>
-          <div className="details-sub">
-            <b>Total actions:</b>{" "}
-            {fra?.total_actions ?? fra?.total_action_count ?? "—"}
-          </div>
-          <div className="details-sub">
-            <b>Overdue actions:</b>{" "}
-            {fra?.overdue_actions ?? fra?.overdue_action_count ?? "—"}
-          </div>
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(4, minmax(0, 1fr))",
+            gap: 12,
+          }}
+        >
+          {Object.entries(fireRiskSummary).map(([band, count]) => (
+            <div
+              key={band}
+              style={{
+                border: "1px solid rgba(148,163,184,0.22)",
+                borderRadius: 16,
+                padding: 14,
+                background: "#fff",
+              }}
+            >
+              <RiskBadge band={band} />
+              <div style={{ fontSize: 24, fontWeight: 800, marginTop: 10 }}>{count}</div>
+            </div>
+          ))}
         </div>
 
-        <div className="details-block">
-          <div className="details-h">FRAEW</div>
-          <div className="details-sub">
-            <b>Risk:</b>{" "}
-            {fraew?.risk_level || fraew?.rag_status || fraew?.raw_rating || "—"}
+        <div
+          style={{
+            border: "1px solid rgba(37,99,235,0.22)",
+            borderRadius: 18,
+            padding: 16,
+            background: "linear-gradient(135deg, rgba(37,99,235,0.08), rgba(16,185,129,0.08))",
+            display: "flex",
+            flexDirection: "column",
+            justifyContent: "space-between",
+            gap: 14,
+          }}
+        >
+          <div>
+            <div style={{ fontWeight: 800, fontSize: 16 }}>Add fire evidence</div>
+            <div className="muted" style={{ marginTop: 4 }}>
+              FRA and FRAEW uploads should be added here after the SoV. The next upload screen will show the block reference and property matching fields.
+            </div>
           </div>
-          <div className="details-sub">
-            <b>Assessment date:</b> {fraew?.assessment_date || "—"}
-          </div>
-          <div className="details-sub">
-            <b>Valid until:</b> {fraew?.assessment_valid_until || "—"}
-          </div>
-          <div className="details-sub">
-            <b>In date:</b>{" "}
-            {fraew?.is_in_date === true
-              ? "Yes"
-              : fraew?.is_in_date === false
-              ? "No"
-              : "—"}
-          </div>
-          <div className="details-sub">
-            <b>Height:</b>{" "}
-            {Number.isFinite(Number(fraew?.building_height_m))
-              ? `${Number(fraew.building_height_m).toFixed(1)} m`
-              : "—"}
-          </div>
-          <div className="details-sub">
-            <b>Combustible cladding:</b>{" "}
-            {fraew?.combustible_cladding === true ||
-            fraew?.has_combustible_cladding === true
-              ? "Yes"
-              : fraew?.combustible_cladding === false ||
-                fraew?.has_combustible_cladding === false
-              ? "No"
-              : "—"}
-          </div>
-          <div className="details-sub">
-            <b>PAS 9980 compliant:</b>{" "}
-            {fraew?.pas_9980_compliant === true
-              ? "Yes"
-              : fraew?.pas_9980_compliant === false
-              ? "No"
-              : "—"}
-          </div>
-          <div className="details-sub">
-            <b>Interim measures:</b>{" "}
-            {fraew?.interim_measures_required === true
-              ? "Required"
-              : fraew?.interim_measures_required === false
-              ? "Not required"
-              : "—"}
-          </div>
-          <div className="details-sub">
-            <b>Remediation required:</b>{" "}
-            {fraew?.remediation_required === true ||
-            fraew?.has_remedial_actions === true
-              ? "Yes"
-              : fraew?.remediation_required === false ||
-                fraew?.has_remedial_actions === false
-              ? "No"
-              : "—"}
+
+          <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+            <button
+              type="button"
+              className="btn btn-primary"
+              onClick={() => onUploadNew?.("FRA")}
+            >
+              Upload FRA
+            </button>
+            <button
+              type="button"
+              className="btn"
+              onClick={() => onUploadNew?.("FRAEW")}
+            >
+              Upload FRAEW
+            </button>
           </div>
         </div>
+      </div>
+
+      <div style={{ display: "grid", gap: 12 }}>
+        {fireDocuments.length === 0 ? (
+          <div
+            style={{
+              border: "1px dashed rgba(148,163,184,0.45)",
+              borderRadius: 16,
+              padding: 16,
+              background: "rgba(248,250,252,0.8)",
+            }}
+          >
+            <div style={{ fontWeight: 700 }}>No FRA / FRAEW documents uploaded yet.</div>
+            <div className="muted" style={{ marginTop: 4 }}>
+              Use the buttons above to add fire risk evidence against the matched blocks from the SoV.
+            </div>
+          </div>
+        ) : (
+          fireDocuments.map((doc) => {
+            const band = getFireRiskBand(doc);
+            return (
+              <article
+                key={doc.id}
+                style={{
+                  border: "1px solid rgba(148,163,184,0.22)",
+                  borderRadius: 16,
+                  padding: 14,
+                  background: "#fff",
+                }}
+              >
+                <div className="row-between" style={{ alignItems: "flex-start", gap: 12 }}>
+                  <div>
+                    <div style={{ fontWeight: 800 }}>{doc.document_type}</div>
+                    <div className="muted">
+                      {doc.filename} · Block {doc.block_reference || doc.block_id || "—"}
+                    </div>
+                  </div>
+                  <RiskBadge band={band} />
+                </div>
+                <p className="muted" style={{ marginTop: 10 }}>{doc.summary}</p>
+                {doc.actions?.length > 0 ? (
+                  <ul style={{ margin: "8px 0 0 18px" }}>
+                    {doc.actions.slice(0, 4).map((action, idx) => (
+                      <li key={idx}>{action}</li>
+                    ))}
+                  </ul>
+                ) : null}
+              </article>
+            );
+          })
+        )}
       </div>
     </div>
   );
 }
 
-function BlockListPanel({
-  blocks,
-  selectedBlockId,
-  onSelectBlock,
-  selectedProperty,
-}) {
+function BlockListPanel({ blocks, selectedBlockId, onSelectBlock, selectedProperty }) {
   return (
     <div className="card">
       <div className="card-header row-between">
         <div>
           <div className="card-title">Block analysis list</div>
           <div className="card-subtitle">
-            Drill into grouped blocks without rendering the whole SoV as a long
-            table.
+            Drill into grouped blocks without rendering the whole SoV as a long table.
           </div>
         </div>
-        <span className="pill pill-muted">
-          Top {Math.min(blocks.length, 20)} blocks
-        </span>
+        <span className="pill pill-muted">Top {Math.min(blocks.length, 20)} blocks</span>
       </div>
 
       {!blocks.length ? (
@@ -801,78 +684,40 @@ function BlockListPanel({
                 <th>Block</th>
                 <th>Properties</th>
                 <th>Total value</th>
-                <th>Fire risk</th>
                 <th>Max height</th>
+                <th>FRA</th>
+                <th>FRAEW</th>
               </tr>
             </thead>
             <tbody>
-              {blocks.slice(0, 20).map((block) => {
-                const fireRisk = riskBandFromFireDocs(block);
-                return (
-                  <tr
-                    key={block.id}
-                    onClick={() => onSelectBlock?.(block)}
-                    style={{
-                      cursor: "pointer",
-                      background:
-                        selectedBlockId === block.id && !selectedProperty
-                          ? "rgba(59,130,246,0.08)"
-                          : "transparent",
-                    }}
-                  >
-                    <td>{block.label}</td>
-                    <td>{block.count}</td>
-                    <td>£{fmtMoney(block.totalValue)}</td>
-                    <td>
-                      {fireRisk ? (
-                        <span
-                          className="pill"
-                          style={{
-                            background: `${readinessColor(fireRisk)}22`,
-                            color: readinessColor(fireRisk),
-                            border: `1px solid ${readinessColor(fireRisk)}33`,
-                          }}
-                        >
-                          {fireRisk}
-                        </span>
-                      ) : (
-                        "—"
-                      )}
-                    </td>
-                    <td>
-                      {Number.isFinite(Number(block.maxHeight))
-                        ? `${Number(block.maxHeight).toFixed(1)} m`
-                        : "—"}
-                    </td>
-                  </tr>
-                );
-              })}
+              {blocks.slice(0, 20).map((block) => (
+                <tr
+                  key={block.id}
+                  onClick={() => onSelectBlock?.(block)}
+                  style={{
+                    cursor: "pointer",
+                    background:
+                      selectedBlockId === block.id && !selectedProperty
+                        ? "rgba(59,130,246,0.08)"
+                        : "transparent",
+                  }}
+                >
+                  <td>{block.label}</td>
+                  <td>{block.count}</td>
+                  <td>£{fmtMoney(block.totalValue)}</td>
+                  <td>
+                    {Number.isFinite(Number(block.maxHeight))
+                      ? `${Number(block.maxHeight).toFixed(1)} m`
+                      : "—"}
+                  </td>
+                  <td>{block.latest_fra ? <RiskBadge band={getFireRiskBand(block.latest_fra)} /> : "—"}</td>
+                  <td>{block.latest_fraew ? <RiskBadge band={getFireRiskBand(block.latest_fraew)} /> : "—"}</td>
+                </tr>
+              ))}
             </tbody>
           </table>
         </div>
       )}
-    </div>
-  );
-}
-
-function DocumentPanel() {
-  return (
-    <div className="card">
-      <div className="card-header row-between">
-        <div>
-          <div className="card-title">Documents & exports</div>
-          <div className="card-subtitle">
-            Hook these buttons to your export router once wired.
-          </div>
-        </div>
-        <span className="pill pill-muted">Backend-ready</span>
-      </div>
-
-      <div className="document-grid">
-        <button className="btn">Export Underwriter Pack</button>
-        <button className="btn">Export Doc A</button>
-        <button className="btn">Export Doc B</button>
-      </div>
     </div>
   );
 }
@@ -883,13 +728,18 @@ export default function PortfolioDashboard({
   onUploadNew,
   latestFireRiskPayload = null,
   fireDocumentsLoading = false,
+  refetchFireDocuments,
 }) {
   const properties = ingestionResult?.properties || [];
-  const [workspaceTab, setWorkspaceTab] = useState("overview");
   const [selectedBlock, setSelectedBlock] = useState(null);
   const [selectedProperty, setSelectedProperty] = useState(null);
 
-  const blocks = useMemo(() => {
+  const fireDocuments = useMemo(
+    () => collectFireDocumentsFromIngestion(ingestionResult, latestFireRiskPayload),
+    [ingestionResult, latestFireRiskPayload]
+  );
+
+  const baseBlocks = useMemo(() => {
     if (!properties.length) return [];
 
     const grouped = new Map();
@@ -902,53 +752,27 @@ export default function PortfolioDashboard({
         property.property_reference ||
         property.id;
 
-      if (!grouped.has(key)) {
-        grouped.set(key, []);
-      }
-
+      if (!grouped.has(key)) grouped.set(key, []);
       grouped.get(key).push(property);
     });
 
     return Array.from(grouped.entries())
       .map(([key, items]) => {
         const mappable = items.filter((p) => hasValidLatLon(p.latitude, p.longitude));
-
         const lat =
           mappable.length > 0
             ? mappable.reduce((sum, p) => sum + Number(p.latitude), 0) / mappable.length
             : null;
-
         const lon =
           mappable.length > 0
             ? mappable.reduce((sum, p) => sum + Number(p.longitude), 0) / mappable.length
             : null;
-
-        const totalValue = items.reduce(
-          (sum, p) => sum + (Number(p.sum_insured) || 0),
-          0
-        );
-
-        const avgReadiness =
-          items.reduce((sum, p) => sum + (Number(p.readiness_score) || 0), 0) /
-          Math.max(items.length, 1);
-
+        const totalValue = items.reduce((sum, p) => sum + (Number(p.sum_insured) || 0), 0);
         const maxHeight = items.reduce((max, p) => {
           const height = Number(p.height_m);
           return Number.isFinite(height) ? Math.max(max, height) : max;
         }, 0);
-
-        const representativeProperty =
-          mappable[0] || items.find((p) => p.uprn) || items[0] || null;
-
-        const latestFra =
-          items.find((p) => p.latest_fra)?.latest_fra ||
-          items.find((p) => p.fire_documents?.fra)?.fire_documents?.fra ||
-          null;
-
-        const latestFraew =
-          items.find((p) => p.latest_fraew)?.latest_fraew ||
-          items.find((p) => p.fire_documents?.fraew)?.fire_documents?.fraew ||
-          null;
+        const representativeProperty = mappable[0] || items.find((p) => p.uprn) || items[0] || null;
 
         return {
           id: key,
@@ -965,7 +789,6 @@ export default function PortfolioDashboard({
           __lon: lon,
           hasValidCoords: hasValidLatLon(lat, lon),
           totalValue,
-          avgReadiness,
           maxHeight,
           parent_uprn:
             items.find((p) => p.parent_uprn)?.parent_uprn ||
@@ -973,45 +796,72 @@ export default function PortfolioDashboard({
             null,
           block_reference: key || "",
           representativeProperty,
-          latest_fra: latestFra,
-          latest_fraew: latestFraew,
-          fire_documents: {
-            fra: latestFra,
-            fraew: latestFraew,
-          },
         };
       })
       .filter((block) => block.hasValidCoords)
       .sort((a, b) => b.totalValue - a.totalValue);
   }, [properties]);
 
+  const blocks = useMemo(() => {
+    return baseBlocks.map((block) => {
+      const blockAliases = [
+        block.id,
+        block.block_id,
+        block.label,
+        block.name,
+        block.block_reference,
+        block.parent_uprn,
+      ]
+        .map(normaliseKey)
+        .filter(Boolean);
+
+      const linkedDocs = fireDocuments.filter((doc) => {
+        const docBlock = normaliseKey(doc.block_reference || doc.block_id);
+        const docProperty = normaliseKey(doc.property_id);
+        const blockMatch = docBlock && blockAliases.includes(docBlock);
+        const propertyMatch =
+          docProperty &&
+          block.properties.some((property) =>
+            [property.id, property.property_id, property.property_reference, property.uprn]
+              .map(normaliseKey)
+              .filter(Boolean)
+              .includes(docProperty)
+          );
+        return blockMatch || propertyMatch;
+      });
+
+      const propertyFra = block.properties.find((p) => p.latest_fra)?.latest_fra ?? null;
+      const propertyFraew = block.properties.find((p) => p.latest_fraew)?.latest_fraew ?? null;
+      const latestFraDoc = linkedDocs.find((doc) => doc.document_type === "FRA") ?? null;
+      const latestFraewDoc = linkedDocs.find((doc) => doc.document_type === "FRAEW") ?? null;
+      const latestFra = latestFraDoc?.fra ?? latestFraDoc ?? propertyFra;
+      const latestFraew = latestFraewDoc?.fraew ?? latestFraewDoc ?? propertyFraew;
+
+      return {
+        ...block,
+        latest_fra: latestFra,
+        latest_fraew: latestFraew,
+        fire_documents: {
+          fra: latestFra,
+          fraew: latestFraew,
+          all: linkedDocs,
+        },
+      };
+    });
+  }, [baseBlocks, fireDocuments]);
+
   const tenancyRows = useMemo(
-    () =>
-      buildBreakdown(
-        properties,
-        (property) => property.occupancy_type || "Not recorded",
-        (property) => property.sum_insured
-      ),
+    () => buildBreakdown(properties, (property) => property.occupancy_type || "Not recorded", (property) => property.sum_insured),
     [properties]
   );
 
   const blockRows = useMemo(
-    () =>
-      blocks.map((block) => ({
-        label: block.label || "Unassigned block",
-        count: block.count || 0,
-        totalValue: block.totalValue || 0,
-      })),
+    () => blocks.map((block) => ({ label: block.label || "Unassigned block", count: block.count || 0, totalValue: block.totalValue || 0 })),
     [blocks]
   );
 
   const propertyTypeRows = useMemo(
-    () =>
-      buildBreakdown(
-        properties,
-        (property) => property.property_type || inferPortfolioClass(property),
-        (property) => property.sum_insured
-      ),
+    () => buildBreakdown(properties, (property) => property.property_type || inferPortfolioClass(property), (property) => property.sum_insured),
     [properties]
   );
 
@@ -1046,16 +896,12 @@ export default function PortfolioDashboard({
 
     if (selectedProperty) {
       const matchingProperty = properties.find((p) => sameProperty(p, selectedProperty));
-      if (!matchingProperty) {
-        setSelectedProperty(null);
-      }
+      if (!matchingProperty) setSelectedProperty(null);
     }
 
     if (selectedBlock) {
       const matchingBlock = blocks.find((b) => sameBlock(b, selectedBlock));
-      if (!matchingBlock) {
-        setSelectedBlock(null);
-      }
+      if (!matchingBlock) setSelectedBlock(null);
     }
   }, [properties, blocks, selectedProperty, selectedBlock]);
 
@@ -1066,35 +912,34 @@ export default function PortfolioDashboard({
 
   const resolvedSelectedBlock = useMemo(() => {
     if (resolvedSelectedProperty) {
-      return (
-        blocks.find((block) =>
-          block.properties.some((p) => sameProperty(p, resolvedSelectedProperty))
-        ) || null
-      );
+      return blocks.find((block) => block.properties.some((p) => sameProperty(p, resolvedSelectedProperty))) || null;
     }
-
     if (!selectedBlock) return null;
     return blocks.find((b) => sameBlock(b, selectedBlock)) || null;
   }, [blocks, selectedBlock, resolvedSelectedProperty]);
 
   const selectedBlockId = resolvedSelectedBlock?.id ?? null;
-
-  const avgReadiness = ingestionSummary?.avgReadiness ?? 0;
-  const uprnMatchPct = ingestionSummary?.uprnMatchPct ?? 0;
-  const addrCompletenessPct = ingestionSummary?.addrCompletenessPct ?? 0;
   const geoCompletenessPct = ingestionSummary?.geoCompletenessPct ?? 0;
-  const sovCompletenessPct = ingestionSummary?.sovCompletenessPct ?? 0;
-
   const highRiseBlocks = blocks.filter((b) => Number(b.maxHeight) > 18).length;
-  const amberBlocks = blocks.filter(
-    (b) => Number(b.maxHeight) > 11 && Number(b.maxHeight) <= 18
-  ).length;
-
+  const amberBlocks = blocks.filter((b) => Number(b.maxHeight) > 11 && Number(b.maxHeight) <= 18).length;
   const mappedBlocksCount = blocks.filter((b) => b.hasValidCoords).length;
-  const blocksWithFireDocs = blocks.filter((b) => b.latest_fra || b.latest_fraew).length;
-  const redFireRiskCount = properties.filter(
-    (p) => riskBandFromFireDocs(p) === "Red"
-  ).length;
+
+  const fireRiskCounts = useMemo(() => {
+    return blocks.reduce(
+      (acc, block) => {
+        const docs = [block.latest_fra, block.latest_fraew].filter(Boolean);
+        const hasRed = docs.some((doc) => getFireRiskBand(doc) === "Red");
+        const hasAmber = docs.some((doc) => getFireRiskBand(doc) === "Amber");
+        const hasGreen = docs.some((doc) => getFireRiskBand(doc) === "Green");
+        if (hasRed) acc.red += 1;
+        else if (hasAmber) acc.amber += 1;
+        else if (hasGreen) acc.green += 1;
+        else acc.unlinked += 1;
+        return acc;
+      },
+      { red: 0, amber: 0, green: 0, unlinked: 0 }
+    );
+  }, [blocks]);
 
   const handleSelectBlock = (block) => {
     if (!block) {
@@ -1102,11 +947,9 @@ export default function PortfolioDashboard({
       setSelectedProperty(null);
       return;
     }
-
     const matchingBlock = blocks.find((b) => sameBlock(b, block)) || block;
     setSelectedBlock(matchingBlock);
     setSelectedProperty(null);
-    setWorkspaceTab("block-analysis");
   };
 
   const handleSelectProperty = (property) => {
@@ -1114,18 +957,10 @@ export default function PortfolioDashboard({
       setSelectedProperty(null);
       return;
     }
-
-    const matchingProperty =
-      properties.find((p) => sameProperty(p, property)) || property;
+    const matchingProperty = properties.find((p) => sameProperty(p, property)) || property;
     setSelectedProperty(matchingProperty);
-
-    const parentBlock =
-      blocks.find((block) =>
-        block.properties.some((p) => sameProperty(p, matchingProperty))
-      ) || null;
-
+    const parentBlock = blocks.find((block) => block.properties.some((p) => sameProperty(p, matchingProperty))) || null;
     setSelectedBlock(parentBlock);
-    setWorkspaceTab("block-analysis");
   };
 
   const handleClearMapSelection = () => {
@@ -1137,37 +972,19 @@ export default function PortfolioDashboard({
     return (
       <div className="content-wrap">
         <div className="card">
-          <div className="empty-state">
-            No portfolio loaded yet. Upload an SoV file to begin.
-          </div>
+          <div className="empty-state">No portfolio loaded yet. Upload an SoV file to begin.</div>
           <div style={{ marginTop: 16 }}>
-            <button className="btn btn-primary" onClick={onUploadNew}>
-              Upload SoV
-            </button>
+            <button className="btn btn-primary" onClick={() => onUploadNew?.("SOV")}>Upload SoV</button>
           </div>
         </div>
       </div>
     );
   }
 
-  const showOverview = workspaceTab === "overview";
-  const showBlockAnalysis = workspaceTab === "block-analysis";
-
   const hasActiveBlockSelection = Boolean(resolvedSelectedBlock);
   const hasActivePropertySelection = Boolean(resolvedSelectedProperty);
-
-  const overviewMapMode = hasActiveBlockSelection ? "properties" : "blocks";
-  const blockAnalysisMapMode = hasActiveBlockSelection ? "properties" : "blocks";
-
-  const overviewMapProperties =
-    overviewMapMode === "properties"
-      ? resolvedSelectedBlock?.properties || []
-      : properties;
-
-  const blockAnalysisMapProperties =
-    blockAnalysisMapMode === "properties"
-      ? resolvedSelectedBlock?.properties || []
-      : properties;
+  const mapMode = hasActiveBlockSelection ? "properties" : "blocks";
+  const mapProperties = mapMode === "properties" ? resolvedSelectedBlock?.properties || [] : properties;
 
   return (
     <div className="content-wrap">
@@ -1175,72 +992,18 @@ export default function PortfolioDashboard({
         <div>
           <div className="page-title">Portfolio Overview</div>
           <div className="page-sub">
-            Underwriter-focused dashboard using ingested portfolio, enrichment,
-            block grouping, and linked fire-risk PDFs.
+            Underwriter-focused dashboard using ingested portfolio, enrichment, block grouping, fire risk evidence, and map analysis.
           </div>
         </div>
 
-        <div className="actions">
-          <button className="btn" onClick={onUploadNew}>
-            Upload new SoV
-          </button>
-          <button className="btn btn-primary">Flag for review</button>
-        </div>
-      </div>
-
-      <div className="card banner">
-        <div className="banner-left">
-          <div
-            className="pill"
-            style={{
-              background: `${readinessColor(avgReadiness)}22`,
-              color: readinessColor(avgReadiness),
-              border: `1px solid ${readinessColor(avgReadiness)}33`,
-            }}
-          >
-            {bandFromScore(avgReadiness).toUpperCase()}
-          </div>
-
-          <div className="banner-title">Portfolio underwriting snapshot</div>
-
-          <div className="banner-sub">
-            This view shows portfolio value, UPRN confidence, mappable coverage,
-            block spatial analysis, and attached FRA/FRAEW extraction results.
-          </div>
-
-          <div className="banner-actions">
-            <button className="btn btn-primary">Generate action plan</button>
-            <button className="btn">Open evidence summary</button>
-          </div>
-        </div>
-
-        <div className="banner-right">
-          <div className="donut">
-            <div
-              className="donut-ring"
-              style={{
-                background: `conic-gradient(${readinessColor(
-                  avgReadiness
-                )} ${avgReadiness}%, rgba(15,23,42,.10) 0)`,
-              }}
-            />
-            <div className="donut-center">
-              <div className="donut-value">{avgReadiness}</div>
-              <div className="donut-sub">/ 100</div>
-            </div>
-            <div className="donut-caption">
-              <span
-                className="pill"
-                style={{
-                  background: `${readinessColor(avgReadiness)}22`,
-                  color: readinessColor(avgReadiness),
-                }}
-              >
-                {bandFromScore(avgReadiness)}
-              </span>
-              <span className="muted">Portfolio readiness</span>
-            </div>
-          </div>
+        <div className="actions" style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+          {typeof refetchFireDocuments === "function" ? (
+            <button className="btn" onClick={refetchFireDocuments} disabled={fireDocumentsLoading}>
+              {fireDocumentsLoading ? "Refreshing…" : "Refresh fire evidence"}
+            </button>
+          ) : null}
+          <button className="btn" onClick={() => onUploadNew?.("SOV")}>Upload SoV</button>
+          <button className="btn btn-primary" onClick={() => onUploadNew?.("FRA")}>Upload FRA / FRAEW</button>
         </div>
       </div>
 
@@ -1257,265 +1020,117 @@ export default function PortfolioDashboard({
           tone="blue"
         />
         <KpiCard
-          title="UPRN coverage"
-          value={`${uprnMatchPct}%`}
-          subtitle="Matched properties with UPRN present"
-          tone="green"
-        />
-        <KpiCard
-          title="Fire-risk PDFs linked"
-          value={blocksWithFireDocs}
-          subtitle={`${redFireRiskCount} red-risk properties flagged`}
+          title="Fire evidence"
+          value={fireDocuments.length}
+          subtitle={`${fireRiskCounts.red} red · ${fireRiskCounts.amber} amber blocks`}
           tone="amber"
         />
+        <KpiCard
+          title="Mappable coverage"
+          value={`${geoCompletenessPct}%`}
+          subtitle={`${mappedBlocksCount} mapped blocks`}
+          tone="green"
+        />
       </div>
 
-      <div className="card confidence-card">
-        <div className="card-header row-between">
-          <div>
-            <div className="card-title">Confidence & completeness</div>
-            <div className="card-subtitle">
-              Mapped directly from your ingestion utilities and linked document
-              extraction fields.
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "minmax(0, 1fr) minmax(0, 1fr)",
+          gap: 16,
+          alignItems: "stretch",
+        }}
+      >
+        <div style={{ display: "grid", gap: 16 }}>
+          <PortfolioCompositionCard properties={properties} blocks={blocks} />
+
+          <div className="card">
+            <div className="card-header row-between">
+              <div className="card-title">
+                {hasActivePropertySelection
+                  ? "Selected property details"
+                  : hasActiveBlockSelection
+                  ? "Selected block details"
+                  : "Selection details"}
+              </div>
+              <span className="pill pill-muted">
+                {hasActivePropertySelection
+                  ? "Property selected"
+                  : hasActiveBlockSelection
+                  ? "Block selected"
+                  : "None"}
+              </span>
+            </div>
+
+            <div className="details-body" style={{ maxHeight: 420, overflowY: "auto", paddingRight: 6 }}>
+              <PropertyDetails
+                property={resolvedSelectedProperty}
+                selectedBlock={resolvedSelectedBlock}
+                blockMode={!resolvedSelectedProperty}
+              />
             </div>
           </div>
-          <span className="pill pill-muted">Portfolio QA</span>
         </div>
 
-        <div className="bars">
-          <ConfidenceBar
-            label="Addresses & UPRN verification"
-            value={Math.round((addrCompletenessPct + uprnMatchPct) / 2)}
-          />
-          <ConfidenceBar label="Geo coverage" value={geoCompletenessPct} />
-          <ConfidenceBar label="SOV completeness" value={sovCompletenessPct} />
-        </div>
-      </div>
+        <div className="card" style={{ height: "100%" }}>
+          <div className="card-header row-between">
+            <div>
+              <div className="card-title">Block analysis map</div>
+              <div className="card-subtitle">
+                Clustered map view with clear block counts at map level and colour-coded properties once a block is selected.
+              </div>
+            </div>
+            <span className="pill pill-muted">{mappedBlocksCount} mapped blocks</span>
+          </div>
 
-      <WorkspaceTabs activeTab={workspaceTab} onChange={setWorkspaceTab} />
+          <div className="map-wrap">
+            <PortfolioMap
+              properties={mapProperties}
+              blocks={blocks}
+              viewMode={mapMode}
+              selectedBlock={resolvedSelectedBlock}
+              selectedProperty={resolvedSelectedProperty}
+              onSelectBlock={handleSelectBlock}
+              onSelectProperty={handleSelectProperty}
+            />
+          </div>
 
-      {showOverview && (
-        <>
           <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "1fr 1fr",
-              gap: 16,
-            }}
+            className="map-foot"
+            style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center", flexWrap: "wrap" }}
           >
-            <PortfolioCompositionCard properties={properties} blocks={blocks} />
-            <FireRiskOverviewCard blocks={blocks} />
+            <span>
+              {mapMode === "properties"
+                ? "Zoomed into the selected block. Coloured property dots show the property mix inside that block."
+                : "Click a block circle on the map to inspect that block in detail."}
+            </span>
+
+            {hasActiveBlockSelection ? (
+              <button className="btn" onClick={handleClearMapSelection}>Back to blocks</button>
+            ) : null}
           </div>
+        </div>
+      </div>
 
-          <PortfolioAnalysisWindow
-            tenancyRows={tenancyRows}
-            blockRows={blockRows}
-            propertyTypeRows={propertyTypeRows}
-            ageBandRows={ageBandRows}
-          />
+      <FireEvidencePanel
+        fireDocuments={fireDocuments}
+        loading={fireDocumentsLoading}
+        onUploadNew={onUploadNew}
+      />
 
-          <FireDocsPanel
-            latestFireRiskPayload={latestFireRiskPayload}
-            fireDocumentsLoading={fireDocumentsLoading}
-            selectedProperty={resolvedSelectedProperty}
-            selectedBlock={resolvedSelectedBlock}
-          />
+      <PortfolioAnalysisWindow
+        tenancyRows={tenancyRows}
+        blockRows={blockRows}
+        propertyTypeRows={propertyTypeRows}
+        ageBandRows={ageBandRows}
+      />
 
-          <div className="two-col">
-            <div className="card">
-              <div className="card-header row-between">
-                <div>
-                  <div className="card-title">Block analysis map</div>
-                  <div className="card-subtitle">
-                    Clustered map view aligned to the latest feedback style,
-                    with clear block counts at map level and colour-coded
-                    properties once a block is selected.
-                  </div>
-                </div>
-                <span className="pill pill-muted">
-                  {mappedBlocksCount} mapped blocks
-                </span>
-              </div>
-
-              <div className="map-wrap">
-                <PortfolioMap
-                  properties={overviewMapProperties}
-                  blocks={blocks}
-                  viewMode={overviewMapMode}
-                  selectedBlock={resolvedSelectedBlock}
-                  selectedProperty={resolvedSelectedProperty}
-                  onSelectBlock={handleSelectBlock}
-                  onSelectProperty={handleSelectProperty}
-                />
-              </div>
-
-              <div
-                className="map-foot"
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  gap: 12,
-                  alignItems: "center",
-                  flexWrap: "wrap",
-                }}
-              >
-                <span>
-                  {overviewMapMode === "properties"
-                    ? "Zoomed into the selected block. Coloured property dots show the property mix inside that block."
-                    : "Click a block circle on the map to inspect that block in detail."}
-                </span>
-
-                {hasActiveBlockSelection ? (
-                  <button className="btn" onClick={handleClearMapSelection}>
-                    Back to blocks
-                  </button>
-                ) : null}
-              </div>
-            </div>
-
-            <div className="card">
-              <div className="card-header row-between">
-                <div className="card-title">
-                  {hasActivePropertySelection
-                    ? "Selected property details"
-                    : hasActiveBlockSelection
-                    ? "Selected block details"
-                    : "Selection details"}
-                </div>
-                <span className="pill pill-muted">
-                  {hasActivePropertySelection
-                    ? "Property selected"
-                    : hasActiveBlockSelection
-                    ? "Block selected"
-                    : "None"}
-                </span>
-              </div>
-
-              <div
-                className="details-body"
-                style={{
-                  maxHeight: 620,
-                  overflowY: "auto",
-                  paddingRight: 6,
-                }}
-              >
-                <PropertyDetails
-                  property={resolvedSelectedProperty}
-                  selectedBlock={resolvedSelectedBlock}
-                  blockMode={!resolvedSelectedProperty}
-                />
-              </div>
-            </div>
-          </div>
-
-          <DocumentPanel />
-        </>
-      )}
-
-      {showBlockAnalysis && (
-        <>
-          <div className="two-col">
-            <div className="card">
-              <div className="card-header row-between">
-                <div>
-                  <div className="card-title">Block analysis map</div>
-                  <div className="card-subtitle">
-                    Clustered portfolio map with count-led block circles at
-                    outset, then colour-coded properties inside the selected
-                    block.
-                  </div>
-                </div>
-                <span className="pill pill-muted">
-                  {mappedBlocksCount} mapped blocks
-                </span>
-              </div>
-
-              <div className="map-wrap">
-                <PortfolioMap
-                  properties={blockAnalysisMapProperties}
-                  blocks={blocks}
-                  viewMode={blockAnalysisMapMode}
-                  selectedBlock={resolvedSelectedBlock}
-                  selectedProperty={resolvedSelectedProperty}
-                  onSelectBlock={handleSelectBlock}
-                  onSelectProperty={handleSelectProperty}
-                />
-              </div>
-
-              <div
-                className="map-foot"
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  gap: 12,
-                  alignItems: "center",
-                  flexWrap: "wrap",
-                }}
-              >
-                <span>
-                  {blockAnalysisMapMode === "properties"
-                    ? "Zoomed into the selected block. Property membership and coloured property types are shown on the map and in the right-hand panel."
-                    : "Click a block to inspect that block circle. Property membership is shown in the right-hand details panel."}
-                </span>
-
-                {hasActiveBlockSelection ? (
-                  <button className="btn" onClick={handleClearMapSelection}>
-                    Back to blocks
-                  </button>
-                ) : null}
-              </div>
-            </div>
-
-            <div className="card">
-              <div className="card-header row-between">
-                <div className="card-title">
-                  {hasActivePropertySelection
-                    ? "Selected property details"
-                    : hasActiveBlockSelection
-                    ? "Selected block details"
-                    : "Selection details"}
-                </div>
-                <span className="pill pill-muted">
-                  {hasActivePropertySelection
-                    ? "Property selected"
-                    : hasActiveBlockSelection
-                    ? "Block selected"
-                    : "None"}
-                </span>
-              </div>
-
-              <div
-                className="details-body"
-                style={{
-                  maxHeight: 620,
-                  overflowY: "auto",
-                  paddingRight: 6,
-                }}
-              >
-                <PropertyDetails
-                  property={resolvedSelectedProperty}
-                  selectedBlock={resolvedSelectedBlock}
-                  blockMode={!resolvedSelectedProperty}
-                />
-              </div>
-            </div>
-          </div>
-
-          <FireDocsPanel
-            latestFireRiskPayload={latestFireRiskPayload}
-            fireDocumentsLoading={fireDocumentsLoading}
-            selectedProperty={resolvedSelectedProperty}
-            selectedBlock={resolvedSelectedBlock}
-          />
-
-          <BlockListPanel
-            blocks={blocks}
-            selectedBlockId={selectedBlockId}
-            onSelectBlock={handleSelectBlock}
-            selectedProperty={resolvedSelectedProperty}
-          />
-        </>
-      )}
+      <BlockListPanel
+        blocks={blocks}
+        selectedBlockId={selectedBlockId}
+        onSelectBlock={handleSelectBlock}
+        selectedProperty={resolvedSelectedProperty}
+      />
     </div>
   );
 }

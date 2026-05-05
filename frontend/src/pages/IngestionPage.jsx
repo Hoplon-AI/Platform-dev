@@ -2,7 +2,11 @@ import React, { useCallback, useMemo, useRef, useState } from "react";
 
 function StepCard({ number, title, subtitle, state = "upcoming" }) {
   return (
-    <div className={`step ${state === "active" ? "step-active" : ""} ${state === "done" ? "step-done" : ""}`}>
+    <div
+      className={`step ${state === "active" ? "step-active" : ""} ${
+        state === "done" ? "step-done" : ""
+      }`}
+    >
       <div className="step-dot">{number}</div>
       <div className="step-meta">
         <div className="step-title">{title}</div>
@@ -30,18 +34,83 @@ function ChecklistItem({ children }) {
   );
 }
 
+const DOCUMENT_COPY = {
+  sov: {
+    kicker: "Portfolio ingestion",
+    title: "Upload your portfolio data",
+    subtitle:
+      "Upload the SoV, let the API ingest it, then move directly into portfolio and block analysis.",
+    cardTitle: "Upload SoV",
+    cardSubtitle:
+      "Drag and drop a schedule of values file, or browse from your computer.",
+    pill: "Excel / CSV",
+    accept: ".csv,.xlsx,.xls",
+    dropTitle: "Drag & drop your SoV file here",
+    dropSub: "or click to browse from your computer",
+    supported: "Supported: Excel (.xlsx / .xls) and CSV",
+    readyLabel: "Portfolio loaded",
+  },
+  pdf: {
+    kicker: "Fire risk evidence ingestion",
+    title: "Upload FRA / FRAEW evidence",
+    subtitle:
+      "Upload fire risk evidence separately from the SoV. The backend extracts FRA / FRAEW fields and links them to the selected block or property.",
+    cardTitle: "Upload FRA / FRAEW PDF",
+    cardSubtitle:
+      "Drag and drop a fire risk PDF, or browse from your computer.",
+    pill: "PDF",
+    accept: ".pdf,application/pdf",
+    dropTitle: "Drag & drop your FRA / FRAEW PDF here",
+    dropSub: "or click to browse from your computer",
+    supported: "Supported: PDF only",
+    readyLabel: "PDF extracted",
+  },
+};
+
 export default function IngestionPage({
   onFilesSelected,
   pipelineStep,
   ingestionSummary,
   uploadError,
   isUploading,
+  uploadMode = "sov",
+  pdfDocumentType = "fra",
+  onPdfDocumentTypeChange,
+  selectedBlockReference = "",
+  onSelectedBlockReferenceChange,
+  selectedPropertyId = "",
+  onSelectedPropertyIdChange,
+  latestFireRiskPayload = null,
 }) {
   const inputRef = useRef(null);
   const [dragActive, setDragActive] = useState(false);
 
-  const steps = useMemo(
-    () => [
+  const isPdfMode = uploadMode === "pdf" || uploadMode === "fire";
+  const modeKey = isPdfMode ? "pdf" : "sov";
+  const copy = DOCUMENT_COPY[modeKey];
+
+  const steps = useMemo(() => {
+    if (isPdfMode) {
+      return [
+        {
+          n: 1,
+          title: "Upload evidence",
+          sub: "Submit FRA / FRAEW PDF",
+        },
+        {
+          n: 2,
+          title: "Backend extraction",
+          sub: "Extract risk fields from PDF",
+        },
+        {
+          n: 3,
+          title: "Dashboard linkage",
+          sub: "Patch linked block / property",
+        },
+      ];
+    }
+
+    return [
       {
         n: 1,
         title: "Upload portfolio",
@@ -57,9 +126,10 @@ export default function IngestionPage({
         title: "Portfolio overview",
         sub: "Map, blocks, and review",
       },
-    ],
-    []
-  );
+    ];
+  }, [isPdfMode]);
+
+  const hasCompletedUpload = isPdfMode ? Boolean(latestFireRiskPayload) : Boolean(ingestionSummary);
 
   const pickFiles = () => {
     if (!isUploading) inputRef.current?.click();
@@ -79,12 +149,14 @@ export default function IngestionPage({
       event.stopPropagation();
       setDragActive(false);
 
+      if (isUploading) return;
+
       const files = event.dataTransfer?.files;
       if (files && files.length) {
         onFilesSelected?.(files);
       }
     },
-    [onFilesSelected]
+    [isUploading, onFilesSelected]
   );
 
   const onDrag = (event) => {
@@ -101,51 +173,132 @@ export default function IngestionPage({
     }
   };
 
+  const latestPdfType =
+    latestFireRiskPayload?.document_type?.toUpperCase?.() ||
+    pdfDocumentType?.toUpperCase?.() ||
+    "PDF";
+
   return (
     <div className="page pad-xl">
       <div className="ingestion-shell">
         <div className="ingestion-head">
-          <div className="ingestion-kicker">Portfolio ingestion</div>
-          <h1 className="ingestion-title">Upload your portfolio data</h1>
-          <p className="ingestion-subtitle">
-            Keep the same workflow, but align the experience to the backend:
-            upload the SoV, let the API ingest it, then move directly into
-            portfolio and block analysis.
-          </p>
+          <div className="ingestion-kicker">{copy.kicker}</div>
+          <h1 className="ingestion-title">{copy.title}</h1>
+          <p className="ingestion-subtitle">{copy.subtitle}</p>
           <div className="ingestion-head-tags">
-            <span className="pill pill-soft">CSV</span>
-            <span className="pill pill-soft">XLSX</span>
-            <span className="pill pill-soft">Backend-connected</span>
+            {isPdfMode ? (
+              <>
+                <span className="pill pill-soft">FRA</span>
+                <span className="pill pill-soft">FRAEW</span>
+                <span className="pill pill-soft">PDF extraction</span>
+              </>
+            ) : (
+              <>
+                <span className="pill pill-soft">CSV</span>
+                <span className="pill pill-soft">XLSX</span>
+                <span className="pill pill-soft">Backend-connected</span>
+              </>
+            )}
           </div>
         </div>
 
         <div className="stepper">
-          <StepCard number={1} title={steps[0].title} subtitle={steps[0].sub} state="active" />
-          <StepCard number={2} title={steps[1].title} subtitle={steps[1].sub} state={isUploading ? "active" : "upcoming"} />
+          <StepCard
+            number={1}
+            title={steps[0].title}
+            subtitle={steps[0].sub}
+            state={isUploading ? "done" : "active"}
+          />
+          <StepCard
+            number={2}
+            title={steps[1].title}
+            subtitle={steps[1].sub}
+            state={isUploading ? "active" : hasCompletedUpload ? "done" : "upcoming"}
+          />
           <StepCard
             number={3}
             title={steps[2].title}
             subtitle={steps[2].sub}
-            state={ingestionSummary ? "done" : "upcoming"}
+            state={hasCompletedUpload ? "done" : "upcoming"}
           />
         </div>
 
         <div className="card card-lg ingestion-main-card">
           <div className="card-header row-between">
             <div>
-              <div className="card-title">Upload SoV</div>
-              <div className="card-subtitle">
-                Drag and drop a schedule of values file, or browse from your computer.
-              </div>
+              <div className="card-title">{copy.cardTitle}</div>
+              <div className="card-subtitle">{copy.cardSubtitle}</div>
             </div>
-            <span className="pill pill-muted">Excel / CSV</span>
+            <span className="pill pill-muted">{copy.pill}</span>
           </div>
 
           <div className="card-body">
+            {isPdfMode ? (
+              <div
+                className="card card-soft"
+                style={{ marginBottom: 16, border: "1px solid rgba(124,58,237,0.18)" }}
+              >
+                <div className="card-body">
+                  <div className="mini-title">PDF linkage</div>
+                  <div
+                    style={{
+                      display: "grid",
+                      gridTemplateColumns: "180px minmax(0, 1fr) minmax(0, 1fr)",
+                      gap: 12,
+                      alignItems: "end",
+                      marginTop: 10,
+                    }}
+                  >
+                    <label style={{ display: "grid", gap: 6, fontWeight: 700 }}>
+                      Document type
+                      <select
+                        className="input"
+                        value={pdfDocumentType}
+                        disabled={isUploading}
+                        onChange={(event) => onPdfDocumentTypeChange?.(event.target.value)}
+                      >
+                        <option value="fra">FRA</option>
+                        <option value="fraew">FRAEW</option>
+                      </select>
+                    </label>
+
+                    <label style={{ display: "grid", gap: 6, fontWeight: 700 }}>
+                      Block reference
+                      <input
+                        className="input"
+                        value={selectedBlockReference}
+                        disabled={isUploading}
+                        onChange={(event) =>
+                          onSelectedBlockReferenceChange?.(event.target.value)
+                        }
+                        placeholder="Example: Block A / 02BR"
+                      />
+                    </label>
+
+                    <label style={{ display: "grid", gap: 6, fontWeight: 700 }}>
+                      Property ID / UPRN
+                      <input
+                        className="input"
+                        value={selectedPropertyId}
+                        disabled={isUploading}
+                        onChange={(event) => onSelectedPropertyIdChange?.(event.target.value)}
+                        placeholder="Optional direct property linkage"
+                      />
+                    </label>
+                  </div>
+
+                  <div className="mini-muted" style={{ marginTop: 10 }}>
+                    The backend endpoint expects document_type=fra or document_type=fraew as a query parameter.
+                    Block reference and property ID are optional linkage hints.
+                  </div>
+                </div>
+              </div>
+            ) : null}
+
             <input
               ref={inputRef}
               type="file"
-              accept=".csv,.xlsx,.xls"
+              accept={copy.accept}
               onChange={handleInput}
               style={{ display: "none" }}
             />
@@ -168,10 +321,8 @@ export default function IngestionPage({
                 <div className="dropzone-icon">⤒</div>
 
                 <div className="dropzone-text">
-                  <div className="dropzone-title">Drag &amp; drop your file here</div>
-                  <div className="dropzone-sub">
-                    or click to browse from your computer
-                  </div>
+                  <div className="dropzone-title">{copy.dropTitle}</div>
+                  <div className="dropzone-sub">{copy.dropSub}</div>
                 </div>
 
                 <div className="dropzone-actions">
@@ -189,9 +340,7 @@ export default function IngestionPage({
                 </div>
               </div>
 
-              <div className="dropzone-foot">
-                Supported: Excel (.xlsx / .xls) and CSV
-              </div>
+              <div className="dropzone-foot">{copy.supported}</div>
             </div>
 
             {uploadError ? (
@@ -203,12 +352,25 @@ export default function IngestionPage({
             <div className="ingestion-grid">
               <div className="card card-soft">
                 <div className="card-body">
-                  <div className="mini-title">Best results when your SoV includes</div>
+                  <div className="mini-title">
+                    {isPdfMode ? "Best results when PDFs include" : "Best results when your SoV includes"}
+                  </div>
                   <ul className="mini-list">
-                    <ChecklistItem>address line, town / city, and postcode</ChecklistItem>
-                    <ChecklistItem>sum insured and property type</ChecklistItem>
-                    <ChecklistItem>height / storeys where available</ChecklistItem>
-                    <ChecklistItem>UPRN or block reference if you already have it</ChecklistItem>
+                    {isPdfMode ? (
+                      <>
+                        <ChecklistItem>clear assessment date and assessor details</ChecklistItem>
+                        <ChecklistItem>overall FRA / FRAEW risk rating</ChecklistItem>
+                        <ChecklistItem>significant findings and required actions</ChecklistItem>
+                        <ChecklistItem>block reference, property ID, address, or UPRN where available</ChecklistItem>
+                      </>
+                    ) : (
+                      <>
+                        <ChecklistItem>address line, town / city, and postcode</ChecklistItem>
+                        <ChecklistItem>sum insured and property type</ChecklistItem>
+                        <ChecklistItem>height / storeys where available</ChecklistItem>
+                        <ChecklistItem>UPRN or block reference if you already have it</ChecklistItem>
+                      </>
+                    )}
                   </ul>
                 </div>
               </div>
@@ -222,16 +384,12 @@ export default function IngestionPage({
                       className={`pill ${
                         isUploading
                           ? "pill-warn"
-                          : ingestionSummary
+                          : hasCompletedUpload
                           ? "pill-good"
                           : "pill-muted"
                       }`}
                     >
-                      {isUploading
-                        ? "Processing"
-                        : ingestionSummary
-                        ? "Ready"
-                        : "Waiting"}
+                      {isUploading ? "Processing" : hasCompletedUpload ? "Ready" : "Waiting"}
                     </span>
 
                     <span className="pipeline-step">
@@ -240,8 +398,9 @@ export default function IngestionPage({
                   </div>
 
                   <div className="mini-muted">
-                    The backend validates format, normalizes fields, writes the
-                    ingested rows, and prepares the portfolio dashboard.
+                    {isPdfMode
+                      ? "The backend validates the PDF, extracts text, calls the FRA/FRAEW processor, and returns a fire_risk_payload for dashboard linkage."
+                      : "The backend validates format, normalizes fields, writes the ingested rows, and prepares the portfolio dashboard."}
                   </div>
                 </div>
               </div>
@@ -249,13 +408,54 @@ export default function IngestionPage({
 
             <div className="section">
               <div className="section-head">
-                <div className="section-title">Upload summary</div>
-                {ingestionSummary ? (
-                  <span className="pill pill-good">Portfolio loaded</span>
+                <div className="section-title">
+                  {isPdfMode ? "PDF extraction summary" : "Upload summary"}
+                </div>
+                {hasCompletedUpload ? (
+                  <span className="pill pill-good">{copy.readyLabel}</span>
                 ) : null}
               </div>
 
-              {!ingestionSummary ? (
+              {isPdfMode ? (
+                !latestFireRiskPayload ? (
+                  <div className="mini-muted">
+                    Upload a FRA / FRAEW PDF to see the extracted fire risk payload and linkage status.
+                  </div>
+                ) : (
+                  <div className="summary-grid">
+                    <SummaryTile label="Document" value={latestPdfType} />
+                    <SummaryTile label="Upload ID" value={latestFireRiskPayload.upload_id || "—"} wide />
+                    <SummaryTile label="Feature ID" value={latestFireRiskPayload.feature_id || "—"} />
+                    <SummaryTile label="Block ID" value={latestFireRiskPayload.block_id || "—"} />
+                    <SummaryTile label="Property ID" value={latestFireRiskPayload.property_id || "—"} />
+                    <SummaryTile
+                      label="FRA risk"
+                      value={
+                        latestFireRiskPayload.fra?.risk_level ||
+                        latestFireRiskPayload.fra?.raw_rating ||
+                        "—"
+                      }
+                    />
+                    <SummaryTile
+                      label="FRAEW risk"
+                      value={
+                        latestFireRiskPayload.fraew?.risk_level ||
+                        latestFireRiskPayload.fraew?.raw_rating ||
+                        "—"
+                      }
+                    />
+                    <SummaryTile
+                      label="Errors"
+                      value={
+                        Array.isArray(latestFireRiskPayload.extraction_errors) &&
+                        latestFireRiskPayload.extraction_errors.length
+                          ? latestFireRiskPayload.extraction_errors.length
+                          : "None"
+                      }
+                    />
+                  </div>
+                )
+              ) : !ingestionSummary ? (
                 <div className="mini-muted">
                   Upload a file to generate a summary of rows, mappable properties,
                   readiness, and UPRN coverage before you move to the dashboard.
@@ -284,11 +484,12 @@ export default function IngestionPage({
                     />
                     <SummaryTile
                       label="Total insured value"
-                      value={`£${Number(
-                        ingestionSummary.totalValue || 0
-                      ).toLocaleString(undefined, {
-                        maximumFractionDigits: 0,
-                      })}`}
+                      value={`£${Number(ingestionSummary.totalValue || 0).toLocaleString(
+                        undefined,
+                        {
+                          maximumFractionDigits: 0,
+                        }
+                      )}`}
                     />
                   </div>
 
@@ -301,23 +502,35 @@ export default function IngestionPage({
 
             <div className="feature-row">
               <div className="feature">
-                <div className="feature-title">Backend-led ingestion</div>
+                <div className="feature-title">
+                  {isPdfMode ? "PDF-specific pipeline" : "Backend-led ingestion"}
+                </div>
                 <div className="feature-sub">
-                  The frontend now follows the backend contract rather than relying on local-only parsing.
+                  {isPdfMode
+                    ? "FRA and FRAEW uploads use the backend PDF extraction route, not the SoV spreadsheet path."
+                    : "The frontend now follows the backend contract rather than relying on local-only parsing."}
                 </div>
               </div>
 
               <div className="feature">
-                <div className="feature-title">Portfolio-first flow</div>
+                <div className="feature-title">
+                  {isPdfMode ? "Block/property linkage" : "Portfolio-first flow"}
+                </div>
                 <div className="feature-sub">
-                  Uploading is the entry point into block analysis, mapping, and underwriting review.
+                  {isPdfMode
+                    ? "Provide a block reference or property ID so the dashboard can patch the extracted risk evidence into the current portfolio."
+                    : "Uploading is the entry point into block analysis, mapping, and underwriting review."}
                 </div>
               </div>
 
               <div className="feature">
-                <div className="feature-title">Geo-ready model</div>
+                <div className="feature-title">
+                  {isPdfMode ? "Dashboard-ready evidence" : "Geo-ready model"}
+                </div>
                 <div className="feature-sub">
-                  The dashboard can consume UPRN, block, coordinate, and enrichment fields as they arrive.
+                  {isPdfMode
+                    ? "Returned FRA / FRAEW fields are shown in evidence summaries, block rows, and property details."
+                    : "The dashboard can consume UPRN, block, coordinate, and enrichment fields as they arrive."}
                 </div>
               </div>
             </div>
@@ -325,8 +538,9 @@ export default function IngestionPage({
         </div>
 
         <div className="mini-muted" style={{ marginTop: 10 }}>
-          Tip: keep your SoV columns clear and consistent. The backend can normalize aliases,
-          but cleaner data produces better portfolio and geo analysis.
+          {isPdfMode
+            ? "Tip: upload the SoV first, then upload FRA/FRAEW PDFs so evidence can be linked to known blocks and properties."
+            : "Tip: keep your SoV columns clear and consistent. The backend can normalize aliases, but cleaner data produces better portfolio and geo analysis."}
         </div>
       </div>
     </div>

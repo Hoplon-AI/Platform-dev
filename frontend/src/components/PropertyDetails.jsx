@@ -26,7 +26,21 @@ const isPresent = (value) => {
   if (typeof value === "string") return value.trim().length > 0;
   if (typeof value === "number") return Number.isFinite(value);
   if (typeof value === "boolean") return true;
+  if (Array.isArray(value)) return value.length > 0;
   return true;
+};
+
+const asArray = (value) => {
+  if (!value) return [];
+  if (Array.isArray(value)) return value.filter(Boolean);
+  if (typeof value === "string") return value.trim() ? [value.trim()] : [];
+  return [value];
+};
+
+const truncate = (value, maxLength = 140) => {
+  const text = String(value ?? "").trim();
+  if (!text) return "—";
+  return text.length > maxLength ? `${text.slice(0, maxLength)}…` : text;
 };
 
 const bandMeta = (bandOrScore) => {
@@ -35,6 +49,7 @@ const bandMeta = (bandOrScore) => {
   if (
     text.includes("green") ||
     text.includes("low risk") ||
+    text.includes("low") ||
     text.includes("acceptable") ||
     text.includes("broadly acceptable")
   ) {
@@ -42,6 +57,7 @@ const bandMeta = (bandOrScore) => {
   }
   if (
     text.includes("amber") ||
+    text.includes("yellow") ||
     text.includes("medium") ||
     text.includes("moderate") ||
     text.includes("tolerable")
@@ -51,6 +67,7 @@ const bandMeta = (bandOrScore) => {
   if (
     text.includes("red") ||
     text.includes("high risk") ||
+    text.includes("high") ||
     text.includes("intolerable") ||
     text.includes("not acceptable")
   ) {
@@ -170,40 +187,106 @@ const getSovValues = (property) => {
   };
 };
 
-const getFireAssessment = (source) => {
-  const fra =
-    source?.latest_fra ??
-    source?.fire_documents?.fra ??
-    source?.fra ??
-    null;
+const normaliseFireDoc = (doc, type) => {
+  if (!doc) return null;
 
-  const fraew =
+  const raw = doc.raw && typeof doc.raw === "object" ? doc.raw : {};
+  const merged = { ...raw, ...doc };
+
+  return {
+    ...merged,
+    document_type: String(merged.document_type ?? type ?? "").toUpperCase(),
+    risk_level:
+      merged.risk_level ??
+      merged.rag_status ??
+      merged.raw_rating ??
+      merged.overall_risk_rating ??
+      merged.risk_rating ??
+      merged.external_wall_risk ??
+      merged.building_risk_rating ??
+      null,
+    summary:
+      merged.summary ??
+      merged.executive_summary ??
+      merged.overview ??
+      merged.findings_summary ??
+      merged.significant_findings_summary ??
+      "",
+    recommendations:
+      merged.recommendations ??
+      merged.actions ??
+      merged.action_items ??
+      merged.remedial_actions ??
+      merged.significant_findings ??
+      [],
+    feature_id: merged.feature_id ?? merged.id ?? merged.document_id ?? null,
+    upload_id: merged.upload_id ?? null,
+    filename: merged.filename ?? merged.source_filename ?? "Uploaded PDF",
+  };
+};
+
+const getFireAssessment = (source) => {
+  const fra = normaliseFireDoc(
+    source?.latest_fra ??
+      source?.fire_documents?.fra ??
+      source?.fire_documents?.FRA ??
+      source?.fra ??
+      null,
+    "FRA"
+  );
+
+  const fraew = normaliseFireDoc(
     source?.latest_fraew ??
-    source?.fire_documents?.fraew ??
-    source?.fraew ??
-    null;
+      source?.fire_documents?.fraew ??
+      source?.fire_documents?.FRAEW ??
+      source?.fraew ??
+      null,
+    "FRAEW"
+  );
+
+  const all = [
+    ...asArray(source?.fire_documents?.all),
+    ...asArray(source?.fire_documents?.documents),
+    ...asArray(source?.fire_documents),
+  ]
+    .filter((item) => typeof item === "object" && item !== null)
+    .map((item) => normaliseFireDoc(item, item.document_type));
 
   return {
     fra,
     fraew,
-    hasAny: Boolean(fra || fraew),
+    all,
+    hasAny: Boolean(fra || fraew || all.length),
   };
 };
 
 const normaliseBooleanLabel = (value, yes = "Yes", no = "No") => {
   if (value === true) return yes;
   if (value === false) return no;
+  if (typeof value === "string") {
+    const lower = value.trim().toLowerCase();
+    if (["true", "yes", "y", "1", "required", "present"].includes(lower)) return yes;
+    if (["false", "no", "n", "0", "not required", "absent"].includes(lower)) return no;
+  }
   return "—";
 };
 
 const normaliseFraActions = (fra) => {
+  const actions = asArray(fra?.recommendations ?? fra?.actions ?? fra?.action_items);
+
   return {
-    total: fra?.total_actions ?? fra?.total_action_count ?? "—",
+    total: fra?.total_actions ?? fra?.total_action_count ?? (actions.length || "—"),
     overdue: fra?.overdue_actions ?? fra?.overdue_action_count ?? "—",
     outstanding:
       fra?.outstanding_actions ?? fra?.outstanding_action_count ?? "—",
+    items: actions,
   };
 };
+
+const getFraewHeight = (fraew) =>
+  toNumberOrNull(fraew?.building_height_m) ??
+  toNumberOrNull(fraew?.building_height) ??
+  toNumberOrNull(fraew?.height_m);
 
 /* ========================= UI COMPONENTS ========================= */
 
@@ -224,6 +307,21 @@ function KeyValueCard({ label, value }) {
   );
 }
 
+function BulletList({ items, max = 5 }) {
+  const safeItems = asArray(items);
+  if (!safeItems.length) return null;
+
+  return (
+    <ul style={{ margin: "8px 0 0 18px", padding: 0 }}>
+      {safeItems.slice(0, max).map((item, index) => (
+        <li key={`${String(item).slice(0, 20)}-${index}`} style={{ marginBottom: 4 }}>
+          {truncate(item, 180)}
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 function FireRiskSection({
   fra,
   fraew,
@@ -236,6 +334,10 @@ function FireRiskSection({
     fraew?.risk_level ?? fraew?.rag_status ?? fraew?.raw_rating
   );
   const fraActions = normaliseFraActions(fra);
+  const fraewRecommendations = asArray(
+    fraew?.recommendations ?? fraew?.actions ?? fraew?.remedial_actions
+  );
+  const fraewHeight = getFraewHeight(fraew);
 
   return (
     <div className="details-block">
@@ -270,6 +372,11 @@ function FireRiskSection({
               >
                 <span className={`pill ${fraMeta.cls}`}>{fraMeta.label}</span>
                 <span className="pill pill-muted">FRA</span>
+                {fra.extraction_confidence ? (
+                  <span className="pill pill-muted">
+                    confidence {fmt(fra.extraction_confidence, 2)}
+                  </span>
+                ) : null}
               </div>
 
               <DetailRow
@@ -278,16 +385,43 @@ function FireRiskSection({
               />
               <DetailRow label="Assessment date" value={fra?.assessment_date} />
               <DetailRow label="Valid until" value={fra?.assessment_valid_until} />
+              <DetailRow label="Next review" value={fra?.next_review_date} />
               <DetailRow
                 label="In date"
                 value={normaliseBooleanLabel(fra?.is_in_date)}
               />
               <DetailRow label="Assessor" value={fra?.assessor_name} />
               <DetailRow label="Company" value={fra?.assessor_company} />
+              <DetailRow label="Responsible person" value={fra?.responsible_person} />
               <DetailRow label="Evacuation" value={fra?.evacuation_strategy} />
+              <DetailRow label="Fire doors" value={normaliseBooleanLabel(fra?.fire_doors)} />
+              <DetailRow
+                label="Compartmentation"
+                value={normaliseBooleanLabel(fra?.compartmentation)}
+              />
+              <DetailRow
+                label="Fire alarm"
+                value={normaliseBooleanLabel(fra?.fire_alarm_system)}
+              />
+              <DetailRow
+                label="Smoke detection"
+                value={normaliseBooleanLabel(fra?.smoke_detection)}
+              />
+              <DetailRow
+                label="Sprinklers"
+                value={normaliseBooleanLabel(fra?.sprinkler_system)}
+              />
               <DetailRow label="Total actions" value={fraActions.total} />
               <DetailRow label="Overdue actions" value={fraActions.overdue} />
               <DetailRow label="Outstanding actions" value={fraActions.outstanding} />
+
+              {fra.summary ? (
+                <div className="details-sub" style={{ marginTop: 10 }}>
+                  <b>Summary:</b> {truncate(fra.summary, 240)}
+                </div>
+              ) : null}
+
+              <BulletList items={fraActions.items} />
             </div>
           )}
 
@@ -311,11 +445,20 @@ function FireRiskSection({
               >
                 <span className={`pill ${fraewMeta.cls}`}>{fraewMeta.label}</span>
                 <span className="pill pill-muted">FRAEW</span>
+                {fraew.extraction_confidence ? (
+                  <span className="pill pill-muted">
+                    confidence {fmt(fraew.extraction_confidence, 2)}
+                  </span>
+                ) : null}
               </div>
 
               <DetailRow
                 label="Risk"
                 value={fraew?.risk_level ?? fraew?.rag_status ?? fraew?.raw_rating}
+              />
+              <DetailRow
+                label="External wall risk"
+                value={fraew?.external_wall_risk ?? fraew?.building_risk_rating}
               />
               <DetailRow label="Assessment date" value={fraew?.assessment_date} />
               <DetailRow label="Valid until" value={fraew?.assessment_valid_until} />
@@ -325,12 +468,13 @@ function FireRiskSection({
               />
               <DetailRow
                 label="Height"
-                value={
-                  Number.isFinite(Number(fraew?.building_height_m))
-                    ? `${Number(fraew.building_height_m).toFixed(1)} m`
-                    : "—"
-                }
+                value={Number.isFinite(fraewHeight) ? `${fmt(fraewHeight, 1)} m` : "—"}
               />
+              <DetailRow label="Height category" value={fraew?.building_height_category} />
+              <DetailRow label="Storeys" value={fraew?.num_storeys} />
+              <DetailRow label="Units" value={fraew?.num_units} />
+              <DetailRow label="Cladding type" value={fraew?.cladding_type} />
+              <DetailRow label="Wall types" value={asArray(fraew?.wall_types).join(", ")} />
               <DetailRow
                 label="Combustible cladding"
                 value={normaliseBooleanLabel(
@@ -338,9 +482,14 @@ function FireRiskSection({
                 )}
               />
               <DetailRow
+                label="Cavity barriers"
+                value={normaliseBooleanLabel(fraew?.cavity_barriers_present)}
+              />
+              <DetailRow
                 label="PAS 9980 compliant"
                 value={normaliseBooleanLabel(fraew?.pas_9980_compliant)}
               />
+              <DetailRow label="PAS 9980 version" value={fraew?.pas_9980_version} />
               <DetailRow
                 label="Interim measures"
                 value={normaliseBooleanLabel(
@@ -349,12 +498,25 @@ function FireRiskSection({
                   "Not required"
                 )}
               />
+              <DetailRow label="Interim detail" value={fraew?.interim_measures_detail} />
               <DetailRow
                 label="Remediation required"
                 value={normaliseBooleanLabel(
                   fraew?.remediation_required ?? fraew?.has_remedial_actions
                 )}
               />
+              <DetailRow label="Evacuation" value={fraew?.evacuation_strategy} />
+              <DetailRow label="Dry riser" value={normaliseBooleanLabel(fraew?.dry_riser_present)} />
+              <DetailRow label="Wet riser" value={normaliseBooleanLabel(fraew?.wet_riser_present)} />
+              <DetailRow label="ADB compliant" value={fraew?.adb_compliant} />
+
+              {fraew.summary ? (
+                <div className="details-sub" style={{ marginTop: 10 }}>
+                  <b>Summary:</b> {truncate(fraew.summary, 240)}
+                </div>
+              ) : null}
+
+              <BulletList items={fraewRecommendations} />
             </div>
           )}
         </div>
@@ -388,21 +550,31 @@ function BlockPropertiesTable({ properties = [] }) {
               <th>Property</th>
               <th>UPRN</th>
               <th>Value</th>
+              <th>FRA</th>
+              <th>FRAEW</th>
             </tr>
           </thead>
           <tbody>
-            {properties.map((item, index) => (
-              <tr key={item.id || item.property_id || item.uprn || index}>
-                <td>
-                  {item.address_line_1 ||
-                    item.property_reference ||
-                    item.id ||
-                    `Property ${index + 1}`}
-                </td>
-                <td>{item.uprn || "—"}</td>
-                <td>{fmtMoney(item.sum_insured)}</td>
-              </tr>
-            ))}
+            {properties.map((item, index) => {
+              const fire = getFireAssessment(item);
+              const fraMeta = bandMeta(fire.fra?.risk_level);
+              const fraewMeta = bandMeta(fire.fraew?.risk_level);
+
+              return (
+                <tr key={item.id || item.property_id || item.uprn || index}>
+                  <td>
+                    {item.address_line_1 ||
+                      item.property_reference ||
+                      item.id ||
+                      `Property ${index + 1}`}
+                  </td>
+                  <td>{item.uprn || "—"}</td>
+                  <td>{fmtMoney(item.sum_insured)}</td>
+                  <td>{fire.fra ? <span className={`pill ${fraMeta.cls}`}>{fraMeta.label}</span> : "—"}</td>
+                  <td>{fire.fraew ? <span className={`pill ${fraewMeta.cls}`}>{fraewMeta.label}</span> : "—"}</td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>
@@ -449,6 +621,7 @@ export default function PropertyDetails({
           </div>
 
           <DetailRow label="Block reference" value={selectedBlock.block_reference} />
+          <DetailRow label="Block ID" value={selectedBlock.block_id ?? selectedBlock.id} />
           <DetailRow label="Parent UPRN" value={selectedBlock.parent_uprn} />
           <DetailRow
             label="Properties"
@@ -531,6 +704,7 @@ export default function PropertyDetails({
           label="Property ref"
           value={property?.property_reference ?? property?.propertyReference ?? property?.id}
         />
+        <DetailRow label="Property ID" value={property?.property_id ?? property?.propertyId} />
         <DetailRow label="UPRN" value={property?.uprn ?? property?.UPRN} />
         <DetailRow label="Parent UPRN" value={property?.parent_uprn} />
         <DetailRow

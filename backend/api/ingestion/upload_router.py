@@ -56,6 +56,15 @@ detector = FileTypeDetector()
 middleware = TenantMiddleware()
 
 
+# Groq free/on-demand tiers can reject large prompts. Keep local PDF extraction
+# bounded before sending text into FRA/FRAEW processors. Override in backend/.env
+# if you move to a higher-token model/tier.
+# Keep this conservative because the processors add their own prompt/schema text.
+PDF_LLM_MAX_CHARS = int(os.getenv("PDF_LLM_MAX_CHARS", "7000"))
+PDF_LLM_HEAD_CHARS = int(os.getenv("PDF_LLM_HEAD_CHARS", "5000"))
+PDF_LLM_TAIL_CHARS = int(os.getenv("PDF_LLM_TAIL_CHARS", "2000"))
+
+
 def _is_true_env(name: str, default: str = "false") -> bool:
     return os.getenv(name, default).lower() == "true"
 
@@ -268,6 +277,76 @@ def _extract_pdf_text_full(pdf_bytes: bytes) -> str:
     return "\n\n".join(pages)
 
 
+def _prepare_pdf_text_for_llm(text: str) -> tuple[str, dict]:
+    """
+    Bound extracted PDF text before LLM processing.
+
+    The previous flow sent the entire extracted PDF to the LLM, which can exceed
+    Groq's tokens-per-minute / request limits for long FRA documents. This keeps
+    the beginning and end of the document, where executive summaries, ratings,
+    conclusions, and action tables commonly appear.
+    """
+    original_chars = len(text or "")
+
+    if not text or original_chars <= PDF_LLM_MAX_CHARS:
+        return text, {
+            "original_chars": original_chars,
+            "sent_chars": original_chars,
+            "truncated": False,
+            "max_chars": PDF_LLM_MAX_CHARS,
+        }
+
+    head_chars = max(0, min(PDF_LLM_HEAD_CHARS, PDF_LLM_MAX_CHARS))
+    tail_chars = max(0, min(PDF_LLM_TAIL_CHARS, PDF_LLM_MAX_CHARS - head_chars))
+
+    if head_chars + tail_chars <= 0:
+        head_chars = PDF_LLM_MAX_CHARS
+        tail_chars = 0
+
+    omitted_chars = max(0, original_chars - head_chars - tail_chars)
+
+    trimmed = text[:head_chars]
+    if tail_chars > 0:
+        trimmed += (
+            "\n\n[... PDF text truncated before LLM processing; "
+            f"{omitted_chars} characters omitted to stay within provider token limits ...]\n\n"
+            + text[-tail_chars:]
+        )
+
+    return trimmed, {
+        "original_chars": original_chars,
+        "sent_chars": len(trimmed),
+        "truncated": True,
+        "max_chars": PDF_LLM_MAX_CHARS,
+        "head_chars": head_chars,
+        "tail_chars": tail_chars,
+        "omitted_chars": omitted_chars,
+    }
+
+
+def _friendly_llm_error(exc: Exception) -> str:
+    """Return a frontend-safe LLM error message with actionable local-dev hints."""
+    msg = str(exc)
+    lower = msg.lower()
+
+    if "rate_limit" in lower or "request too large" in lower or "tokens per minute" in lower:
+        return (
+            "LLM extraction failed because the PDF text exceeded the provider token/rate limit. "
+            "The backend truncates PDF text before LLM processing. Restart the backend and retry. "
+            "If this still happens, lower PDF_LLM_MAX_CHARS in backend/.env. "
+            f"Original error: {msg}"
+        )
+
+    if "invalid api key" in lower or "invalid_api_key" in lower or "authentication" in lower:
+        return (
+            "LLM extraction failed because the Groq API key was rejected. "
+            "Check GROQ_API_KEY in backend/.env, then restart the backend. "
+            f"Original error: {msg}"
+        )
+
+    return msg
+
+
 def _fallback_local_upload_metadata(
     *,
     ha_id: str,
@@ -443,6 +522,7 @@ def _build_fire_risk_payload(
     fraew_data: Optional[dict] = None,
     extraction_errors: Optional[list[str]] = None,
     raw_llm_response: Any = None,
+    text_stats: Optional[dict] = None,
 ) -> dict:
     return {
         "document_type": document_type,
@@ -458,6 +538,7 @@ def _build_fire_risk_payload(
         },
         "extraction_errors": extraction_errors or [],
         "raw_llm_response": raw_llm_response,
+        "text_stats": text_stats or {},
     }
 
 
@@ -945,8 +1026,8 @@ async def ingest_document(
     Single ingestion endpoint for all document types.
 
     - sov   -> Excel/CSV Schedule of Values -> processed into silver.properties
-    - fra   -> FRA PDF -> Bedrock LLM extraction -> silver.fra_features
-    - fraew -> FRAEW PDF -> Bedrock LLM extraction -> silver.fraew_features
+    - fra   -> FRA PDF -> LLM extraction -> silver.fra_features
+    - fraew -> FRAEW PDF -> LLM extraction -> silver.fraew_features
 
     In local dev, this endpoint can run without an Authorization header.
     """
@@ -1143,12 +1224,21 @@ async def ingest_document(
             detail="No text could be extracted. File may be a scanned/image PDF.",
         )
 
+    text_for_llm, text_stats = _prepare_pdf_text_for_llm(text)
+    if text_stats.get("truncated"):
+        logger.info(
+            "[INGEST] PDF text truncated before LLM: %s -> %s chars for %s",
+            text_stats.get("original_chars"),
+            text_stats.get("sent_chars"),
+            filename,
+        )
+
     try:
         from backend.workers.llm_client import LLMClient
 
         llm = LLMClient.from_env()
     except Exception as exc:
-        raise HTTPException(status_code=500, detail=f"LLM client error: {exc}")
+        raise HTTPException(status_code=500, detail=f"LLM client error: {_friendly_llm_error(exc)}")
 
     pool = DatabasePool.get_pool()
     async with pool.acquire() as conn:
@@ -1179,7 +1269,7 @@ async def ingest_document(
 
                 processor = FRAProcessor(conn, llm)
                 result = await processor.process(
-                    text=text,
+                    text=text_for_llm,
                     upload_id=str(upload_id),
                     block_id=resolved_block_id,
                     ha_id=ha_id,
@@ -1195,13 +1285,14 @@ async def ingest_document(
                     fraew_data=None,
                     extraction_errors=[],
                     raw_llm_response=getattr(processor, "last_raw_response", None),
+                    text_stats=text_stats,
                 )
             else:
                 from backend.workers.fraew_processor import FRAEWProcessor
 
                 processor = FRAEWProcessor(conn, llm)
                 result = await processor.process(
-                    text=text,
+                    text=text_for_llm,
                     upload_id=str(upload_id),
                     block_id=resolved_block_id,
                     ha_id=ha_id,
@@ -1217,10 +1308,12 @@ async def ingest_document(
                     fraew_data=_normalize_fraew_result(result),
                     extraction_errors=[],
                     raw_llm_response=getattr(processor, "last_raw_response", None),
+                    text_stats=text_stats,
                 )
 
         except Exception as exc:
             raw_llm = getattr(processor, "last_raw_response", None) if processor else None
+            friendly_error = _friendly_llm_error(exc)
             logger.exception("Processor failed for %s", filename)
             return JSONResponse(
                 status_code=500,
@@ -1230,10 +1323,12 @@ async def ingest_document(
                         "document_type": document_type,
                         "upload_id": upload_id,
                         "filename": filename,
-                        "error": str(exc),
+                        "error": friendly_error,
+                        "raw_error": str(exc),
                         "raw_llm_response": raw_llm,
                         "detection_warning": detection_warning,
                         "block_lookup_warning": block_lookup_warning,
+                        "text_stats": text_stats,
                         "fire_risk_payload": _build_fire_risk_payload(
                             document_type=document_type,
                             upload_id=str(upload_id),
@@ -1242,8 +1337,9 @@ async def ingest_document(
                             property_id=property_id,
                             fra_data=None,
                             fraew_data=None,
-                            extraction_errors=[str(exc)],
+                            extraction_errors=[friendly_error],
                             raw_llm_response=raw_llm,
+                            text_stats=text_stats,
                         ),
                     }
                 ),
@@ -1262,12 +1358,15 @@ async def ingest_document(
                 "file_size": len(file_content),
                 "s3_key": s3_key,
                 "text_chars_extracted": len(text),
+                "text_chars_sent_to_llm": len(text_for_llm),
+                "text_truncated_for_llm": bool(text_stats.get("truncated")),
+                "text_stats": text_stats,
                 "auto_detected": auto_detected.value,
                 "user_selected": document_type,
                 "detection_warning": detection_warning,
                 "block_lookup_warning": block_lookup_warning,
                 "storage": storage_meta,
-                "message": f"{document_type.upper()} extracted by Bedrock and written to silver.{document_type}_features",
+                "message": f"{document_type.upper()} extracted by LLM and written to silver.{document_type}_features",
                 "fire_risk_payload": fire_risk_payload,
             }
         )
