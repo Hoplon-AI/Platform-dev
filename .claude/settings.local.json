@@ -2,7 +2,11 @@
   "permissions": {
     "allow": [
       "WebFetch(domain:epc.opendatacommunities.org)",
-      "WebSearch"
+      "WebSearch",
+      "Bash(find \"C:\\\\Users\\\\Igors\\\\Hoplon\\\\Platform-dev\" -type f -name \"*.py\" -exec grep -l \"postcode_parser\\\\|uk_postcode\\\\|address_parser\\\\|parse.*address\" {} \\\\;)",
+      "WebFetch(domain:osdatahub.readthedocs.io)",
+      "WebFetch(domain:www.europa.uk.com)",
+      "WebFetch(domain:docs.os.uk)"
     ]
   }
 }
