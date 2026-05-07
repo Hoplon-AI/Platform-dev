@@ -1,615 +1,910 @@
 # Platform-dev
 
-Full-stack property portfolio management and ingestion platform built with **React (Vite) + FastAPI + Postgres**.
+Full-stack property portfolio management, ingestion, enrichment, and underwriting analytics platform built with **React (Vite) + FastAPI + PostgreSQL**.
+
+---
 
 ## Overview
 
-This project is a web-based platform for property portfolio management, ingestion, and analytics.
-Current focus is **Week 1–3** groundwork:
-- Bronze ingestion to S3 (LocalStack for local dev)
-- Postgres-backed Silver/Gold schemas and Gold views for dashboards
-- A small Week 3 UI: **Ingestion** page + **PortfolioOverview** dashboard
+Platform-dev is a backend-driven portfolio intelligence platform focused on:
 
-## Project Structure
+- Property schedule ingestion (SoV / stock schedules)
+- Block and property hierarchy modelling
+- UPRN enrichment and matching
+- FRA / FRAEW document ingestion
+- Underwriting analytics
+- Readiness and risk scoring
+- Block-level mapping and portfolio visualization
+- Document evidence aggregation
+- Export generation workflows (Doc A / Doc B)
 
-```
+The platform architecture is organized around a lakehouse-style ingestion model:
+
+- **Bronze**: raw uploads and source lineage
+- **Silver**: normalized and enriched entities
+- **Gold**: dashboard and underwriting analytics views
+
+The current branch, `frontend-backend-wireframing`, represents the transition from mostly mock frontend flows and isolated ingestion prototypes into a fully wired frontend/backend integration layer, backend-driven dashboard rendering, block-aware portfolio analytics, and document-oriented risk workflows.
+
+---
+
+## Current Development Focus
+
+The current development phase focuses on:
+
+- Frontend/backend ingestion wiring
+- SoV ingestion stabilization
+- Block/property hierarchy modelling
+- UPRN enrichment consistency
+- FRA/FRAEW extraction and dashboard integration
+- Map-based underwriting analysis
+- Dashboard aggregation correctness
+- Async ingestion orchestration
+- Evidence summary and document analysis flows
+
+---
+
+## Repository Structure
+
+```text
 Platform-dev/
-├── backend/                    # FastAPI API (ingestion + portfolios + lineage)
-├── frontend/                   # Vite + React + TypeScript UI
+├── backend/                        # FastAPI backend
+│   ├── api/
+│   ├── workers/
+│   ├── geo/
+│   ├── enrichment/
+│   └── core/
+│
+├── frontend/                       # React + Vite frontend
+│   ├── src/
+│   ├── public/
+│   └── package.json
+│
 ├── database/
-│   ├── migrations/             # Bronze/Silver/Gold SQL
-│   └── seeds/                  # Local seed data
-├── infrastructure/storage/      # S3 keying + upload service
-├── docs/                        # Roadmap + local dev guide
-└── docker-compose.yml           # Postgres 16.9 + LocalStack (S3)
+│   ├── migrations/
+│   ├── seeds/
+│   └── views/
+│
+├── infrastructure/
+│   └── storage/
+│
+├── schemas/                        # JSON schemas
+├── docs/                           # Architecture + roadmap docs
+├── scripts/
+└── docker-compose.yml
 ```
+
+---
 
 ## Technology Stack
 
 ### Frontend
-- **React** + **TypeScript**
-- **Vite** (dev/build tooling)
-- **React Router**
 
-### Backend
-- **FastAPI**
-- **asyncpg** (Postgres)
-- **boto3** (S3)
-
-## Features
-
-### Current Features
-- **Ingestion landing page** (`/`): list submissions + batch upload (auto-detect file type)
-- **PortfolioOverview dashboard** (`/portfolio`): summary, readiness, risk distribution, recent activity
-
-## Local development (recommended)
-
-Use the step-by-step guide in:
-- `docs/LOCAL_DEV.md`
-
-Quickstart (Option B: real DB + LocalStack):
-
-```bash
-docker compose up -d
-docker exec -i platform-dev-postgres psql -U postgres -d platform_dev < database/migrations/001_bronze_layer.sql
-docker exec -i platform-dev-postgres psql -U postgres -d platform_dev < database/migrations/002_async_processing_retries.sql
-docker exec -i platform-dev-postgres psql -U postgres -d platform_dev < database/migrations/001_silver_layer.sql
-docker exec -i platform-dev-postgres psql -U postgres -d platform_dev < database/migrations/001_gold_layer.sql
-docker exec -i platform-dev-postgres psql -U postgres -d platform_dev < database/seeds/week3_seed.sql
-docker exec -i platform-dev-localstack awslocal s3 mb s3://platform-bronze
-```
+- React
+- Vite
+- TypeScript / JavaScript
+- React Router
+- Leaflet
+- PapaParse
 
 ### Backend
 
-This repo supports a local runtime venv for Python 3.13:
+- FastAPI
+- asyncpg
+- boto3
+- PostgreSQL
+- LocalStack
+- Pydantic
+- Bedrock integration, partially optional for local work
 
-```bash
-python3 -m venv venv_local
-./venv_local/bin/pip install -r requirements.local.txt
+### Infrastructure
 
-DB_HOST=localhost DB_PORT=5432 DB_USER=postgres DB_PASSWORD=postgres DB_NAME=platform_dev \
-AWS_ACCESS_KEY_ID=test AWS_SECRET_ACCESS_KEY=test AWS_DEFAULT_REGION=us-east-1 \
-S3_ENDPOINT_URL=http://localhost:4566 S3_BUCKET_NAME=platform-bronze \
-DEV_MODE=true DEV_HA_ID=ha_demo \
-./venv_local/bin/uvicorn backend.main:app --reload --port 8000
+- Docker
+- Docker Compose
+- S3-style storage
+- LocalStack S3 emulation
+
+---
+
+# Frontend–Backend Wireframing Progress Report
+
+This section summarizes the major integration and wireframing work completed during the current development cycle.
+
+---
+
+## 1. Frontend Application Flow Rework
+
+The frontend application structure was remodeled to align with the backend ingestion and analytics pipeline.
+
+### Preserved
+
+- Original landing page
+- Original app entry flow
+
+### Added/Reworked
+
+- Ingestion-style upload page
+- Backend-connected upload workflow
+- Backend-driven dashboard flow
+- Underwriting-style dashboard layout
+- Sidebar/dashboard navigation structure
+- Block analysis layout structure
+- Evidence summary placeholders
+- Document workflow placeholders
+
+### Current frontend flow
+
+```text
+Landing Page
+    ↓
+Upload SoV / Document
+    ↓
+Backend ingestion pipeline
+    ↓
+Frontend normalization layer
+    ↓
+Portfolio dashboard
+    ↓
+Block analysis / Evidence workflows
 ```
 
-API docs: `http://127.0.0.1:8000/docs`
+---
+
+## 2. Backend-Connected Upload Pipeline
+
+The frontend upload flow was reworked so uploads now hit the real backend ingestion APIs.
+
+### Current Upload Behavior
+
+The frontend now:
+
+- Creates `FormData` payloads
+- Uploads directly to backend endpoints
+- Waits for ingestion responses
+- Normalizes backend rows
+- Stores backend-derived state
+- Redirects into dashboard workflows
+
+### Main endpoint
+
+```text
+POST /api/v1/upload/ingest?document_type=sov
+```
+
+---
+
+## 3. Backend Response Normalization Layer
+
+A normalization layer was added between backend responses and frontend dashboard rendering.
+
+This was necessary because backend rows can contain mixed naming conventions, while frontend dashboard components require stable field names.
+
+### Normalized fields include
+
+```text
+property_id
+property_reference
+uprn
+parent_uprn
+block_reference
+latitude
+longitude
+sum_insured
+property_type
+occupancy_type
+height_m
+storeys
+units
+readiness_score
+readiness_band
+missing_fields
+```
+
+---
+
+## 4. Portfolio Dashboard Wireframing
+
+The portfolio dashboard was rebuilt around backend-derived analytics instead of placeholder UI.
+
+### Implemented dashboard sections
+
+#### Underwriting snapshot
+
+- Portfolio value
+- Total blocks
+- UPRN coverage
+- Mapped properties
+- Completeness metrics
+
+#### Block analysis
+
+- Grouped block table
+- Block-level aggregation
+- Map-based visualization
+- Selected block panel
+
+#### Property analysis
+
+- Property schedule table
+- Detailed property panel
+- Raw field display
+- Readiness indicators
+
+#### Placeholder workflows
+
+- Evidence Summary
+- Block Analysis
+- Documents
+- Doc A / Doc B exports
+
+---
+
+## 5. Block and Property Hierarchy Work
+
+One of the largest changes in this phase was introducing frontend-aware block/property grouping.
+
+### Current grouping logic uses
+
+- `block_reference`
+- `parent_uprn`
+- `uprn`
+- `property_reference`
+- fallback IDs
+
+### Purpose
+
+This grouping structure supports:
+
+- Block-level aggregation
+- Map clustering
+- Underwriting summaries
+- Risk analysis
+- Evidence association
+- Document linking
+
+---
+
+## 6. Portfolio Map Rework
+
+The map layer was substantially rewritten.
+
+### Current capabilities
+
+The map currently supports:
+
+- Block mode
+- Property mode
+- Dynamic marker rendering
+- Fly-to interactions
+- Block selection
+- Property selection
+- Invalid coordinate filtering
+- Tooltip rendering
+- Popup rendering
+- Grouped block display
+
+### Coordinate handling
+
+The map attempts multiple coordinate sources:
+
+- `latitude` / `longitude`
+- `x_coordinate` / `y_coordinate`
+- alternative field names
+- fallback parsing
+
+Invalid coordinates are ignored, including:
+
+```text
+0,0
+null
+undefined
+```
+
+---
+
+## 7. Property Details Panel Rebuild
+
+The property details panel was rebuilt to support backend-driven rendering.
+
+### Current displayed fields
+
+- Address
+- Postcode
+- UPRN
+- Parent UPRN
+- Block reference
+- Readiness band
+- Readiness score
+- Missing fields
+- Sum insured
+- Raw backend fields
+- Placeholder enrichment fields
+
+---
+
+## 8. FRA / FRAEW Ingestion Work
+
+FRA/FRAEW ingestion is currently one of the largest active workstreams.
+
+### Current implemented work
+
+#### Backend
+
+- FRA/FRAEW upload routes exist
+- Extraction workers exist
+- Async processing exists
+- Database persistence exists
+- Action item extraction exists
+- Risk extraction exists
+- Assessment metadata extraction exists
+
+### Current extracted fields include
+
+- `risk_rating`
+- `rag_status`
+- `assessor_company`
+- `assessor_name`
+- `assessment_date`
+- `next_review_date`
+- `action_items`
+- `significant_findings`
+- `evacuation_strategy`
+- `bsa_2022_applicable`
+- fire safety system indicators
+
+### Database persistence
+
+FRA/FRAEW-related data is currently written into:
+
+- `silver.document_features`
+- `silver.fra_features`
+
+---
+
+## 9. FRA/FRAEW Colour Banding Work
+
+A major issue currently being worked on is colour banding consistency.
+
+### Current mismatch problem
+
+Different areas of the platform currently use different fields for risk colour mapping:
+
+- `risk_rating`
+- `rag_status`
+- inferred readiness
+- local frontend mappings
+
+This causes:
+
+- Mismatched dashboard colours
+- Incorrect amber/red/green chips
+- FRA vs FRAEW inconsistencies
+- Grey fallback states
+- Inconsistent risk summaries
+
+### Current normalization status
+
+Recently added normalization:
+
+```python
+normalized_risk = _normalize_for_dashboard(features.risk_rating)
+```
+
+However:
+
+```python
+normalized_rag = _normalize_for_dashboard(rag_status)
+```
+
+can create downstream frontend mismatches because frontend colour mappings often expect:
+
+```text
+RED
+AMBER
+GREEN
+```
+
+rather than lowercase values.
+
+### Recommended fix
+
+```python
+normalized_rag = rag_status.strip().upper() if rag_status else None
+```
+
+while keeping:
+
+```python
+normalized_risk = _normalize_for_dashboard(features.risk_rating)
+```
+
+### Current colour banding issue areas
+
+#### FRA/FRAEW
+
+- Inconsistent risk scales
+- Missing standardization
+- Frontend fallback colours
+
+#### Dashboard
+
+- Some widgets use `risk_rating`
+- Some widgets use `rag_status`
+- Some widgets infer risk locally
+
+#### Map markers
+
+- Some markers derive colours from readiness
+- Some markers derive colours from inferred risk
+
+---
+
+## 10. UPRN Mismatch Work
+
+UPRN consistency is currently still a work in progress.
+
+### Current mismatch areas
+
+The SoV dashboard may currently show:
+
+- Mismatched grouped properties
+- Duplicated properties
+- Incorrect block associations
+- Inconsistent `parent_uprn` usage
+
+### Likely causes
+
+- Mixed source schedule formats
+- Inconsistent UPRN enrichment
+- Partial OS lookup coverage
+- Fallback grouping heuristics
+- Duplicate property references
+- Parent UPRN inconsistencies
+
+### Current work underway
+
+#### Backend
+
+- Improved enrichment logic
+- Stronger hierarchy matching
+- UPRN normalization
+- Better fallback grouping
+
+#### Frontend
+
+- Normalized grouping logic
+- Improved block display
+- Property-to-block drilldown support
+
+---
+
+## 11. PDF Upload and Document Analysis Work
+
+PDF upload and document analysis are currently partially integrated.
+
+### Existing capabilities
+
+#### Upload
+
+- PDF upload routes exist
+- Async processing exists
+- Extraction workers exist
+
+#### Parsing
+
+Current extraction attempts:
+
+- Metadata extraction
+- Fire risk extraction
+- Action item extraction
+- Findings extraction
+- Confidence scoring
+
+### Still in progress
+
+#### UI integration
+
+Still needed:
+
+- Frontend PDF upload flow
+- Document analysis pages
+- Evidence summary rendering
+- Extraction visualization
+- Extraction confidence display
+- Block/property document linking
+
+---
+
+## 12. Evidence Summary and Block Analysis Pages
+
+These pages are currently partially wired.
+
+### Existing
+
+- Frontend placeholders exist
+- Dashboard routing exists
+- Layout scaffolding exists
+
+### Still needed
+
+- Backend-driven evidence aggregation
+- Linked documents
+- Risk timelines
+- Extracted action items
+- Block-level fire evidence summaries
+- Property-level document summaries
+
+---
+
+## 13. Async Ingestion and Worker Integration
+
+Async ingestion architecture exists but is still being stabilized.
+
+### Current architecture includes
+
+#### Workers
+
+- `sov_processor`
+- `sov_processor_v2`
+- `fra_processor`
+- `fraew_processor`
+- `enrichment_worker`
+
+### Processing flow
+
+```text
+Upload
+    ↓
+Bronze storage
+    ↓
+Async worker
+    ↓
+Extraction
+    ↓
+Silver persistence
+    ↓
+Gold aggregation
+```
+
+---
+
+## 14. Current Known Issues
+
+### FRA/FRAEW
+
+- Colour banding mismatch
+- Inconsistent normalization
+- Frontend/backend risk mismatch
+
+### UPRN
+
+- Grouping inconsistencies
+- Parent UPRN mismatch
+- Duplicated grouping
+- Incomplete enrichment
+
+### Map
+
+- Block selection edge cases
+- Invalid coordinate handling
+- Cluster consistency
+
+### Backend
+
+- Bedrock credential issues locally
+- Async retry edge cases
+- Some worker instability
 
 ### Frontend
 
-```bash
-cd frontend
-npm install
-npm run dev -- --host 127.0.0.1 --port 3000
-```
-
-UI:
-- Ingestion: `http://127.0.0.1:3000/`
-- PortfolioOverview: `http://127.0.0.1:3000/portfolio`
-
-## S3 partitioning (Bronze)
-
-Uploads are stored using lake-style partitioning and submission sidecars:
-
-```
-ha_id=<ha_id>/bronze/dataset=<file_type>/ingest_date=YYYY-MM-DD/submission_id=<upload_id>/file=<filename>
-ha_id=<ha_id>/bronze/dataset=<file_type>/ingest_date=YYYY-MM-DD/submission_id=<upload_id>/manifest.json
-ha_id=<ha_id>/bronze/dataset=<file_type>/ingest_date=YYYY-MM-DD/submission_id=<upload_id>/metadata.json
-```
-
-## API Endpoints
-
-### Backend API (FastAPI)
-
-- Ingestion:
-  - `POST /api/v1/upload/batch` (multi-file upload + type detection)
-  - `GET /api/v1/upload/submissions` (recent submissions)
-  - `GET /api/v1/upload/{upload_id}/status` (single submission)
-- Portfolios (Gold-backed):
-  - `GET /api/v1/portfolios`
-  - `GET /api/v1/portfolios/{portfolio_id}/summary`
-  - `GET /api/v1/portfolios/{portfolio_id}/readiness`
-  - `GET /api/v1/portfolios/{portfolio_id}/risk-distribution`
-  - `GET /api/v1/portfolios/{portfolio_id}/recent-activity`
-
-## Data Schemas
-
-The project uses JSON schemas to define core data structures:
-
-- **[Property Schema](schemas/property-schema.json)** - Complete property data structure with all fields including insurance, risk, and high-value property details
-- **[Standardized Property Schema](schemas/standardized-property-schema.json)** - Property data after column standardization (based on preprocessing column mapping)
-- **[CSV Upload Response Schema](schemas/csv-upload-response-schema.json)** - API response structure for CSV upload endpoint
-- **[Auto-Detection Result Schema](schemas/auto-detection-result-schema.json)** - Structure of auto-detection results from the data type detection system
-
-These schemas can be used for:
-- API validation
-- Data transformation pipelines
-- Frontend type definitions
-- Documentation and testing
-
-## Data Processing
-
-The backend includes utilities for:
-- **Column Standardization** - Automatically standardize CSV column names
-- **Data Preprocessing** - Clean and prepare data for analysis
-- **Auto-Detection** - Automatically detect data patterns and types (see [Auto-Detection Documentation](docs/auto-detection.md))
-- **Geographic Processing** - Handle postcode and location data
-
-## Roadmap
-
-See:
-- `docs/mvp-3month-roadmap.md`
-- `docs/AWS_ASYNC_INGESTION.md` (AWS-first async ingestion: S3 → Step Functions)
+- Some placeholder analytics
+- Some locally inferred metrics
+- Incomplete export workflows
 
 ---
 
-## Frontend–Backend Wireframing Progress and Setup Guide
+# Local Development Setup
 
-This section documents the wireframing and integration work completed so far to connect the frontend dashboard flow to the backend ingestion pipeline, along with the environment setup and run steps needed for local development. It also records what is currently working, what was fixed during the latest integration pass, and what still remains to be completed.
+## Prerequisites
 
-### Purpose of this wireframing phase
+Install:
 
-The goal of this phase has been to move the frontend away from a mostly mock/local parsing flow and align it with the real backend ingestion and enrichment flow already present in the repository.
-
-The intended user flow is now:
-
-1. Start from the unchanged landing page.
-2. Navigate to the upload page.
-3. Upload a SoV file through the real backend ingestion endpoint.
-4. Normalize the backend response into frontend-friendly property objects.
-5. Feed those normalized rows into the portfolio dashboard.
-6. Group properties into blocks for block-level mapping and analysis.
-7. Show selected block/property details in the dashboard panel.
-8. Prepare the UI structure for later enrichment, risk, PDF ingestion, and export workflows.
+- Python 3.11+
+- Node.js 18+
+- npm
+- Docker
+- Docker Compose
 
 ---
 
-## What has been done so far
-
-### 1. Frontend routing and page flow were reworked
-
-The frontend flow now preserves the original landing page and overall navigation flow, but the application after the landing page has been remodeled to better reflect the backend functionality.
-
-Completed changes include:
-
-- the landing page remains unchanged
-- the upload page has been restyled to match the ingestion-style visual reference
-- the dashboard page now acts as the main portfolio overview page
-- the upload page now leads directly into the backend-driven portfolio dashboard
-- the sidebar structure now reflects the actual backend-oriented workflow:
-  - Upload SoV
-  - Portfolio Overview
-  - placeholder areas for Evidence Summary, Block Analysis, and Documents
-
-### 2. The upload page is now backend-connected
-
-Previously, frontend ingestion utilities were doing more local work. This phase changed that so the upload page uses the backend ingestion API.
-
-Current frontend upload behavior:
-
-- builds a `FormData` object
-- sends the file to:
-
-  `/api/v1/upload/ingest?document_type=sov`
-
-- waits for the backend JSON response
-- validates the response structure
-- normalizes backend rows into the frontend property model
-- stores the result in application state
-- redirects into the dashboard view
-
-This means the frontend is now consuming backend-produced rows instead of relying only on local spreadsheet parsing logic.
-
-### 3. Backend ingestion response handling was aligned to the UI
-
-The frontend was updated to normalize the backend response structure into one consistent shape. This includes mapping fields such as:
-
-- `property_id`
-- `property_reference`
-- `address_line_1`
-- `address_line_2`
-- `address_3`
-- `post_code`
-- `uprn`
-- `parent_uprn`
-- `block_reference`
-- `latitude`
-- `longitude`
-- `x_coordinate`
-- `y_coordinate`
-- `sum_insured`
-- `property_type`
-- `occupancy_type`
-- `height_m`
-- `storeys`
-- `units`
-- `year_of_build`
-- `wall_construction`
-- `roof_construction`
-- `readiness_score`
-- `readiness_band`
-- `missing_fields`
-
-This normalization step was necessary because the frontend dashboard components need predictable field names even when backend rows include mixed naming styles.
-
-### 4. Portfolio dashboard wireframing was rebuilt around backend data
-
-The dashboard page was remodeled to match actual backend functionality rather than generic placeholder UI.
-
-Completed dashboard sections now include:
-
-- portfolio underwriting snapshot banner
-- KPI cards for:
-  - total insured value
-  - number of detected blocks
-  - UPRN coverage
-  - mappable locations
-- confidence and completeness bars
-- block analysis map
-- selected property/details panel
-- block grouping table
-- property schedule table
-- document/export panel placeholders
-
-This gives the frontend a backend-shaped dashboard even before all enrichment and export functionality is complete.
-
-### 5. Property grouping into blocks was added in the dashboard layer
-
-A grouping pass was added on the frontend so the portfolio rows can be clustered into blocks using:
-
-- `block_reference`
-- `parent_uprn`
-- `uprn`
-- `property_reference`
-- fallback `id`
-
-This grouped structure is used to:
-
-- create block-level summary rows
-- calculate block-level total value
-- calculate block-level average readiness
-- estimate block-level height
-- create block table entries
-- feed the map with grouped block data
-
-### 6. The map component was remodeled for block/property analysis
-
-The `PortfolioMap` component was rewritten to support both:
-
-- property mode
-- block mode
-
-It now:
-- accepts normalized properties
-- accepts grouped blocks
-- derives coordinates robustly from multiple possible field names
-- ignores invalid `0,0` or missing coordinates
-- renders Leaflet markers dynamically
-- handles selection callbacks for map interaction
-- supports fly-to behavior when selecting a block or property
-- supports block popups/tooltips and property popups/tooltips
-
-This is the core wireframing layer for geo packaging and block analysis behavior.
-
-### 7. The property details panel was rebuilt for compatibility with backend fields
-
-`PropertyDetails.jsx` was rewritten to accept normalized property rows and render:
-
-- address
-- city/postcode
-- UPRN
-- parent UPRN
-- block reference
-- UPRN match score
-- readiness band/score
-- missing fields
-- SoV values
-- raw backend fields
-- placeholder UPRN confidence results when available
-
-This panel is designed to work with both the current SoV ingestion output and later enrichment output.
-
-### 8. Frontend utility files were updated to support the new flow
-
-Updated utility files include:
-
-- `ingestion.js`
-- `uprn.js`
-- `readiness.js`
-- `leaflet.js`
-
-These now better support:
-- backend response normalization
-- readiness calculations
-- UPRN-related UI compatibility
-- Leaflet marker behavior
-
-### 9. App-level state management was updated
-
-`App.jsx` was rewired so that it now handles:
-
-- landing page visibility
-- upload page vs overview page navigation
-- upload progress state
-- upload error state
-- pipeline step display
-- storage of the backend ingestion result
-- computation of the ingestion summary
-- handoff of backend-normalized data into the dashboard page
-
-This is what ties the upload page and dashboard page together.
-
-### 10. Local development triage was done
-
-A number of first-run issues were found and fixed during this integration pass, including:
-
-- bad CSS import path from `main.jsx`
-- running `npm run dev` in the wrong folder
-- missing/incorrect frontend `.env`
-- frontend/backend API base URL mismatch
-- upload failures due to backend response handling
-- selection and map-display mismatches between blocks and properties
-- backend enrichment side effects causing noise in local development logs
-- block map centering problems from invalid coordinates such as `0,0`
-
----
-
-## Backend files most involved in this phase
-
-The main backend areas involved in this frontend–backend wireframing pass are:
-
-### Upload and ingestion
-- `backend/api/ingestion/upload_router.py`
-- `backend/api/ingestion/file_type_detector.py`
-- `backend/api/ingestion/upload_models.py`
-- `backend/api/ingestion/upload_validator.py`
-
-### SoV processing
-- `backend/workers/sov_processor_v2.py`
-- `backend/workers/sov_processor.py`
-
-### Enrichment and geo support
-- `backend/workers/enrichment_worker.py`
-- `backend/geo/uprn_maps/*`
-
-### Core data and storage support
-- `backend/core/database/db_pool.py`
-- `infrastructure/storage/upload_service.py`
-
-These are the main backend components currently shaping the frontend wireframe behavior.
-
----
-
-## Frontend files most involved in this phase
-
-### Application flow
-- `frontend/src/App.jsx`
-- `frontend/src/main.jsx`
-
-### Pages
-- `frontend/src/pages/IngestionPage.jsx`
-- `frontend/src/pages/PortfolioDashboard.jsx`
-
-### Components
-- `frontend/src/components/PortfolioMap.jsx`
-- `frontend/src/components/PropertyDetails.jsx`
-- `frontend/src/components/RawFieldsTable.jsx`
-
-### Utilities
-- `frontend/src/utils/ingestion.js`
-- `frontend/src/utils/uprn.js`
-- `frontend/src/utils/readiness.js`
-- `frontend/src/utils/leaflet.js`
-
-### Styling
-- `frontend/src/styles/global.css`
-
----
-
-## Local setup and run guide
-
-This section gives the current step-by-step local setup flow for running the platform during this wireframing phase.
-
-### 1. Clone the repository
+## Clone the Repository
 
 ```bash
 git clone <repo-url>
 cd Platform-dev
+```
 
-### 2. Create and activate the Python virtual environment
+---
 
-From the project root:
+## Backend Setup
+
+### Create virtual environment
 
 ```bash
 python3 -m venv venv
+```
+
+### Activate environment
+
+Mac/Linux:
+
+```bash
 source venv/bin/activate
+```
 
-Install backend dependencies:
+Windows:
 
+```bash
+venv\Scripts\activate
+```
+
+### Install backend dependencies
+
+```bash
 pip install -r requirements.txt
+```
 
-### 3. Install frontend dependencies
+Optional local runtime:
 
-Move into the frontend folder:
+```bash
+pip install -r requirements.local.txt
+```
+
+---
+
+## Frontend Setup
+
+```bash
 cd frontend
 npm install
-
-Then return to the project root when needed:
 cd ..
+```
 
-### 4. Set up the frontend environment file
+---
 
-Inside frontend/.env, set:
+## Frontend Environment Variables
+
+Create:
+
+```text
+frontend/.env
+```
+
+Add:
+
+```env
 VITE_API_BASE_URL=http://127.0.0.1:8000
+```
 
-This is required so the frontend can call the FastAPI backend.
+---
 
-### 5. Start required Docker services
+## Start Docker Services
 
-From the project root:
-docker compose up
-
-To run in the background:
+```bash
 docker compose up -d
+```
 
-To check running containers:
-docker ps
+---
 
-To stop services:
-docker compose down
+## Initialize Database
 
-### 6. Start the backend server
+```bash
+docker exec -i platform-dev-postgres psql -U postgres -d platform_dev < database/migrations/001_bronze_layer.sql
 
-From the project root:
+docker exec -i platform-dev-postgres psql -U postgres -d platform_dev < database/migrations/002_async_processing_retries.sql
+
+docker exec -i platform-dev-postgres psql -U postgres -d platform_dev < database/migrations/001_silver_layer.sql
+
+docker exec -i platform-dev-postgres psql -U postgres -d platform_dev < database/migrations/001_gold_layer.sql
+```
+
+---
+
+## Seed Local Data
+
+```bash
+docker exec -i platform-dev-postgres psql -U postgres -d platform_dev < database/seeds/week3_seed.sql
+```
+
+---
+
+## Create LocalStack S3 Bucket
+
+```bash
+docker exec -i platform-dev-localstack awslocal s3 mb s3://platform-bronze
+```
+
+---
+
+## Start Backend
+
+```bash
 source venv/bin/activate
-uvicorn backend.main:app --host 127.0.0.1 --port 8000
 
-Health check:
+DB_HOST=localhost \
+DB_PORT=5432 \
+DB_USER=postgres \
+DB_PASSWORD=postgres \
+DB_NAME=platform_dev \
+AWS_ACCESS_KEY_ID=test \
+AWS_SECRET_ACCESS_KEY=test \
+AWS_DEFAULT_REGION=us-east-1 \
+S3_ENDPOINT_URL=http://localhost:4566 \
+S3_BUCKET_NAME=platform-bronze \
+DEV_MODE=true \
+DEV_HA_ID=ha_demo \
+uvicorn backend.main:app --reload --port 8000
+```
+
+---
+
+## Backend Health Check
+
+```bash
 curl http://127.0.0.1:8000/health
+```
 
-### 7. Start the frontend dev server
+---
 
-In a new terminal:
+## Start Frontend
+
+```bash
 cd frontend
 npm run dev
+```
 
-The app will typically run at:
+Frontend typically runs at:
+
+```text
 http://localhost:5173
+```
 
-### 8. Open the platform
+---
 
-Open in your browser:
-http://localhost:5173
+# Recommended Multi-Terminal Workflow
 
-Expected flow:
-	•	Landing page loads
-	•	Click Get Started
-	•	Upload page appears
-	•	Upload SoV file
-	•	Dashboard renders with backend data
+## Terminal 1 — Docker
 
-Git workflow for this wireframing phase
-
-Create a new branch:
-git checkout -b frontend-backend-wireframing
-
-Stage all changes:
-git add .
-
-Commit changes:
-git commit -m "frontend-backend wiring: dashboard, map, ingestion, property details, async upload flow"
-
-Push branch to remote:
-git push -u origin frontend-backend-wireframing
-
-### Recommended terminal workflow
-
-Use three terminals for smooth development.
-
-Terminal 1 — Docker:
+```bash
 docker compose up
+```
 
-Terminal 2 — Backend:
+## Terminal 2 — Backend
+
+```bash
 source venv/bin/activate
-uvicorn backend.main:app --host 127.0.0.1 --port 8000
+uvicorn backend.main:app --reload --port 8000
+```
 
-Terminal 3 — Frontend:
+## Terminal 3 — Frontend
+
+```bash
 cd frontend
 npm run dev
+```
 
-What is currently working
+---
 
-Frontend
-	•	Landing page unchanged
-	•	Upload page connected to backend
-	•	Upload request successfully hits backend
-	•	Backend response is normalized into frontend state
-	•	Portfolio dashboard renders from backend data
-	•	Block grouping logic implemented
-	•	Property schedule table renders
-	•	Property details panel renders
-	•	Map structure supports block/property modes
+# Git Workflow
 
-⸻
+## Switch to branch
 
-Backend
-	•	SoV upload endpoint is functional
-	•	SoV processing writes to database (silver.properties)
-	•	Async upload handling is in place (with ongoing fixes)
-	•	Enrichment worker exists and is partially integrated
-	•	Block detection logic is present
+```bash
+git checkout frontend-backend-wireframing
+```
 
-⸻
+## Pull latest changes
 
-What still needs to be done
+```bash
+git pull origin frontend-backend-wireframing
+```
 
-1. Block properties on the map
-	•	Ensure correct block centroid calculation
-	•	Fix block vs property selection consistency
-	•	Ensure details panel updates correctly on click
-	•	Allow drill-down from block → properties
+## Stage changes
 
-⸻
+```bash
+git add .
+```
 
-2. Accurate portfolio risk/readiness
-	•	Confirm backend as source of truth
-	•	Separate readiness vs risk clearly
-	•	Replace placeholder/inferred values with backend-calculated metrics
-	•	Add proper portfolio-level aggregation
+## Commit
 
-⸻
+```bash
+git commit -m "frontend-backend wiring updates"
+```
 
-3. PDF upload (FRA / FRAEW)
-	•	Support PDF ingestion from frontend
-	•	Improve error handling for extraction failures
-	•	Display extracted fire risk data in UI
-	•	Link documents to blocks/properties
+## Push
 
-⸻
+```bash
+git push origin frontend-backend-wireframing
+```
 
-4. Doc A / Doc B export
-	•	Connect frontend buttons to backend exporters
-	•	Generate documents from SoV + fire risk data
-	•	Add loading + success states
-	•	Enable file download
+---
 
-⸻
+# Current Working Features
 
-5. Evidence Summary & Block Analysis pages
-	•	Replace placeholders with real data views
-	•	Show per-block evidence and risk insights
-	•	Link uploaded documents to analysis
+## Frontend
 
-⸻
+- Backend-connected upload flow
+- Portfolio dashboard rendering
+- Grouped block analysis
+- Map interactions
+- Property details panel
+- Backend normalization
+- Underwriting layout structure
 
-Known issues
-	•	Bedrock / LLM errors without credentials
-	•	External API limits (e.g. OS Places)
-	•	Some enrichment not fully wired
-	•	Map interactions still being refined
-	•	Export buttons not yet connected
-	•	Some metrics still inferred instead of backend-driven
+## Backend
 
-⸻
+- SoV ingestion
+- Async upload handling
+- FRA/FRAEW extraction
+- Silver-layer persistence
+- Enrichment workers
+- Block grouping logic
 
-Recommended next steps
-	1.	Finalize block selection behavior on map
-	2.	Lock backend readiness/risk as source of truth
-	3.	Stabilize async ingestion responses
-	4.	Add PDF ingestion support
-	5.	Wire document export (Doc A / Doc B)
-	6.	Complete Evidence + Block Analysis pages
+---
 
-⸻
+# Major Remaining Work
 
-Summary
+## FRA/FRAEW
 
-The platform is now transitioning from a mock UI into a backend-driven system:
-	•	uploads are real
-	•	data is backend-derived
-	•	dashboard is data-driven
-	•	map supports block-level analysis
-	•	architecture supports enrichment and document workflows
+- Normalization consistency
+- Frontend rendering
+- Risk aggregation
+- Document linking
+- Confidence visualization
 
-Remaining work focuses on correctness, enrichment, document handling, and export functionality rather than UI structure.
+## UPRN
+
+- Hierarchy correctness
+- Grouping stability
+- Enrichment consistency
+- Duplicate prevention
+
+## Block Hierarchy
+
+- Stronger parent-child modelling
+- Drilldown navigation
+- Aggregation correctness
+
+## Dashboard
+
+- Backend source-of-truth enforcement
+- Remove inferred frontend metrics
+- Consistent aggregation logic
+
+## Documents
+
+- PDF upload UI
+- Evidence pages
+- Document visualization
+- Doc A / Doc B generation
+
+## Async Infrastructure
+
+- Worker stabilization
+- Retry handling
+- Ingestion status polling
+- Processing orchestration
+
+---
+
+# Summary
+
+The platform has transitioned from isolated ingestion prototypes and partially mocked frontend workflows into a backend-driven portfolio intelligence platform with:
+
+- Block-aware underwriting dashboard architecture
+- Document-aware ingestion workflows
+- Async processing infrastructure
+- Enrichment-aware portfolio visualization
+- Early FRA/FRAEW evidence handling
+
+The primary remaining work is now correctness, normalization consistency, enrichment stabilization, document workflows, risk aggregation, export generation, and evidence analytics rather than initial frontend/backend structural integration.
