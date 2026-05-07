@@ -4,47 +4,49 @@ Full-stack property portfolio management, ingestion, enrichment, and underwritin
 
 ---
 
-## Overview
+# Overview
 
 Platform-dev is a backend-driven portfolio intelligence platform focused on:
 
-- Property schedule ingestion (SoV / stock schedules)
-- Block and property hierarchy modelling
-- UPRN enrichment and matching
-- FRA / FRAEW document ingestion
-- Underwriting analytics
-- Readiness and risk scoring
-- Block-level mapping and portfolio visualization
-- Document evidence aggregation
-- Export generation workflows (Doc A / Doc B)
+* Property schedule ingestion (SoV / stock schedules)
+* Block and property hierarchy modelling
+* UPRN enrichment and matching
+* FRA / FRAEW document ingestion
+* Underwriting analytics
+* Readiness and risk scoring
+* Block-level mapping and portfolio visualization
+* Document evidence aggregation
+* Export generation workflows (Doc A / Doc B)
 
 The platform architecture is organized around a lakehouse-style ingestion model:
 
-- **Bronze**: raw uploads and source lineage
-- **Silver**: normalized and enriched entities
-- **Gold**: dashboard and underwriting analytics views
+* **Bronze**: raw uploads and source lineage
+* **Silver**: normalized and enriched entities
+* **Gold**: dashboard and underwriting analytics views
 
 The current branch, `frontend-backend-wireframing`, represents the transition from mostly mock frontend flows and isolated ingestion prototypes into a fully wired frontend/backend integration layer, backend-driven dashboard rendering, block-aware portfolio analytics, and document-oriented risk workflows.
 
 ---
 
-## Current Development Focus
+# Current Development Focus
 
 The current development phase focuses on:
 
-- Frontend/backend ingestion wiring
-- SoV ingestion stabilization
-- Block/property hierarchy modelling
-- UPRN enrichment consistency
-- FRA/FRAEW extraction and dashboard integration
-- Map-based underwriting analysis
-- Dashboard aggregation correctness
-- Async ingestion orchestration
-- Evidence summary and document analysis flows
+* Frontend/backend ingestion wiring
+* SoV ingestion stabilization
+* Block/property hierarchy modelling
+* UPRN enrichment consistency
+* FRA/FRAEW extraction and dashboard integration
+* Map-based underwriting analysis
+* Dashboard aggregation correctness
+* Async ingestion orchestration
+* Evidence summary and document analysis flows
+* Geo/polygon support for UK-wide expansion
+* Fire evidence visualization and colour banding consistency
 
 ---
 
-## Repository Structure
+# Repository Structure
 
 ```text
 Platform-dev/
@@ -71,38 +73,39 @@ Platform-dev/
 ├── schemas/                        # JSON schemas
 ├── docs/                           # Architecture + roadmap docs
 ├── scripts/
+├── test-files/                     # Recommended SoV/FRA/FRAEW test uploads
 └── docker-compose.yml
 ```
 
 ---
 
-## Technology Stack
+# Technology Stack
 
-### Frontend
+## Frontend
 
-- React
-- Vite
-- TypeScript / JavaScript
-- React Router
-- Leaflet
-- PapaParse
+* React
+* Vite
+* TypeScript / JavaScript
+* React Router
+* Leaflet
+* PapaParse
 
-### Backend
+## Backend
 
-- FastAPI
-- asyncpg
-- boto3
-- PostgreSQL
-- LocalStack
-- Pydantic
-- Bedrock integration, partially optional for local work
+* FastAPI
+* asyncpg
+* boto3
+* PostgreSQL
+* LocalStack
+* Pydantic
+* Bedrock integration (optional for local work)
 
-### Infrastructure
+## Infrastructure
 
-- Docker
-- Docker Compose
-- S3-style storage
-- LocalStack S3 emulation
+* Docker
+* Docker Compose
+* S3-style storage
+* LocalStack S3 emulation
 
 ---
 
@@ -118,19 +121,19 @@ The frontend application structure was remodeled to align with the backend inges
 
 ### Preserved
 
-- Original landing page
-- Original app entry flow
+* Original landing page
+* Original app entry flow
 
 ### Added/Reworked
 
-- Ingestion-style upload page
-- Backend-connected upload workflow
-- Backend-driven dashboard flow
-- Underwriting-style dashboard layout
-- Sidebar/dashboard navigation structure
-- Block analysis layout structure
-- Evidence summary placeholders
-- Document workflow placeholders
+* Ingestion-style upload page
+* Backend-connected upload workflow
+* Backend-driven dashboard flow
+* Underwriting-style dashboard layout
+* Sidebar/dashboard navigation structure
+* Block analysis layout structure
+* Evidence summary placeholders
+* Document workflow placeholders
 
 ### Current frontend flow
 
@@ -158,12 +161,12 @@ The frontend upload flow was reworked so uploads now hit the real backend ingest
 
 The frontend now:
 
-- Creates `FormData` payloads
-- Uploads directly to backend endpoints
-- Waits for ingestion responses
-- Normalizes backend rows
-- Stores backend-derived state
-- Redirects into dashboard workflows
+* Creates FormData payloads
+* Uploads directly to backend endpoints
+* Waits for ingestion responses
+* Normalizes backend rows
+* Stores backend-derived state
+* Redirects into dashboard workflows
 
 ### Main endpoint
 
@@ -210,32 +213,32 @@ The portfolio dashboard was rebuilt around backend-derived analytics instead of 
 
 #### Underwriting snapshot
 
-- Portfolio value
-- Total blocks
-- UPRN coverage
-- Mapped properties
-- Completeness metrics
+* Portfolio value
+* Total blocks
+* UPRN coverage
+* Mapped properties
+* Completeness metrics
 
 #### Block analysis
 
-- Grouped block table
-- Block-level aggregation
-- Map-based visualization
-- Selected block panel
+* Grouped block table
+* Block-level aggregation
+* Map-based visualization
+* Selected block panel
 
 #### Property analysis
 
-- Property schedule table
-- Detailed property panel
-- Raw field display
-- Readiness indicators
+* Property schedule table
+* Detailed property panel
+* Readiness indicators
+* Fire evidence links
 
 #### Placeholder workflows
 
-- Evidence Summary
-- Block Analysis
-- Documents
-- Doc A / Doc B exports
+* Evidence Summary
+* Block Analysis
+* Documents
+* Doc A / Doc B exports
 
 ---
 
@@ -245,22 +248,29 @@ One of the largest changes in this phase was introducing frontend-aware block/pr
 
 ### Current grouping logic uses
 
-- `block_reference`
-- `parent_uprn`
-- `uprn`
-- `property_reference`
-- fallback IDs
+* `block_reference`
+* `parent_uprn`
+* `uprn`
+* `property_reference`
+* fallback IDs
 
 ### Purpose
 
 This grouping structure supports:
 
-- Block-level aggregation
-- Map clustering
-- Underwriting summaries
-- Risk analysis
-- Evidence association
-- Document linking
+* Block-level aggregation
+* Map clustering
+* Underwriting summaries
+* Risk analysis
+* Evidence association
+* Document linking
+
+### Current work in progress
+
+* Improving parent-child hierarchy consistency
+* Preventing duplicated grouped properties
+* Improving grouping when parent UPRN is missing
+* Better reconciliation between frontend grouping and backend block models
 
 ---
 
@@ -272,25 +282,25 @@ The map layer was substantially rewritten.
 
 The map currently supports:
 
-- Block mode
-- Property mode
-- Dynamic marker rendering
-- Fly-to interactions
-- Block selection
-- Property selection
-- Invalid coordinate filtering
-- Tooltip rendering
-- Popup rendering
-- Grouped block display
+* Block mode
+* Property mode
+* Dynamic marker rendering
+* Fly-to interactions
+* Block selection
+* Property selection
+* Invalid coordinate filtering
+* Tooltip rendering
+* Popup rendering
+* Grouped block display
 
 ### Coordinate handling
 
 The map attempts multiple coordinate sources:
 
-- `latitude` / `longitude`
-- `x_coordinate` / `y_coordinate`
-- alternative field names
-- fallback parsing
+* `latitude` / `longitude`
+* `x_coordinate` / `y_coordinate`
+* alternative field names
+* fallback parsing
 
 Invalid coordinates are ignored, including:
 
@@ -308,17 +318,18 @@ The property details panel was rebuilt to support backend-driven rendering.
 
 ### Current displayed fields
 
-- Address
-- Postcode
-- UPRN
-- Parent UPRN
-- Block reference
-- Readiness band
-- Readiness score
-- Missing fields
-- Sum insured
-- Raw backend fields
-- Placeholder enrichment fields
+* Address
+* Postcode
+* UPRN
+* Parent UPRN
+* Block reference
+* Readiness band
+* Readiness score
+* Missing fields
+* Sum insured
+* Raw backend fields
+* Fire evidence fields
+* Placeholder enrichment fields
 
 ---
 
@@ -330,34 +341,34 @@ FRA/FRAEW ingestion is currently one of the largest active workstreams.
 
 #### Backend
 
-- FRA/FRAEW upload routes exist
-- Extraction workers exist
-- Async processing exists
-- Database persistence exists
-- Action item extraction exists
-- Risk extraction exists
-- Assessment metadata extraction exists
+* FRA/FRAEW upload routes exist
+* Extraction workers exist
+* Async processing exists
+* Database persistence exists
+* Action item extraction exists
+* Risk extraction exists
+* Assessment metadata extraction exists
 
 ### Current extracted fields include
 
-- `risk_rating`
-- `rag_status`
-- `assessor_company`
-- `assessor_name`
-- `assessment_date`
-- `next_review_date`
-- `action_items`
-- `significant_findings`
-- `evacuation_strategy`
-- `bsa_2022_applicable`
-- fire safety system indicators
+* `risk_rating`
+* `rag_status`
+* `assessor_company`
+* `assessor_name`
+* `assessment_date`
+* `next_review_date`
+* `action_items`
+* `significant_findings`
+* `evacuation_strategy`
+* `bsa_2022_applicable`
+* fire safety system indicators
 
 ### Database persistence
 
 FRA/FRAEW-related data is currently written into:
 
-- `silver.document_features`
-- `silver.fra_features`
+* `silver.document_features`
+* `silver.fra_features`
 
 ---
 
@@ -369,73 +380,48 @@ A major issue currently being worked on is colour banding consistency.
 
 Different areas of the platform currently use different fields for risk colour mapping:
 
-- `risk_rating`
-- `rag_status`
-- inferred readiness
-- local frontend mappings
+* `risk_rating`
+* `rag_status`
+* inferred readiness
+* local frontend mappings
 
 This causes:
 
-- Mismatched dashboard colours
-- Incorrect amber/red/green chips
-- FRA vs FRAEW inconsistencies
-- Grey fallback states
-- Inconsistent risk summaries
+* Mismatched dashboard colours
+* Incorrect amber/red/green chips
+* FRA vs FRAEW inconsistencies
+* Grey fallback states
+* Inconsistent risk summaries
 
-### Current normalization status
+### Current normalization work
 
-Recently added normalization:
-
-```python
-normalized_risk = _normalize_for_dashboard(features.risk_rating)
-```
-
-However:
-
-```python
-normalized_rag = _normalize_for_dashboard(rag_status)
-```
-
-can create downstream frontend mismatches because frontend colour mappings often expect:
-
-```text
-RED
-AMBER
-GREEN
-```
-
-rather than lowercase values.
-
-### Recommended fix
-
-```python
-normalized_rag = rag_status.strip().upper() if rag_status else None
-```
-
-while keeping:
-
-```python
-normalized_risk = _normalize_for_dashboard(features.risk_rating)
-```
+Normalization logic has recently been added in the backend write pipeline so frontend dashboard rendering receives more consistent values.
 
 ### Current colour banding issue areas
 
 #### FRA/FRAEW
 
-- Inconsistent risk scales
-- Missing standardization
-- Frontend fallback colours
+* Inconsistent risk scales
+* Missing standardization
+* Frontend fallback colours
 
 #### Dashboard
 
-- Some widgets use `risk_rating`
-- Some widgets use `rag_status`
-- Some widgets infer risk locally
+* Some widgets use `risk_rating`
+* Some widgets use `rag_status`
+* Some widgets infer risk locally
 
 #### Map markers
 
-- Some markers derive colours from readiness
-- Some markers derive colours from inferred risk
+* Some markers derive colours from readiness
+* Some markers derive colours from inferred risk
+
+### Remaining work
+
+* Standardize backend risk enums
+* Remove duplicate frontend risk mappings
+* Ensure consistent Red / Amber / Green rendering platform-wide
+* Align FRA and FRAEW rendering logic
 
 ---
 
@@ -447,34 +433,34 @@ UPRN consistency is currently still a work in progress.
 
 The SoV dashboard may currently show:
 
-- Mismatched grouped properties
-- Duplicated properties
-- Incorrect block associations
-- Inconsistent `parent_uprn` usage
+* Mismatched grouped properties
+* Duplicated properties
+* Incorrect block associations
+* Inconsistent `parent_uprn` usage
 
 ### Likely causes
 
-- Mixed source schedule formats
-- Inconsistent UPRN enrichment
-- Partial OS lookup coverage
-- Fallback grouping heuristics
-- Duplicate property references
-- Parent UPRN inconsistencies
+* Mixed source schedule formats
+* Inconsistent UPRN enrichment
+* Partial OS lookup coverage
+* Fallback grouping heuristics
+* Duplicate property references
+* Parent UPRN inconsistencies
 
 ### Current work underway
 
 #### Backend
 
-- Improved enrichment logic
-- Stronger hierarchy matching
-- UPRN normalization
-- Better fallback grouping
+* Improved enrichment logic
+* Stronger hierarchy matching
+* UPRN normalization
+* Better fallback grouping
 
 #### Frontend
 
-- Normalized grouping logic
-- Improved block display
-- Property-to-block drilldown support
+* Normalized grouping logic
+* Improved block display
+* Property-to-block drilldown support
 
 ---
 
@@ -486,19 +472,19 @@ PDF upload and document analysis are currently partially integrated.
 
 #### Upload
 
-- PDF upload routes exist
-- Async processing exists
-- Extraction workers exist
+* PDF upload routes exist
+* Async processing exists
+* Extraction workers exist
 
 #### Parsing
 
 Current extraction attempts:
 
-- Metadata extraction
-- Fire risk extraction
-- Action item extraction
-- Findings extraction
-- Confidence scoring
+* Metadata extraction
+* Fire risk extraction
+* Action item extraction
+* Findings extraction
+* Confidence scoring
 
 ### Still in progress
 
@@ -506,12 +492,12 @@ Current extraction attempts:
 
 Still needed:
 
-- Frontend PDF upload flow
-- Document analysis pages
-- Evidence summary rendering
-- Extraction visualization
-- Extraction confidence display
-- Block/property document linking
+* Frontend PDF upload flow
+* Document analysis pages
+* Evidence summary rendering
+* Extraction visualization
+* Extraction confidence display
+* Block/property document linking
 
 ---
 
@@ -521,18 +507,18 @@ These pages are currently partially wired.
 
 ### Existing
 
-- Frontend placeholders exist
-- Dashboard routing exists
-- Layout scaffolding exists
+* Frontend placeholders exist
+* Dashboard routing exists
+* Layout scaffolding exists
 
 ### Still needed
 
-- Backend-driven evidence aggregation
-- Linked documents
-- Risk timelines
-- Extracted action items
-- Block-level fire evidence summaries
-- Property-level document summaries
+* Backend-driven evidence aggregation
+* Linked documents
+* Risk timelines
+* Extracted action items
+* Block-level fire evidence summaries
+* Property-level document summaries
 
 ---
 
@@ -544,11 +530,11 @@ Async ingestion architecture exists but is still being stabilized.
 
 #### Workers
 
-- `sov_processor`
-- `sov_processor_v2`
-- `fra_processor`
-- `fraew_processor`
-- `enrichment_worker`
+* `sov_processor`
+* `sov_processor_v2`
+* `fra_processor`
+* `fraew_processor`
+* `enrichment_worker`
 
 ### Processing flow
 
@@ -568,38 +554,169 @@ Gold aggregation
 
 ---
 
-## 14. Current Known Issues
+## 14. Geo / Polygon Package Setup for City Coverage
+
+The platform currently focuses mainly on **Glasgow** during local testing and MVP wireframing. The longer-term target is UK-wide support.
+
+### Next priority cities
+
+* Glasgow
+* Edinburgh
+* Manchester
+* London
+* Birmingham
+* Liverpool
+* Leeds
+* Bristol
+
+### Why geo/polygon support matters
+
+The geo/polygon package work supports:
+
+* block/property location matching
+* map rendering
+* UPRN enrichment checks
+* local authority filtering
+* geographic portfolio analysis
+* polygon-based property grouping
+* future exposure/risk aggregation
+
+### Current status
+
+* Glasgow-focused geo support has been used for testing
+* The frontend map supports grouped block markers
+* The platform still needs broader city polygon imports for MVP coverage
+* UPRN and block/property hierarchy issues still need validation against richer geo datasets
+
+### Recommended geo structure
+
+```text
+backend/geo/
+├── polygons/
+│   ├── glasgow/
+│   ├── edinburgh/
+│   ├── manchester/
+│   ├── london/
+│   └── README.md
+├── uprn_maps/
+└── loaders/
+```
+
+### Recommended polygon formats
+
+Preferred formats:
+
+* GeoJSON
+* Shapefile (convert to GeoJSON where possible)
+* CSV with WKT geometry
+
+Recommended MVP file structure:
+
+```text
+backend/geo/polygons/<city>/<city>_wards.geojson
+backend/geo/polygons/<city>/<city>_local_authority.geojson
+backend/geo/polygons/<city>/<city>_postcodes.geojson
+```
+
+### Geo tooling dependencies
+
+Recommended local tools:
+
+* GDAL
+* jq
+* geopandas
+* shapely
+* pyproj
+* fiona
+* rtree
+
+### Recommended MVP expansion order
+
+1. Glasgow
+2. Edinburgh
+3. Manchester
+4. London
+5. Birmingham / Leeds / Liverpool / Bristol
+
+### Recommended ingestion test files
+
+```text
+test-files/
+├── sov/
+├── fra/
+└── fraew/
+```
+
+Suggested files:
+
+```text
+test-files/sov/glasgow_sample_sov.xlsx
+test-files/sov/edinburgh_sample_sov.xlsx
+test-files/sov/manchester_sample_sov.xlsx
+test-files/sov/london_sample_sov.xlsx
+```
+
+```text
+test-files/fra/glasgow_sample_fra.pdf
+test-files/fraew/glasgow_sample_fraew.pdf
+```
+
+### Validation checklist after adding a city
+
+After adding a city polygon package and SoV:
+
+1. Upload the city SoV
+2. Confirm dashboard loads
+3. Confirm map locations render correctly
+4. Confirm grouped blocks are sensible
+5. Confirm UPRN associations look correct
+6. Upload FRA/FRAEW documents
+7. Confirm evidence links correctly to blocks/properties
+8. Confirm colour banding renders consistently
+
+### Remaining geo work
+
+* Add geo loader scripts
+* Add coordinate-to-polygon validation
+* Improve geo-based UPRN mismatch detection
+* Add frontend geo validation warnings
+* Expand city-level test coverage
+* Potential future PostGIS support
+
+---
+
+## 15. Current Known Issues
 
 ### FRA/FRAEW
 
-- Colour banding mismatch
-- Inconsistent normalization
-- Frontend/backend risk mismatch
+* Colour banding mismatch
+* Inconsistent normalization
+* Frontend/backend risk mismatch
 
 ### UPRN
 
-- Grouping inconsistencies
-- Parent UPRN mismatch
-- Duplicated grouping
-- Incomplete enrichment
+* Grouping inconsistencies
+* Parent UPRN mismatch
+* Duplicated grouping
+* Incomplete enrichment
 
 ### Map
 
-- Block selection edge cases
-- Invalid coordinate handling
-- Cluster consistency
+* Block selection edge cases
+* Invalid coordinate handling
+* Cluster consistency
 
 ### Backend
 
-- Bedrock credential issues locally
-- Async retry edge cases
-- Some worker instability
+* Bedrock credential issues locally
+* Async retry edge cases
+* Some worker instability
 
 ### Frontend
 
-- Some placeholder analytics
-- Some locally inferred metrics
-- Incomplete export workflows
+* Some placeholder analytics
+* Some locally inferred metrics
+* Incomplete export workflows
 
 ---
 
@@ -609,11 +726,11 @@ Gold aggregation
 
 Install:
 
-- Python 3.11+
-- Node.js 18+
-- npm
-- Docker
-- Docker Compose
+* Python 3.11+
+* Node.js 18+
+* npm
+* Docker
+* Docker Compose
 
 ---
 
@@ -833,22 +950,24 @@ git push origin frontend-backend-wireframing
 
 ## Frontend
 
-- Backend-connected upload flow
-- Portfolio dashboard rendering
-- Grouped block analysis
-- Map interactions
-- Property details panel
-- Backend normalization
-- Underwriting layout structure
+* Backend-connected upload flow
+* Portfolio dashboard rendering
+* Grouped block analysis
+* Map interactions
+* Property details panel
+* Backend normalization
+* Underwriting layout structure
+* Fire evidence panel
 
 ## Backend
 
-- SoV ingestion
-- Async upload handling
-- FRA/FRAEW extraction
-- Silver-layer persistence
-- Enrichment workers
-- Block grouping logic
+* SoV ingestion
+* Async upload handling
+* FRA/FRAEW extraction
+* Silver-layer persistence
+* Enrichment workers
+* Block grouping logic
+* FRA/FRAEW persistence
 
 ---
 
@@ -856,44 +975,52 @@ git push origin frontend-backend-wireframing
 
 ## FRA/FRAEW
 
-- Normalization consistency
-- Frontend rendering
-- Risk aggregation
-- Document linking
-- Confidence visualization
+* Normalization consistency
+* Frontend rendering
+* Risk aggregation
+* Document linking
+* Confidence visualization
 
 ## UPRN
 
-- Hierarchy correctness
-- Grouping stability
-- Enrichment consistency
-- Duplicate prevention
+* Hierarchy correctness
+* Grouping stability
+* Enrichment consistency
+* Duplicate prevention
 
 ## Block Hierarchy
 
-- Stronger parent-child modelling
-- Drilldown navigation
-- Aggregation correctness
+* Stronger parent-child modelling
+* Drilldown navigation
+* Aggregation correctness
 
 ## Dashboard
 
-- Backend source-of-truth enforcement
-- Remove inferred frontend metrics
-- Consistent aggregation logic
+* Backend source-of-truth enforcement
+* Remove inferred frontend metrics
+* Consistent aggregation logic
 
 ## Documents
 
-- PDF upload UI
-- Evidence pages
-- Document visualization
-- Doc A / Doc B generation
+* PDF upload UI
+* Evidence pages
+* Document visualization
+* Doc A / Doc B generation
 
 ## Async Infrastructure
 
-- Worker stabilization
-- Retry handling
-- Ingestion status polling
-- Processing orchestration
+* Worker stabilization
+* Retry handling
+* Ingestion status polling
+* Processing orchestration
+
+## Geo / Polygon Support
+
+* UK-wide city expansion
+* Polygon validation
+* Coordinate consistency checks
+* Improved geo enrichment
+* Larger ingestion test dataset coverage
 
 ---
 
@@ -901,10 +1028,11 @@ git push origin frontend-backend-wireframing
 
 The platform has transitioned from isolated ingestion prototypes and partially mocked frontend workflows into a backend-driven portfolio intelligence platform with:
 
-- Block-aware underwriting dashboard architecture
-- Document-aware ingestion workflows
-- Async processing infrastructure
-- Enrichment-aware portfolio visualization
-- Early FRA/FRAEW evidence handling
+* Block-aware underwriting dashboard architecture
+* Document-aware ingestion workflows
+* Async processing infrastructure
+* Enrichment-aware portfolio visualization
+* Early FRA/FRAEW evidence handling
+* Geo-aware portfolio analysis foundations
 
-The primary remaining work is now correctness, normalization consistency, enrichment stabilization, document workflows, risk aggregation, export generation, and evidence analytics rather than initial frontend/backend structural integration.
+The primary remaining work is now correctness, normalization consistency, enrichment stabilization, document workflows, risk aggregation, export generation, evidence analytics, and geo-validation rather than initial frontend/backend structural integration.
