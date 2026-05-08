@@ -594,47 +594,33 @@ if __name__ == "__main__":
     from os_datahub_functions import get_uprns_from_addresses
 
     test_addresses = [
-        "Flat 0/1, 24 Brisbane Street, Battlefield, Glasgow, G42 9HY",
-        "Flat 0/2, 24 Brisbane Street, Battlefield, Glasgow, G42 9HY",
-        "Flat 6, Alder House, Alder Way, New Earswick, York, YO32 4TP",
-        "Block 1, Alder House, Alder Way, New Earswick, York, YO32 4TP",
-        "7 Beeforth Close, New Earswick, York, YO32 4DF",
-        "328 Holmlea Road, Cathcart, Glasgow, G44 4BX",
-        "257 Holmlea Road, Cathcart, Glasgow, G44 4DU",
-        "91 Spean Street , Cathcart, Glasgow, G44 4FA",
-        "30 Sycamore Drive, Carterton, OX18 3AT",
-        "22 Rowntree Lodge, Haxby Road, New Earswick, York, YO32 4AA",
-        "Guest Room 28 Rowntree Lodge, Haxby Road, New Earswick, York, YO32 4AA",
-        "117 Parker Court, Haxby Road, New Earswick, York, YO32 4DU",
-        "9 Shakenoak, North Leigh, Witney, OX29 6SP",
-        "8 Shakenoak, North Leigh, Witney, OX29 6SP",
-        "12 Hughes-Owen House Collett Drive, Bampton, OX18 2FY",
-        "Flat 2, 3 Rhannan Road, Cathcart, Glasgow, G44 3AZ"
-    ]
-
-    print("\n\n" + "=" * 60)
-    print("LIVE COMPARISON: OS Places vs Cross-Reference")
-    print("=" * 60)
+'91 Albert Street, Riverside, Cardiff, CF11 6JQ',
+'110 Albert Street, Riverside, Cardiff, CF11 6JP',
+'16 Alexandra Court, Ethel Street, Canton, Cardiff, CF5 1EN',
+]
 
     os_results = get_uprns_from_addresses(test_addresses, PLACES_KEY)
 
+    rows = []
     for input_addr, os_record in zip(test_addresses, os_results):
-        print(f"\n  Input: {input_addr}")
-
         if isinstance(os_record, str):
-            print(f"  OS Places error: {os_record}")
+            rows.append((input_addr, f"ERROR: {os_record}", "-", "-", os_record))
             continue
 
         matched_addr = os_record.get("ADDRESS", "")
         os_match = os_record.get("MATCH", 0.0)
-        os_desc = os_record.get("MATCH_DESCRIPTION", "?")
-        uprn = os_record.get("UPRN", "?")
-
         cr = cross_reference(input_addr, matched_addr, os_match, os_record, PLACES_KEY)
 
-        print(f"  Matched: {matched_addr}")
-        print(f"  UPRN: {uprn}")
-        print(f"  OS:   MATCH={os_match}  ({os_desc})")
-        print(f"  Ours: {cr['level']}  confidence={cr['confidence']}  reasons={cr['reasons']}")
-        if cr.get("parent_record"):
-            print(f"  Parent: {cr['parent_record'].get('ADDRESS')}")
+        our_conf = f"{cr['level']} {cr['confidence']:.2f}"
+        reasoning = ", ".join(cr["reasons"])
+        rows.append((input_addr, matched_addr, f"{os_match:.2f}", our_conf, reasoning))
+
+    col_w = [max(len(r[i]) for r in rows + [("Input", "Matched", "OS conf", "Our conf", "Reasoning")]) for i in range(5)]
+    header = ("Input", "Matched", "OS conf", "Our conf", "Reasoning")
+    sep = "  ".join("-" * w for w in col_w)
+    fmt = "  ".join(f"{{:<{w}}}" for w in col_w)
+
+    print("\n\n" + fmt.format(*header))
+    print(sep)
+    for row in rows:
+        print(fmt.format(*row))
