@@ -278,6 +278,38 @@ def _is_format_mismatch(
     return True
 
 
+# ── Comma-segment match scoring ───────────────────────────
+
+def _segment_match_score(input_address: str, matched_address: str) -> float:
+    """Score how well comma-separated address segments align between two addresses.
+
+    Splits each address by comma and normalises each segment (lowercase,
+    punctuation stripped). For every input segment, finds the best-matching
+    matched segment via SequenceMatcher. A per-segment threshold of 0.85
+    handles property names written as one word or two
+    (e.g. "Red Mayes" vs "REDMAYES" scores ~0.95).
+
+    Returns the fraction of input segments that found a match >= 0.85.
+    """
+    def _norm(s: str) -> str:
+        return re.sub(r"[^\w\s]", " ", s.lower().strip()).strip()
+
+    input_segs = [_norm(s) for s in input_address.split(",") if s.strip()]
+    matched_segs = [_norm(s) for s in matched_address.split(",") if s.strip()]
+
+    if not input_segs or not matched_segs:
+        return 0.0
+
+    matched_count = sum(
+        1 for i_seg in input_segs
+        if i_seg and max(
+            SequenceMatcher(None, i_seg, m_seg).ratio()
+            for m_seg in matched_segs
+        ) >= 0.85
+    )
+    return matched_count / len(input_segs)
+
+
 # ── Parent UPRN verification ──────────────────────────────
 
 def _verify_parent_uprn(
@@ -399,7 +431,8 @@ def cross_reference(
     # though the record is a sub-unit in the database.
     matched_addr_has_flat = _has_flat_token(matched_address)
     structural_alignment = (input_has_flat == matched_addr_has_flat)
-    if os_match >= 0.8 and addr_similarity >= 0.8 and structural_alignment:
+    if (os_match >= 0.8 and addr_similarity >= 0.8 and structural_alignment
+            and not (matched_bld_num and not input_bld_num)):
         reasons.append("good_match_aligned")
         return _build_result(
             "GREEN", os_match, reasons,
@@ -410,7 +443,7 @@ def cross_reference(
     # e.g. "Guest Room 28 Rowntree Lodge" → "28 ROWNTREE LODGE" (OS dropped "Guest Room")
     # Safe because matched didn't ADD anything (unlike "60 Grange Rd" → "60/1, GRANGE RD"
     # where OS added a flat number "1").
-    if os_match >= 0.8 and addr_similarity >= 0.85:
+    if os_match >= 0.8 and addr_similarity >= 0.85 and structural_alignment:
         matched_tokens = set(norm_matched.split())
         input_tokens = set(norm_input.split())
         if matched_tokens.issubset(input_tokens):
@@ -452,6 +485,24 @@ def cross_reference(
                         "GREEN", os_match, reasons,
                         input_has_flat, matched_subunit, parent_uprn_str, None, False,
                     )
+
+    # ── Named-property sub-unit: word-split variant ──────────
+    # Catches cases like "5 Red Mayes" → "5 REDMAYES, HAM LANE" where the
+    # property name is the same entity written as one word or two. Guards:
+    #   - not matched_addr_has_flat: if matched has "Flat X", AMBER logic below
+    #     is the right handler — don't shortcut it
+    #   - 0.9 threshold: nearly all input segments must align, preventing
+    #     a high-scoring postcode/locality coincidence from promoting a wrong match
+    #   - building number mismatch already caught at Step 1 before reaching here
+
+    if (not input_has_flat and matched_subunit and not matched_addr_has_flat
+            and not (matched_bld_num and not input_bld_num)):
+        if _segment_match_score(input_address, matched_address) >= 0.9:
+            reasons.append("segment_match_same_property")
+            return _build_result(
+                "GREEN", max(os_match, 0.75), reasons,
+                input_has_flat, matched_subunit, parent_uprn_str, None, False,
+            )
 
     # ── AMBER / RED: missing flat number, matched a sub-unit ──
 
@@ -523,7 +574,7 @@ def cross_reference(
         street_overlap = 0.0
         if input_street and matched_street:
             street_overlap = len(input_street & matched_street) / max(len(input_street), len(matched_street))
-        if street_overlap >= 0.6:
+        if street_overlap >= 0.6 and not (matched_bld_num and not input_bld_num):
             reasons.append("moderate_match_aligned")
             return _build_result(
                 "GREEN", os_match, reasons,
@@ -594,10 +645,8 @@ if __name__ == "__main__":
     from os_datahub_functions import get_uprns_from_addresses
 
     test_addresses = [
-'91 Albert Street, Riverside, Cardiff, CF11 6JQ',
-'110 Albert Street, Riverside, Cardiff, CF11 6JP',
-'16 Alexandra Court, Ethel Street, Canton, Cardiff, CF5 1EN',
-]
+        "180 Broadholm Street	Parkhouse	Glasgow	G22 6DD"
+    ]
 
     os_results = get_uprns_from_addresses(test_addresses, PLACES_KEY)
 

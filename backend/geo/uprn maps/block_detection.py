@@ -243,11 +243,9 @@ if __name__ == "__main__":
                       "91 Spean Street , Cathcart, Glasgow, G44 4FA"
                       ]
 
-    test = ["flat 1/1 99 Spean Street, Cathcart, Glasgow, G44 4FA",
-                "99 Spean Street, Cathcart, Glasgow, G44 4FA",
-                "flat 1/2 99 Spean Street, Cathcart, Glasgow, G44 4FA",
-                "flat 2/1 99 Spean Street, Cathcart, Glasgow, G44 4FA",
-                "flat 2/2 99 Spean Street, Cathcart, Glasgow, G44 4FA",]
+    test_addresses = ["75 Rowntree Lodge, Haxby Road, New Earswick, York, YO32 4AA",
+        "78 Rowntree Lodge, Haxby Road, New Earswick, York, YO32 4AA",
+        "4 Rowntree Lodge, Haxby Road, New Earswick, York, YO32 4AA",]
 
     props = get_uprns_from_addresses(test_addresses, API_KEY)
 
