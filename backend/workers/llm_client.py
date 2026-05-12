@@ -262,7 +262,7 @@ GROQ_MODEL         = os.getenv("GROQ_MODEL", GROQ_MODEL_DEFAULT)
 ANTHROPIC_MODEL = "claude-haiku-4-5-20251001"
 
 # AWS Bedrock
-BEDROCK_MODEL_ID = "eu.anthropic.claude-haiku-4-5-20251001-v1:0"
+BEDROCK_MODEL_ID = os.getenv("BEDROCK_MODEL_ID", "eu.anthropic.claude-sonnet-4-5-20250929-v1:0")
 
 # Google Gemini
 GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-3.1-flash-lite-preview")

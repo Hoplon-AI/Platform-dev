@@ -161,11 +161,6 @@ Return ONLY valid JSON. Use null for missing fields. Dates: YYYY-MM-DD.
 
 This document follows PAS 9980:2022 methodology and may use various risk rating conventions:
 
-━━━ RAG STATUS — derive from the overall building risk rating ━━━
-  RED:   High | Intolerable | Not Acceptable | Category B2 | Category C | Extreme | Unacceptable
-  AMBER: Medium | Tolerable (with conditions) | Further Action Required | Further Assessment Required | Category B1
-  GREEN: Low | Broadly Acceptable | Tolerable | No Further Action | Category A | Negligible
-
 ━━━ BUILDING RISK RATING ━━━
 Extract the EXACT phrase from the Conclusion or Summary section.
 Common phrases: "Broadly Acceptable", "Tolerable", "Tolerable but not Acceptable",
@@ -222,7 +217,6 @@ Return ONLY this JSON:
   "pas_9980_version": "2022",
   "pas_9980_compliant": true or false or null,
   "building_risk_rating": "overall conclusion — exact phrase from Conclusion section or null",
-  "rag_status": "RED or AMBER or GREEN or null",
 
   "cavity_barriers_present": true or false or null,
   "cavity_barriers_windows": true or false or null,
@@ -441,8 +435,7 @@ class FRAEWProcessor:
 
         raw_json   = await self._call_llm(text)
         features   = self._parse_llm_response(raw_json)
-        llm_rag    = (self._extract_json(raw_json) or {}).get("rag_status")
-        rag_status = self._normalise_rag_status(features.building_risk_rating, llm_rag=llm_rag)
+        rag_status = self._normalise_rag_status(features.building_risk_rating)
         is_in_date      = self._compute_is_in_date(features.assessment_valid_until)
         height_category = self._derive_height_category(features)
         material_flags  = self._derive_material_flags(features.wall_types)
@@ -886,16 +879,8 @@ class FRAEWProcessor:
 
     # ── Derived fields ────────────────────────────────────────────────
 
-    def _normalise_rag_status(self, building_risk_rating: Optional[str], llm_rag: Optional[str] = None) -> Optional[str]:
-        """
-        Map PAS 9980 risk rating → GREEN / AMBER / RED.
-        Uses LLM-provided rag_status directly when valid — falls back to keyword matching.
-        """
-        if llm_rag:
-            v = llm_rag.strip().upper()
-            if v in ("RED", "AMBER", "GREEN"):
-                return v
-
+    def _normalise_rag_status(self, building_risk_rating: Optional[str]) -> Optional[str]:
+        """Map PAS 9980 risk rating → GREEN / AMBER / RED."""
         if not building_risk_rating:
             return None
         lower = building_risk_rating.lower().strip()

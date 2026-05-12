@@ -221,10 +221,31 @@ if existing_val is None or (isinstance(existing_val, str) and not existing_val.s
     updates[db_col] = api_val
 ```
 
-### LLM extraction — Bedrock with eu. prefix
+### LLM extraction — Bedrock model configurable via env var
 ```python
-# llm_client.py line 265
-BEDROCK_MODEL_ID = "eu.anthropic.claude-haiku-4-5-20251001-v1:0"
+# llm_client.py — model read from env, falls back to Sonnet
+BEDROCK_MODEL_ID = os.getenv("BEDROCK_MODEL_ID", "eu.anthropic.claude-sonnet-4-5-20250929-v1:0")
+```
+
+### FRA/FRAEW RAG derivation — always computed in Python, never from LLM
+```python
+# _normalise_rag_status() in fra_processor.py and fraew_processor.py
+# Do NOT ask LLM to output rag_status — it causes ambiguity for edge cases like "Tolerable"
+# RAG is always derived deterministically from risk_rating / building_risk_rating keyword matching
+rag_status = self._normalise_rag_status(features.risk_rating)
+```
+
+### FRA overdue_action_count — computed from due_date, not LLM status text
+```python
+# _count_actions() in fra_processor.py
+# LLM never sets status="overdue" in practice — documents use "outstanding"
+# Fix (branch fra-fraew-fixes, Apr 2026): compare due_date < date.today()
+overdue = sum(
+    1 for a in action_items
+    if a.due_date is not None
+    and a.due_date < today
+    and a.status != "completed"
+)
 ```
 
 ### Doc B FRA/FRAEW — LATERAL JOINs through silver.blocks
@@ -257,8 +278,11 @@ LEFT JOIN LATERAL (
 - **Doc A:** Working. 35 SoV cols + 7 enrichment cols.
 - **Doc B:** Working. 64 cols with FRA/FRAEW LATERAL JOINs.
 - **Known issue:** FRA/FRAEW uploads don't auto-assign block_id (requires manual SQL).
-- **Known issue:** overdue_action_count always returns zero.
+- **Fixed (fra-fraew-fixes, Apr 2026):** `overdue_action_count` was always zero — now computed from `due_date < today AND status != completed` in `_count_actions()`.
+- **Fixed (fra-fraew-fixes, Apr 2026):** Removed duplicate `rag_status` derivation from FRA/FRAEW prompts — RAG now derived solely by `_normalise_rag_status()` keyword matching.
 - **Pending:** Underwriter dashboard (migration 018 + jwt_utils.py written, React UI not started).
+- **Pending:** `assessment_valid_until` fallback — populate from `next_review_date` when null (02BR example: `assessment_valid_until=null`, `next_review_date=2025-06-18`).
+- **Pending MVP:** FRA/FRAEW upload UI, per-block action drill-down endpoint (`GET /fra-blocks/{block_id}/actions`), RED block summary endpoint.
 
 ---
 
