@@ -1538,3 +1538,219 @@ async def doc_completeness(
                 "field_detail":     doc_b_detail,
             },
         }
+
+
+# ===========================================================================
+# Per-block action drill-down
+# ===========================================================================
+
+@router.get("/fra-blocks/{block_id}/actions")
+async def fra_block_actions(
+    block_id: str,
+    tenant: Tuple[str, str] = Depends(get_tenant_info),
+) -> Dict[str, Any]:
+    """
+    Return all action items from the most recent FRA for a specific block.
+
+    Each action includes: issue_ref, description, hazard_type, priority,
+    due_date, status, responsible.
+
+    Also returns top-level FRA context: rag_status, risk_rating,
+    assessment_date, assessor_company, total/overdue/outstanding action counts.
+    """
+    ha_id, _ = tenant
+    pool = DatabasePool.get_pool()
+    async with pool.acquire() as conn:
+        # Verify the block belongs to this HA
+        block_row = await conn.fetchrow(
+            "SELECT block_id::text, name FROM silver.blocks WHERE block_id = $1 AND ha_id = $2",
+            block_id, ha_id,
+        )
+        if not block_row:
+            raise HTTPException(status_code=404, detail=f"Block {block_id} not found.")
+
+        fra_row = await conn.fetchrow(
+            """
+            SELECT
+                fra_id::text,
+                rag_status,
+                risk_rating,
+                assessment_date,
+                assessment_valid_until,
+                is_in_date,
+                assessor_name,
+                assessor_company,
+                evacuation_strategy,
+                total_action_count,
+                overdue_action_count,
+                outstanding_action_count,
+                high_priority_action_count,
+                no_date_action_count,
+                action_items
+            FROM silver.fra_features
+            WHERE block_id = $1
+            ORDER BY assessment_date DESC NULLS LAST, created_at DESC
+            LIMIT 1
+            """,
+            block_id,
+        )
+
+        if not fra_row:
+            return {
+                "block_id": block_id,
+                "block_name": block_row["name"],
+                "fra_id": None,
+                "message": "No FRA on record for this block.",
+                "action_items": [],
+            }
+
+        import json as _json
+        raw_actions = fra_row["action_items"]
+        if isinstance(raw_actions, str):
+            action_items = _json.loads(raw_actions)
+        elif raw_actions is None:
+            action_items = []
+        else:
+            action_items = list(raw_actions)
+
+        return {
+            "block_id":                  block_id,
+            "block_name":                block_row["name"],
+            "fra_id":                    fra_row["fra_id"],
+            "rag_status":                fra_row["rag_status"],
+            "risk_rating":               fra_row["risk_rating"],
+            "assessment_date":           fra_row["assessment_date"].isoformat() if fra_row["assessment_date"] else None,
+            "assessment_valid_until":    fra_row["assessment_valid_until"].isoformat() if fra_row["assessment_valid_until"] else None,
+            "is_in_date":                fra_row["is_in_date"],
+            "assessor_name":             fra_row["assessor_name"],
+            "assessor_company":          fra_row["assessor_company"],
+            "evacuation_strategy":       fra_row["evacuation_strategy"],
+            "total_action_count":        fra_row["total_action_count"] or 0,
+            "overdue_action_count":      fra_row["overdue_action_count"] or 0,
+            "outstanding_action_count":  fra_row["outstanding_action_count"] or 0,
+            "high_priority_action_count": fra_row["high_priority_action_count"] or 0,
+            "no_date_action_count":      fra_row["no_date_action_count"] or 0,
+            "action_items":              action_items,
+        }
+
+
+# ===========================================================================
+# RED block summary
+# ===========================================================================
+
+@router.get("/portfolios/{portfolio_id}/red-blocks")
+async def red_blocks(
+    portfolio_id: str,
+    tenant: Tuple[str, str] = Depends(get_tenant_info),
+) -> Dict[str, Any]:
+    """
+    All RED-rated blocks in a portfolio — for underwriter risk triage.
+
+    A block is included if its most recent FRA is RED **or** its most recent
+    FRAEW is RED. Returns per-block:
+      - block name, height, unit count, TIV
+      - FRA RAG, risk rating, assessment date, in-date flag
+      - action counts (total / overdue / high-priority)
+      - FRAEW RAG, combustible cladding flag
+      - combined worst-case RAG signal
+    """
+    pool = DatabasePool.get_pool()
+    async with pool.acquire() as conn:
+        portfolio = await _resolve_portfolio(conn, portfolio_id)
+        ha_id = portfolio["ha_id"]
+
+        rows = await conn.fetch(
+            """
+            SELECT
+                b.block_id::text,
+                b.name              AS block_name,
+                b.unit_count,
+                b.height_max_m,
+                b.total_sum_insured,
+                b.is_listed,
+
+                fra.fra_id::text,
+                fra.rag_status          AS fra_rag,
+                fra.risk_rating         AS fra_raw_rating,
+                fra.assessment_date     AS fra_date,
+                fra.assessment_valid_until,
+                fra.is_in_date,
+                fra.assessor_company,
+                fra.evacuation_strategy,
+                COALESCE(fra.total_action_count, 0)         AS total_actions,
+                COALESCE(fra.overdue_action_count, 0)       AS overdue_actions,
+                COALESCE(fra.high_priority_action_count, 0) AS high_priority_actions,
+
+                fraew.fraew_id::text,
+                fraew.rag_status                AS fraew_rag,
+                fraew.has_combustible_cladding,
+                fraew.eps_insulation_present
+
+            FROM silver.blocks b
+
+            LEFT JOIN LATERAL (
+                SELECT fra_id, rag_status, risk_rating, assessment_date,
+                       assessment_valid_until, is_in_date, assessor_company,
+                       evacuation_strategy, total_action_count,
+                       overdue_action_count, high_priority_action_count
+                FROM silver.fra_features
+                WHERE block_id = b.block_id
+                ORDER BY assessment_date DESC NULLS LAST, created_at DESC
+                LIMIT 1
+            ) fra ON TRUE
+
+            LEFT JOIN LATERAL (
+                SELECT fraew_id, rag_status, has_combustible_cladding,
+                       eps_insulation_present
+                FROM silver.fraew_features
+                WHERE block_id = b.block_id
+                ORDER BY created_at DESC
+                LIMIT 1
+            ) fraew ON TRUE
+
+            WHERE b.ha_id = $1
+              AND (fra.rag_status = 'RED' OR fraew.rag_status = 'RED')
+
+            ORDER BY
+                COALESCE(fra.overdue_action_count, 0) DESC,
+                COALESCE(fra.total_action_count, 0) DESC,
+                b.total_sum_insured DESC NULLS LAST
+            """,
+            ha_id,
+        )
+
+        blocks = []
+        for r in rows:
+            blocks.append({
+                "block_id":               r["block_id"],
+                "block_name":             r["block_name"],
+                "unit_count":             r["unit_count"],
+                "height_max_m":           float(r["height_max_m"]) if r["height_max_m"] else None,
+                "total_sum_insured":      float(r["total_sum_insured"]) if r["total_sum_insured"] else None,
+                "is_listed":              r["is_listed"],
+                "fra_id":                 r["fra_id"],
+                "fra_rag":                r["fra_rag"],
+                "fra_raw_rating":         r["fra_raw_rating"],
+                "fra_date":               r["fra_date"].isoformat() if r["fra_date"] else None,
+                "assessment_valid_until": r["assessment_valid_until"].isoformat() if r["assessment_valid_until"] else None,
+                "is_in_date":             r["is_in_date"],
+                "assessor_company":       r["assessor_company"],
+                "evacuation_strategy":    r["evacuation_strategy"],
+                "total_actions":          r["total_actions"],
+                "overdue_actions":        r["overdue_actions"],
+                "high_priority_actions":  r["high_priority_actions"],
+                "fraew_id":               r["fraew_id"],
+                "fraew_rag":              r["fraew_rag"],
+                "has_combustible_cladding": r["has_combustible_cladding"],
+                "eps_insulation_present": r["eps_insulation_present"],
+            })
+
+        return {
+            "portfolio_id":   portfolio_id,
+            "portfolio_name": portfolio["portfolio_name"],
+            "ha_name":        portfolio["ha_name"],
+            "red_block_count": len(blocks),
+            "total_overdue_actions": sum(b["overdue_actions"] for b in blocks),
+            "total_high_priority_actions": sum(b["high_priority_actions"] for b in blocks),
+            "blocks": blocks,
+        }

@@ -1559,14 +1559,6 @@ Return ONLY valid JSON. Use null for missing fields. Dates must be YYYY-MM-DD.
 
 UK FRA documents vary widely in format — apply the rules below regardless of layout, template, or assessor company.
 
-━━━ RAG STATUS ━━━
-Derive from the overall risk rating using these mappings:
-  RED:   High | Very High | Intolerable | Substantial | Extreme | Critical | Serious | Unacceptable | Priority 1 | Grade D | Grade E
-  AMBER: Medium | Moderate | Significant | Tolerable with conditions | Further Action Required | Priority 2 | Grade C
-  GREEN: Low | Trivial | Negligible | Acceptable | Broadly Acceptable | Tolerable | No Further Action | Priority 3 | Grade A | Grade B
-  Numeric scores (likelihood × consequence): ≥15 → RED | 8–14 → AMBER | ≤7 → GREEN
-  If rag_status cannot be determined, return null.
-
 ━━━ RISK RATING ━━━
 Copy the exact phrase used in the document (do not paraphrase).
 Look in: cover page, executive summary, conclusions, risk matrix table, summary box.
@@ -1627,7 +1619,6 @@ List major fire safety concerns noted by the assessor that are not already captu
 Return ONLY this JSON — no markdown, no commentary:
 {{
   "risk_rating": "exact phrase or null",
-  "rag_status": "RED or AMBER or GREEN or null",
   "fra_assessment_type": "Type 1 / Type 2 / Type 3 / Type 4 — only if explicitly stated, else null",
   "assessment_date": "YYYY-MM-DD or null",
   "assessment_valid_until": "YYYY-MM-DD or null",
@@ -1933,9 +1924,11 @@ class FRAProcessor:
         raw_json = await self._call_llm(text)
         features = self._parse_llm_response(raw_json)
 
-        # Use LLM-provided rag_status when available (single-pass prompt extracts it directly)
-        llm_rag    = (self._extract_json(raw_json) or {}).get("rag_status")
-        rag_status = self._normalise_rag_status(features.risk_rating, llm_rag=llm_rag)
+        # Fallback: populate assessment_valid_until from next_review_date when null
+        if features.assessment_valid_until is None and features.next_review_date is not None:
+            features.assessment_valid_until = features.next_review_date
+
+        rag_status = self._normalise_rag_status(features.risk_rating)
 
         # Auto-resolve block_id from LLM-extracted building name/address if not provided
         if not block_id:
@@ -2208,6 +2201,11 @@ class FRAProcessor:
             "DEFICIENCIES AND RECOMMENDATIONS", "ITEMS FOR ACTION",
             "OUTSTANDING ACTIONS", "RECOMMENDED ACTIONS",
             "SECTION 3", "ACTION NO", "ACTION REF",
+            # Additional formats
+            "AREAS OF CONCERN", "REMEDIAL MEASURES", "CORRECTIVE ACTIONS",
+            "AUDIT DETAILS", "ITEMS REQUIRING ATTENTION",
+            "RISK REDUCTION MEASURES", "FINDINGS AND RECOMMENDATIONS",
+            "FIRE SAFETY IMPROVEMENTS", "HAZARD ACTION",
         ])
 
         systems_start = find_first([
@@ -2245,19 +2243,27 @@ class FRAProcessor:
         else:
             systems = ""
 
+        # Always include the document tail — Islington-style FRAs put action
+        # cards at the very end ("Audit Details"), which marker-based splitting
+        # would otherwise miss entirely.
+        tail_budget = int(max_chars * 0.15)
+        tail = text[-tail_budget:]
+
         parts = ["=== HEADER ===", header.strip()]
         if action.strip():
             parts += ["\n\n=== ACTION PLAN / FINDINGS ===", action.strip()]
         if systems.strip():
             parts += ["\n\n=== FIRE SYSTEMS ===", systems.strip()]
+        if tail.strip():
+            parts += ["\n\n=== END OF DOCUMENT ===", tail.strip()]
 
         result = "\n".join(parts)
         if len(result) > max_chars:
             result = result[:max_chars]
 
         logger.info(
-            "Smart truncate: %d → %d chars (header=%d action=%d systems=%d)",
-            len(text), len(result), len(header), len(action), len(systems),
+            "Smart truncate: %d → %d chars (header=%d action=%d systems=%d tail=%d)",
+            len(text), len(result), len(header), len(action), len(systems), len(tail),
         )
         return result
 
@@ -2403,16 +2409,8 @@ class FRAProcessor:
 
     # ── Derived fields ────────────────────────────────────────────────
 
-    def _normalise_rag_status(self, risk_rating: Optional[str], llm_rag: Optional[str] = None) -> Optional[str]:
-        """
-        Derive RED/AMBER/GREEN.
-        Uses LLM-provided rag_status directly when valid — falls back to keyword matching.
-        """
-        if llm_rag:
-            v = llm_rag.strip().upper()
-            if v in ("RED", "AMBER", "GREEN"):
-                return v
-
+    def _normalise_rag_status(self, risk_rating: Optional[str]) -> Optional[str]:
+        """Derive RED/AMBER/GREEN from extracted risk_rating phrase."""
         if not risk_rating:
             return None
         lower = risk_rating.lower().strip()
@@ -2453,9 +2451,15 @@ class FRAProcessor:
         return valid_until >= date.today()
 
     def _count_actions(self, action_items: list) -> dict:
+        today         = date.today()
         total         = len(action_items)
         high_priority = sum(1 for a in action_items if a.priority == "high")
-        overdue       = sum(1 for a in action_items if a.status == "overdue")
+        overdue       = sum(
+            1 for a in action_items
+            if a.due_date is not None
+            and a.due_date < today
+            and a.status != "completed"
+        )
         outstanding   = sum(1 for a in action_items if a.status in ("outstanding", "overdue"))
         no_date       = sum(1 for a in action_items if not a.due_date)
         return {
