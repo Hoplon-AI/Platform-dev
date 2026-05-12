@@ -645,7 +645,30 @@ if __name__ == "__main__":
     from os_datahub_functions import get_uprns_from_addresses
 
     test_addresses = [
-        "180 Broadholm Street	Parkhouse	Glasgow	G22 6DD"
+        "Flat 3/2, 22 Cartside Quadrant, Battlefield, Glasgow, G42 9RL",
+        "Flat 2, 3 Rhannan Road, Cathcart, Glasgow, G44 3AZ"
+    ]
+
+    test_addresses = [
+        # "Flat 1/1, 351 Holmlea Road, Cathcart, Glasgow, G44 4BP",  # Scotland,
+        # "61, WHITESANDS, DUMFRIES, DG1 2RS",
+        # "76A, TAY STREET, PERTH, PH2 8NP P",
+        # "12, NORTH BRIDGE STREET, HAWICK, TD9 9QW",
+        # "40, SHORE ROAD, COVE, HELENSBURGH, G84 0LR",
+        # "47 Greens Road, Eynsham, Witney, OX29 4NQ",  # England
+        # "9 Flexneys Paddock, Stanton Harcourt, Witney, OX29 5RS",
+        # "32 Sycamore Drive, Carterton, OX18 3AT",
+        # "21 Heyford Close, Standlake, Witney, OX29 7SZ",
+        # "1 Mill Street, Tewkesbury, GL20 5RZ",
+        # "13, KINGS STAITH, YORK, YO1 9SN",
+        # "11, FRANKWELL, SHREWSBURY, SY3 8JY",
+        # "3, BRIDGE GATE, HEBDEN BRIDGE, HX7 8EX",
+        "1, OLD CARDIFF ROAD, NEWPORT, NP20 3AT",  # Wales
+        "10, DOWNING STREET, LLANELLI, SA15 2UA",
+        "4 Albert Street, Riverside, Cardiff, CF11 6BG",
+        "110 Albert Street, Riverside, Cardiff, CF11 6JP",
+        "4 Alexandra Court, Ethel Street, Canton, Cardiff, CF5 1EN",
+        "107 Bartley Wilson Way, Canton, Cardiff, CF11 8EN"
     ]
 
     os_results = get_uprns_from_addresses(test_addresses, PLACES_KEY)

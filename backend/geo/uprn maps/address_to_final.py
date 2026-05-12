@@ -18,6 +18,7 @@ from os_datahub_functions import (
 from uprn_to_epc import get_epc_from_uprn, get_epcs_from_uprns
 from uprn_to_height import get_building_from_coords, get_buildings_from_coords_batch
 from uprn_to_listed import get_listed_building_status, get_listed_building_statuses
+from cross_reference import cross_reference, cross_reference_batch
 
 
 def get_final_info_from_address(address: str, email: str, places_key: str, ngd_key: str, epc_key: str) -> dict | str:
@@ -68,7 +69,13 @@ def get_final_info_from_address(address: str, email: str, places_key: str, ngd_k
     # Step 4: Listed building lookup
     listed_data = get_listed_building_status(uprn, places_key)
 
-    # Step 5: Merge — EPC preferred for construction fields
+    # Step 5: Cross-reference scoring — reuses the already-fetched place record,
+    # so no extra OS Places call (parent UPRN lookup only fires in AMBER cases).
+    cr = cross_reference(
+        address, place.get("ADDRESS", ""), float(place.get("MATCH") or 0), place, places_key,
+    )
+
+    # Step 6: Merge — EPC preferred for construction fields
     result = {
         # Identity
         "uprn": str(uprn),
@@ -79,6 +86,11 @@ def get_final_info_from_address(address: str, email: str, places_key: str, ngd_k
         "country_code": place.get("COUNTRY_CODE"),
         "match_score": place.get("MATCH"),
         "match_description": place.get("MATCH_DESCRIPTION"),
+
+        # Cross-reference match quality
+        "match_level": cr["level"],
+        "match_confidence": cr["confidence"],
+        "match_reasons": cr["reasons"],
 
         # Height data (NGD only)
         "height_relativemax_m": ngd.get("height_relativemax_m"),
@@ -203,6 +215,7 @@ def get_final_info_from_uprn(uprn: str | int, email: str, places_key: str, ngd_k
 def _merge_property_result(
     uprn: str, place: dict, epc_data, ngd_building, listed_data: dict,
     include_match_score: bool = False,
+    cross_ref: dict | None = None,
 ) -> dict:
     """Merge data from all sources into a single property dict.
 
@@ -230,6 +243,11 @@ def _merge_property_result(
         "logical_status": place.get("LOGICAL_STATUS_CODE"),
         "match_score": place.get("MATCH"),
         "match_description": place.get("MATCH_DESCRIPTION"),
+
+        # Cross-reference match quality (address-based lookups only; None for UPRN-based)
+        "match_level": cross_ref["level"] if cross_ref else None,
+        "match_confidence": cross_ref["confidence"] if cross_ref else None,
+        "match_reasons": cross_ref["reasons"] if cross_ref else None,
 
         # Height data (NGD only)
         "height_relativemax_m": ngd.get("height_relativemax_m"),
@@ -310,8 +328,10 @@ def get_final_info_from_addresses(
     valid_places = {}  # uprn -> place record
     ngd_coords = []    # (uprn, x, y) for NGD batch
     listed_inputs = [] # (uprn, place) for listed batch
+    cr_entries = []    # (input_address, matched_address, os_match, matched_record) for cross-reference batch
+    cr_uprn_keys = []  # uprn_str for each cr_entry, to map results back
 
-    for place in places:
+    for addr, place in zip(addresses, places):
         if isinstance(place, str):
             continue
         uprn = place.get("UPRN")
@@ -327,6 +347,9 @@ def get_final_info_from_addresses(
             ngd_coords.append((uprn_str, float(x), float(y)))
             listed_inputs.append((uprn_str, place))
 
+        cr_entries.append((addr, place.get("ADDRESS", ""), float(place.get("MATCH") or 0), place))
+        cr_uprn_keys.append(uprn_str)
+
     # Step 2: Batch EPC lookup
     epc_results = get_epcs_from_uprns(valid_uprns, email, epc_key) if valid_uprns else {}
 
@@ -336,9 +359,14 @@ def get_final_info_from_addresses(
     # Step 4: Batch listed building lookup (using pre-resolved place records)
     listed_results = get_listed_building_statuses(listed_inputs, places_key) if listed_inputs else {}
 
-    # Step 5: Merge results per address
+    # Step 5: Cross-reference scoring — reuses already-fetched place records,
+    # so no extra OS Places calls (parent UPRN lookup only fires in AMBER cases).
+    cr_list = cross_reference_batch(cr_entries, places_key) if cr_entries else []
+    cr_results = dict(zip(cr_uprn_keys, cr_list))
+
+    # Step 6: Merge results per address
     output: list[dict | str] = []
-    for place in places:
+    for addr, place in zip(addresses, places):
         if isinstance(place, str):
             output.append(place)
             continue
@@ -356,6 +384,7 @@ def get_final_info_from_addresses(
         output.append(_merge_property_result(
             uprn_str, place, epc_data, ngd_building, listed_data,
             include_match_score=True,
+            cross_ref=cr_results.get(uprn_str),
         ))
 
     return output
@@ -434,15 +463,12 @@ def get_final_info_from_uprns(
 if __name__ == "__main__":
     from block_detection import detect_block_properties
 
-    PLACES_KEY = "1cNGEE0jL0R5pXlDpPd55wyEXnIBCF2J"
-    NGD_KEY = "1cNGEE0jL0R5pXlDpPd55wyEXnIBCF2J"
+    PLACES_KEY = "7VakhnbibvboaY9eE0385zORrBJAc2sw"
+    NGD_KEY = "7VakhnbibvboaY9eE0385zORrBJAc2sw"
     EPC_EMAIL = "igorshuvalov23@gmail.com"
     EPC_KEY = "9213b51f9af85ba4700865191700778f0cc7f3fc"
 
     test_addresses = ["Flat 1/1, 351 Holmlea Road, Cathcart, Glasgow, G44 4BP",
-                      "Flat 1/2, 351 Holmlea Road, Cathcart, Glasgow, G44 4BP",
-                      "Flat 1/3, 351 Holmlea Road, Cathcart, Glasgow, G44 4BP",
-                      "Flat 1/2, 60 Grange Road, Battlefield, Glasgow, G42 9LF",
                       "Flat 2/1, 60 Grange Road, Battlefield, Glasgow, G42 9LF"]
 
     # Batch lookup — resolves addresses once, correct match scores preserved

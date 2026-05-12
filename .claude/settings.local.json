@@ -6,7 +6,26 @@
       "Bash(find \"C:\\\\Users\\\\Igors\\\\Hoplon\\\\Platform-dev\" -type f -name \"*.py\" -exec grep -l \"postcode_parser\\\\|uk_postcode\\\\|address_parser\\\\|parse.*address\" {} \\\\;)",
       "WebFetch(domain:osdatahub.readthedocs.io)",
       "WebFetch(domain:www.europa.uk.com)",
-      "WebFetch(domain:docs.os.uk)"
+      "WebFetch(domain:docs.os.uk)",
+      "WebFetch(domain:www2.sepa.org.uk)",
+      "WebFetch(domain:services7.arcgis.com)",
+      "WebFetch(domain:hub.arcgis.com)",
+      "WebFetch(domain:data-stirling-council.hub.arcgis.com)",
+      "WebFetch(domain:www.arcgis.com)",
+      "WebFetch(domain:map.sepa.org.uk)",
+      "WebFetch(domain:datamap.gov.wales)",
+      "WebFetch(domain:www.data.gov.uk)",
+      "WebFetch(domain:environment.data.gov.uk)",
+      "WebFetch(domain:ckan.publishing.service.gov.uk)",
+      "WebFetch(domain:environmentagency.blog.gov.uk)",
+      "WebFetch(domain:www.gov.uk)",
+      "WebFetch(domain:geosmartinfo.co.uk)",
+      "WebFetch(domain:scalgo.com)",
+      "WebFetch(domain:www.api.gov.uk)",
+      "WebFetch(domain:check-long-term-flood-risk.service.gov.uk)",
+      "WebFetch(domain:flood-warning-information.service.gov.uk)",
+      "WebFetch(domain:services1.arcgis.com)",
+      "WebFetch(domain:services-eu1.arcgis.com)"
     ]
   }
 }
