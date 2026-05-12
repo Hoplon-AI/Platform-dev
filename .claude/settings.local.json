@@ -25,7 +25,11 @@
       "WebFetch(domain:check-long-term-flood-risk.service.gov.uk)",
       "WebFetch(domain:flood-warning-information.service.gov.uk)",
       "WebFetch(domain:services1.arcgis.com)",
-      "WebFetch(domain:services-eu1.arcgis.com)"
+      "WebFetch(domain:services-eu1.arcgis.com)",
+      "WebFetch(domain:cdn.cyfoethnaturiol.cymru)",
+      "WebFetch(domain:beta.sepa.scot)",
+      "WebFetch(domain:www.sepa.org.uk)",
+      "WebFetch(domain:www.gov.scot)"
     ]
   }
 }

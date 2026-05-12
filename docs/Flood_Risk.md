@@ -31,13 +31,34 @@ S  →  SEPA Flood Maps   ArcGIS MapServer spatial query
 N  →  not supported
 ```
 
-**Bands are not directly comparable across countries.** Each agency defines its own probability thresholds and methodology. Do not rank or aggregate across the England/Wales/Scotland divide without accounting for this.
+**Bands are not directly comparable across countries.** Each agency defines its own probability thresholds, and Scotland's bands are on an entirely different scale to England and Wales. A "High" in Scotland means a ≥10%/year chance; a "High" in England means ≥3.3%/year. Scotland also reports undefended (natural) risk, while England and Wales report post-defence risk. Do not rank or aggregate across the England/Wales/Scotland divide without accounting for these differences.
+
+### Annual probability comparison
+
+| Band | England (EA RoFRS) | Wales (NRW FRAW) | Scotland (SEPA) |
+|---|---|---|---|
+| High | ≥ 3.3%/yr (1-in-30) | ≥ 3.3%/yr (1-in-30) | ≥ 10%/yr (1-in-10) |
+| Medium | 1.0 – 3.3%/yr (1-in-100 to 1-in-30) | Rivers/SW: 1.0 – 3.3%/yr · Coastal: 0.5 – 3.3%/yr | 0.5 – 10%/yr (1-in-200 to 1-in-10) |
+| Low | 0.1 – 1.0%/yr (1-in-1000 to 1-in-100) | Rivers/SW: 0.1 – 1.0%/yr · Coastal: 0.1 – 0.5%/yr | 0.1 – 0.5%/yr (1-in-1000 to 1-in-200) |
+| Very Low | < 0.1%/yr (worse than 1-in-1000) | *(not published — outside all extents)* | *(not published — outside all extents)* |
+| Accounts for defences? | Yes | Yes | **No** (undefended/natural risk) |
+| Terminology | "Risk" | "Risk" | "Likelihood" |
+
+**Key implication:** because Scotland is undefended and uses a higher High threshold, a Scottish "Low" (0.1–0.5%/yr) is roughly equivalent to an English/Welsh "Low-Medium", and a Scottish "High" (≥10%/yr) describes events that would be "High" in England only at the most extreme end. When comparing properties across nations, use the annual probability ranges above rather than the band labels.
 
 ---
 
 ## England — EA RoFRS (postcode CSV)
 
-**Bands:** High / Medium / Low / Very Low
+**Bands:** High / Medium / Low / Very Low  
+**Basis:** defended (post-flood-defence) risk
+
+| Band | Annual probability | Return period |
+|---|---|---|
+| High | ≥ 3.3% | more frequent than 1-in-30 |
+| Medium | 1.0 – 3.3% | 1-in-100 to 1-in-30 |
+| Low | 0.1 – 1.0% | 1-in-1000 to 1-in-100 |
+| Very Low | < 0.1% | less frequent than 1-in-1000 |
 
 **Source:** `Postcodes_Risk_Assessment_All.csv`  
 Dataset: <https://environment.data.gov.uk/dataset/53cba123-71f8-417a-8441-4c7ba111e8e1>  
@@ -78,7 +99,19 @@ backend/geo/uprn maps/
 
 ## Wales — NRW FRAW (WFS)
 
-**Bands:** High / Medium / Low (+ Very Low when outside all extents)
+**Bands:** High / Medium / Low (+ Very Low when outside all extents)  
+**Basis:** defended (post-flood-defence) risk
+
+Wales has slightly different thresholds for coastal vs rivers/surface water at the Medium band:
+
+| Band | Rivers & surface water | Coastal | Return period (rivers) |
+|---|---|---|---|
+| High | > 3.3%/yr | > 3.3%/yr | more frequent than 1-in-30 |
+| Medium | 1.0 – 3.3%/yr | 0.5 – 3.3%/yr | 1-in-100 to 1-in-30 |
+| Low | 0.1 – 1.0%/yr | 0.1 – 0.5%/yr | 1-in-1000 to 1-in-100 |
+| Very Low | *(not published)* | *(not published)* | — |
+
+NRW does not publish a Very Low band. Points outside all FRAW extents are reported as Very Low by this code with a note to that effect.
 
 **Source:** Natural Resources Wales Flood Risk Assessment Wales  
 WFS endpoint: `https://datamap.gov.wales/geoserver/inspire-nrw/wfs`
@@ -105,7 +138,19 @@ The old monolithic layer `inspire-nrw:NRW_FLOOD_RISK_ASSESSMENT_WALES` and field
 
 ## Scotland — SEPA (ArcGIS MapServer)
 
-**Bands:** High / Medium / Low (+ Very Low when outside all extents)
+**Bands:** High / Medium / Low (+ Very Low when outside all extents)  
+**Basis:** undefended (natural) risk — flood defences are NOT factored in
+
+SEPA uses the term "likelihood" rather than "probability", but the values are annual probability percentages. The thresholds are significantly different from England and Wales:
+
+| Band (SEPA: "likelihood") | Annual probability | Return period |
+|---|---|---|
+| High | ≥ 10%/yr | more frequent than 1-in-10 |
+| Medium | 0.5 – 10%/yr | 1-in-200 to 1-in-10 |
+| Low | 0.1 – 0.5%/yr | 1-in-1000 to 1-in-200 |
+| Very Low | *(not published)* | — |
+
+Because Scotland reports undefended risk, the same physical flooding event will appear at a higher band in Scotland than it would in England or Wales (where defences reduce the apparent risk). A Scottish "Low" (0.1–0.5%/yr) covers roughly the same probability range as the upper end of an English "Low" and part of English "Medium".
 
 **Source:** SEPA Flood Maps  
 Service: `https://map.sepa.org.uk/server/rest/services/Open/Flood_Maps/MapServer`
@@ -117,8 +162,8 @@ Queries SEPA's ArcGIS REST MapServer using a point-in-polygon spatial query (`es
 | Band | River layer | Coastal layer | Annual probability |
 |---|---|---|---|
 | High | 0 | 6 | ≥ 10% (1-in-10) |
-| Medium | 1 | 7 | ≥ 0.5% (1-in-200) |
-| Low | 2 | 8 | ≥ 0.1% (1-in-1000) |
+| Medium | 1 | 7 | 0.5 – 10% (1-in-200 to 1-in-10) |
+| Low | 2 | 8 | 0.1 – 0.5% (1-in-1000 to 1-in-200) |
 
 Layers are queried in priority order (High first). The first hit is returned without querying lower-priority bands. Surface water layers (3–5) are excluded to match the rivers-and-sea scope of EA RoFRS and NRW FRAW.
 
