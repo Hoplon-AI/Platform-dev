@@ -663,12 +663,13 @@ if __name__ == "__main__":
         # "13, KINGS STAITH, YORK, YO1 9SN",
         # "11, FRANKWELL, SHREWSBURY, SY3 8JY",
         # "3, BRIDGE GATE, HEBDEN BRIDGE, HX7 8EX",
-        "1, OLD CARDIFF ROAD, NEWPORT, NP20 3AT",  # Wales
-        "10, DOWNING STREET, LLANELLI, SA15 2UA",
-        "4 Albert Street, Riverside, Cardiff, CF11 6BG",
-        "110 Albert Street, Riverside, Cardiff, CF11 6JP",
-        "4 Alexandra Court, Ethel Street, Canton, Cardiff, CF5 1EN",
-        "107 Bartley Wilson Way, Canton, Cardiff, CF11 8EN"
+        # "1, OLD CARDIFF ROAD, NEWPORT, NP20 3AT",  # Wales
+        # "10, DOWNING STREET, LLANELLI, SA15 2UA",
+        # "4 Albert Street, Riverside, Cardiff, CF11 6BG",
+        # "110 Albert Street, Riverside, Cardiff, CF11 6JP",
+        # "4 Alexandra Court, Ethel Street, Canton, Cardiff, CF5 1EN",
+        # "107 Bartley Wilson Way, Canton, Cardiff, CF11 8EN",
+        "40 Balmore Road, Glasgow, G22 6RN"
     ]
 
     os_results = get_uprns_from_addresses(test_addresses, PLACES_KEY)

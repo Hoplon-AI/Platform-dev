@@ -545,49 +545,49 @@ if __name__ == "__main__":
     results = get_final_info_from_addresses(test_addresses, EPC_EMAIL, PLACES_KEY, NGD_KEY, EPC_KEY)
 
     # Block detection using the results (parent_uprn is now included)
-    block_input = []
-    for r in results:
-        if isinstance(r, dict):
-            block_input.append({
-                "UPRN": r.get("uprn"),
-                "PARENT_UPRN": r.get("parent_uprn"),
-                "ADDRESS": r.get("address"),
-                "X_COORDINATE": r.get("x_coordinate"),
-                "Y_COORDINATE": r.get("y_coordinate"),
-            })
-    block_result = detect_block_properties(block_input, api_key=PLACES_KEY)
-
-    print("\n" + "=" * 60)
-    print("BLOCK SUMMARY")
-    print("=" * 60)
-    for bkey, bdata in block_result["blocks"].items():
-        print(f"\n  {bkey}: {bdata['block_size']} properties (root UPRN: {bdata['root_parent_uprn']})")
-        for uprn in bdata["properties"]:
-            # Find input + matched address for this UPRN
-            input_addr = "?"
-            matched_addr = ""
-            for addr, r in zip(test_addresses, results):
-                if isinstance(r, dict) and r.get("uprn") == uprn:
-                    input_addr = addr
-                    matched_addr = r.get("address", "")
-                    break
-            print(f"      - {uprn}")
-            print(f"          input:   {input_addr}")
-            print(f"          matched: {matched_addr}")
-
-    if block_result["standalone"]:
-        print(f"\n  Standalone: {len(block_result['standalone'])} properties")
-        for uprn in block_result["standalone"]:
-            input_addr = "?"
-            matched_addr = ""
-            for addr, r in zip(test_addresses, results):
-                if isinstance(r, dict) and r.get("uprn") == uprn:
-                    input_addr = addr
-                    matched_addr = r.get("address", "")
-                    break
-            print(f"      - {uprn}")
-            print(f"          input:   {input_addr}")
-            print(f"          matched: {matched_addr}")
+    # block_input = []
+    # for r in results:
+    #     if isinstance(r, dict):
+    #         block_input.append({
+    #             "UPRN": r.get("uprn"),
+    #             "PARENT_UPRN": r.get("parent_uprn"),
+    #             "ADDRESS": r.get("address"),
+    #             "X_COORDINATE": r.get("x_coordinate"),
+    #             "Y_COORDINATE": r.get("y_coordinate"),
+    #         })
+    # block_result = detect_block_properties(block_input, api_key=PLACES_KEY)
+    #
+    # print("\n" + "=" * 60)
+    # print("BLOCK SUMMARY")
+    # print("=" * 60)
+    # for bkey, bdata in block_result["blocks"].items():
+    #     print(f"\n  {bkey}: {bdata['block_size']} properties (root UPRN: {bdata['root_parent_uprn']})")
+    #     for uprn in bdata["properties"]:
+    #         # Find input + matched address for this UPRN
+    #         input_addr = "?"
+    #         matched_addr = ""
+    #         for addr, r in zip(test_addresses, results):
+    #             if isinstance(r, dict) and r.get("uprn") == uprn:
+    #                 input_addr = addr
+    #                 matched_addr = r.get("address", "")
+    #                 break
+    #         print(f"      - {uprn}")
+    #         print(f"          input:   {input_addr}")
+    #         print(f"          matched: {matched_addr}")
+    #
+    # if block_result["standalone"]:
+    #     print(f"\n  Standalone: {len(block_result['standalone'])} properties")
+    #     for uprn in block_result["standalone"]:
+    #         input_addr = "?"
+    #         matched_addr = ""
+    #         for addr, r in zip(test_addresses, results):
+    #             if isinstance(r, dict) and r.get("uprn") == uprn:
+    #                 input_addr = addr
+    #                 matched_addr = r.get("address", "")
+    #                 break
+    #         print(f"      - {uprn}")
+    #         print(f"          input:   {input_addr}")
+    #         print(f"          matched: {matched_addr}")
 
     print("\n\n" + "=" * 60)
     print("PROPERTY DETAILS")

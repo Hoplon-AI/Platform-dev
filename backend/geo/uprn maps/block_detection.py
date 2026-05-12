@@ -255,6 +255,14 @@ if __name__ == "__main__":
                       "78 Rowntree Lodge, Haxby Road, New Earswick, York, YO32 4AA",
                       "4 Rowntree Lodge, Haxby Road, New Earswick, York, YO32 4AA",]
 
+    test_addresses = [
+        "Flat 0/1, 40 Balmore Road, Glasgow, G22 6RN",
+        "Flat 0/2, 40 Balmore Road, Glasgow, G22 6RN",
+        "Flat 1/1, 40 Balmore Road, Glasgow, G22 6RN",
+        "Flat 1/2, 40 Balmore Road, Glasgow, G22 6RN",
+        "Flat 2/1, 40 Balmore Road, Glasgow, G22 6RN",
+        "40 Balmore Road, Glasgow, G22 6RN"]
+
     props = get_uprns_from_addresses(test_addresses, API_KEY)
 
     #print(get_uprns_from_addresses(["351 Holmlea Road, Cathcart, Glasgow, G44 4BP"], API_KEY))

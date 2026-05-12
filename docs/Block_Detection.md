@@ -15,7 +15,7 @@ The central problem it solves: when a batch of addresses is resolved via OS Plac
 | Parameter | Type | Description |
 |---|---|---|
 | `props` | `list[dict]` | OS Places DPA/LPI records. Each must have `UPRN`; `PARENT_UPRN` is optional. |
-| `api_key` | `str \| None` | OS Places API key. Required for nested hierarchy resolution. If `None`, only single-level grouping is performed. |
+| `api_key` | `str` | OS Places API key. Required — raises `ValueError` (with a logged warning) if omitted when any `PARENT_UPRN` values are present. |
 
 ---
 
@@ -58,7 +58,7 @@ For each UPRN at the current level it fetches the record and checks for a grandp
 - If no grandparent, or if the grandparent was already seen in this chain (cycle guard) → this UPRN is the root.
 - If a new grandparent exists → advance to the next level.
 
-The result is a `root_map` — a dict mapping every input PARENT_UPRN to its resolved root PARENT_UPRN. If `api_key` is `None`, each UPRN maps to itself (single-level only).
+The result is a `root_map` — a dict mapping every input PARENT_UPRN to its resolved root PARENT_UPRN. If `api_key` is absent and `PARENT_UPRN` values are present, a `ValueError` is raised before this step is reached.
 
 **API efficiency:** N unique parent UPRNs at depth D require at most D batch calls, not N × D individual calls. For a typical flat development (depth 1–2), this is 1–2 batch calls regardless of how many flats are in the input.
 
@@ -74,7 +74,7 @@ For each property in the input, one of three paths applies:
 
 ### Step 4 — Post-grouping address substring check
 
-After grouping, any property in `standalone` is cross-checked against all block members by address substring. Both addresses are normalised (punctuation stripped, uppercased, whitespace collapsed) and compared bidirectionally.
+After grouping, any property in `standalone` is cross-checked against all block members by address substring. Both addresses are normalised using `_normalize` from `address_confidence` (punctuation stripped, lowercased, whitespace collapsed) and compared bidirectionally.
 
 If the standalone address is a substring of a block member's address, or vice versa, the standalone property is folded into that block and marked with `is_block_record = True`.
 
@@ -111,7 +111,7 @@ Cycle guard: each chain maintains a `seen` set. If a grandparent has already app
 | UPRN chain cycle in OS data | Cycle guard in `seen_per_chain` stops traversal and uses the current position as the root. |
 | API error mid-traversal | Treated as root — traversal stops and the deepest successfully resolved UPRN is used. |
 | DPA/LPI UPRN mismatch | Post-grouping substring check folds the building record into the correct block without extra API calls. |
-| `api_key` is `None` | `root_map` is identity — each PARENT_UPRN maps to itself, giving single-level grouping only. |
+| `api_key` is `None` but `PARENT_UPRN` values are present | Logs a warning with the count of unresolvable UPRNs and raises `ValueError`. |
 
 ---
 
