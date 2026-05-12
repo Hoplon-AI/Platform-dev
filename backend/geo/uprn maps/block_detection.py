@@ -13,8 +13,12 @@ Edge cases handled:
   different UPRN than the one its flats reference as PARENT_UPRN. Post-grouping
   address matching catches these.
 """
+import logging
 import re
+from address_confidence import _normalize
 from os_datahub_functions import *
+
+logger = logging.getLogger(__name__)
 
 MAX_DEPTH = 5  # max levels to traverse upward for nested hierarchies
 
@@ -139,10 +143,21 @@ def detect_block_properties(props: list[dict], api_key: str = None) -> dict:
                         if not p.get("PARENT_UPRN") and str(p.get("UPRN", "")) in referenced_parents}
     all_to_resolve = unique_parents | block_level_uprns
 
+    if not api_key and all_to_resolve:
+        logger.warning(
+            "detect_block_properties called without api_key but %d parent UPRNs require "
+            "root resolution; nested hierarchies cannot be resolved.",
+            len(all_to_resolve),
+        )
+        raise ValueError(
+            "api_key is required to resolve nested UPRN hierarchies. "
+            "Pass an OS Data Hub API key or ensure no PARENT_UPRNs are present."
+        )
+
     if api_key and all_to_resolve:
         root_cache = _resolve_root_parents_batch(list(all_to_resolve), api_key)
     else:
-        root_cache = {u: u for u in all_to_resolve}
+        root_cache = {}
 
     def get_root(parent_uprn: str) -> str:
         return root_cache.get(parent_uprn, parent_uprn)
@@ -196,11 +211,6 @@ def detect_block_properties(props: list[dict], api_key: str = None) -> dict:
     if standalone and blocks:
         prop_by_uprn = {str(p.get("UPRN", "")): p for p in props}
 
-        def _norm_addr(addr: str) -> str:
-            """Strip punctuation and collapse whitespace for substring matching."""
-            text = re.sub(r"[^\w\s]", " ", addr.upper())
-            return " ".join(text.split())
-
         # Collect normalised addresses for each block's members
         block_addresses: dict[str, list[str]] = {}
         for bkey, bdata in blocks.items():
@@ -208,12 +218,12 @@ def detect_block_properties(props: list[dict], api_key: str = None) -> dict:
             for member_uprn in bdata["properties"]:
                 addr = prop_by_uprn.get(member_uprn, {}).get("ADDRESS", "")
                 if addr:
-                    addrs.append(_norm_addr(addr))
+                    addrs.append(_normalize(addr))
             block_addresses[bkey] = addrs
 
         remaining_standalone = []
         for s_uprn in standalone:
-            s_addr = _norm_addr(prop_by_uprn.get(s_uprn, {}).get("ADDRESS", ""))
+            s_addr = _normalize(prop_by_uprn.get(s_uprn, {}).get("ADDRESS", ""))
             matched = False
 
             if s_addr:
@@ -240,12 +250,10 @@ if __name__ == "__main__":
     API_KEY = "7VakhnbibvboaY9eE0385zORrBJAc2sw"
 
     test_addresses = ["99 Spean Street, Cathcart, Glasgow, G44 4FA",
-                      "91 Spean Street , Cathcart, Glasgow, G44 4FA"
-                      ]
-
-    test_addresses = ["75 Rowntree Lodge, Haxby Road, New Earswick, York, YO32 4AA",
-        "78 Rowntree Lodge, Haxby Road, New Earswick, York, YO32 4AA",
-        "4 Rowntree Lodge, Haxby Road, New Earswick, York, YO32 4AA",]
+                      "91 Spean Street , Cathcart, Glasgow, G44 4FA",
+                      "75 Rowntree Lodge, Haxby Road, New Earswick, York, YO32 4AA",
+                      "78 Rowntree Lodge, Haxby Road, New Earswick, York, YO32 4AA",
+                      "4 Rowntree Lodge, Haxby Road, New Earswick, York, YO32 4AA",]
 
     props = get_uprns_from_addresses(test_addresses, API_KEY)
 
