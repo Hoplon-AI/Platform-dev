@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import "./Landingpage.css";
+import "./landingpage.css";
 
 const CITY_IMAGES = [
   {

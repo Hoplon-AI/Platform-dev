@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import proj4 from "proj4";
 
-import LandingPage from "./Landingpage.jsx";
+import Landingpage from "./landingpage.jsx";
 import IngestionPage from "./pages/IngestionLandingPage.tsx";
 import PortfolioDashboard from "./pages/PortfolioDashboard.jsx";
 
@@ -788,7 +788,7 @@ export default function App() {
 
   if (showLanding) {
     return (
-      <LandingPage
+      <Landingpage
         onGetStarted={() => {
           setShowLanding(false);
           setActiveNav("uploads");

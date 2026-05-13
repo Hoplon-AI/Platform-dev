@@ -4,6 +4,8 @@ Main FastAPI application entry point.
 """
 from dotenv import load_dotenv
 load_dotenv()
+from dotenv import load_dotenv
+load_dotenv("backend/.env")
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
