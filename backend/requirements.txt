@@ -12,3 +12,4 @@ pdfplumber
 asyncpg
 pyproj
 PyJWT
+psycopg2-binary
