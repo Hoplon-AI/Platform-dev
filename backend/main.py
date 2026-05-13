@@ -1,13 +1,19 @@
 """
 Main FastAPI application entry point.
 """
+
+from pathlib import Path
 from dotenv import load_dotenv
+
+# Load environment variables
 load_dotenv()
+load_dotenv(Path(__file__).resolve().parent / ".env", override=True)
 
 from contextlib import asynccontextmanager
+from typing import Dict, Any
+
 from fastapi import FastAPI, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
-from typing import Dict, Any
 
 from backend.api.ingestion.upload_router import router as upload_router
 from backend.api.v1.lineage_router import router as lineage_router
@@ -19,8 +25,9 @@ from backend.api.v1.export_router import router as export_router
 from backend.api.v1.underwriter_router import router as underwriter_router
 from backend.api.v1.pdf_test_router import router as pdf_test_router
 from backend.api.v1.auth_router import router as auth_router
+
 from backend.core.database.db_pool import DatabasePool
-from backend.infrastructure.storage.s3_config import get_s3_config
+from infrastructure.storage.s3_config import get_s3_config
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
