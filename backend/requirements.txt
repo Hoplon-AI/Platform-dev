@@ -13,3 +13,4 @@ asyncpg
 pyproj
 PyJWT
 psycopg2-binary
+bcrypt
