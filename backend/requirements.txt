@@ -8,3 +8,4 @@ requests
 numpy
 boto3
 groq
+pdfplumber
