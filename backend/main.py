@@ -1,4 +1,3 @@
-
 """
 Main FastAPI application entry point.
 """
@@ -10,18 +9,18 @@ from fastapi import FastAPI, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 from typing import Dict, Any
 
-from api.ingestion.upload_router import router as upload_router
-from api.v1.lineage_router import router as lineage_router
-from api.v1.portfolios_router import router as portfolios_router
-from api.enrichment.enrichment_router import router as enrichment_router
-from geo import router as geo_router
-from api.v1.ha_profile_router import router as ha_profile_router
-from api.v1.export_router import router as export_router
-from api.v1.underwriter_router import router as underwriter_router
-from api.v1.pdf_test_router import router as pdf_test_router
-from api.v1.auth_router import router as auth_router
-from core.database.db_pool import DatabasePool
-from infrastructure.storage.s3_config import get_s3_config
+from backend.api.ingestion.upload_router import router as upload_router
+from backend.api.v1.lineage_router import router as lineage_router
+from backend.api.v1.portfolios_router import router as portfolios_router
+from backend.api.enrichment.enrichment_router import router as enrichment_router
+from backend.geo import router as geo_router
+from backend.api.v1.ha_profile_router import router as ha_profile_router
+from backend.api.v1.export_router import router as export_router
+from backend.api.v1.underwriter_router import router as underwriter_router
+from backend.api.v1.pdf_test_router import router as pdf_test_router
+from backend.api.v1.auth_router import router as auth_router
+from backend.core.database.db_pool import DatabasePool
+from backend.infrastructure.storage.s3_config import get_s3_config
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
