@@ -9,3 +9,5 @@ numpy
 boto3
 groq
 pdfplumber
+asyncpg
+pyproj
