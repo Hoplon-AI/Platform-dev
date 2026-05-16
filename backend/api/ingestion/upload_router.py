@@ -1124,7 +1124,7 @@ async def ingest_document(
             db_rows = await conn.fetch(
                 """
                 SELECT
-                    property_id,
+                    id AS property_id,
                     property_reference,
                     submission_id,
                     block_reference,
