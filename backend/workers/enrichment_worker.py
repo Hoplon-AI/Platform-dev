@@ -19,6 +19,8 @@ from __future__ import annotations
 
 import logging
 import os
+import re
+import sys
 import time
 from datetime import datetime, timezone
 import traceback
@@ -29,6 +31,17 @@ import traceback
 import psycopg2
 import psycopg2.extras
 logger = logging.getLogger(__name__)
+
+# Path to 'uprn maps' folder (space in name — Igor's dev folder)
+_UPRN_MAPS_SPACE = os.path.normpath(
+    os.path.join(os.path.dirname(__file__), "..", "geo", "uprn maps")
+)
+
+
+def _ensure_uprn_maps_space_on_path() -> None:
+    """Add the 'uprn maps' (space) directory to sys.path if not already present."""
+    if _UPRN_MAPS_SPACE not in sys.path:
+        sys.path.insert(0, _UPRN_MAPS_SPACE)
 
 # API keys from environment (set in .env or system)
 DEFAULT_PLACES_KEY = os.getenv("OS_PLACES_API_KEY", "")
@@ -168,6 +181,75 @@ def _call_address_confidence(original: str, returned: str) -> dict | None:
         return None
 
 
+def _standardise_address(address: str | None) -> str | None:
+    """Reorder address so flat notation leads (OS Places expects this).
+    Mirrors the same function in sov_processor_v2.py.
+    """
+    if not address:
+        return address
+    parts = [p.strip() for p in address.split(",") if p.strip()]
+    if not parts:
+        return address
+    for i, part in enumerate(parts):
+        if re.match(r"^(flat|unit|apt|apartment|room|suite)\b", part, re.IGNORECASE):
+            continue
+        m = re.match(r"^(.+?)\s+(\d+/\d+)\s*$", part)
+        if m:
+            flat_notation = m.group(2).strip()
+            parts[i] = m.group(1).strip()
+            if not re.match(r"^\d+/\d+", parts[0]):
+                parts.insert(0, flat_notation)
+            return ", ".join(parts)
+    for i in range(1, len(parts)):
+        part = parts[i]
+        if (re.match(r"^(flat|unit|apt|apartment|room|suite)\s+\S+", part, re.IGNORECASE)
+                or re.match(r"^\d+/\d+$", part)):
+            parts.insert(0, parts.pop(i))
+            return ", ".join(parts)
+    return address
+
+
+def _building_only_address(address: str) -> str | None:
+    """Strip leading flat notation to produce a building-only fallback query.
+
+    "0/1, 40 Balmore Road, Glasgow"  ->  "40 Balmore Road, Glasgow"
+    "Flat 3, 45 High Street, Oxford" ->  "45 High Street, Oxford"
+    Returns None if no flat notation is detected (nothing to strip).
+    """
+    m = re.match(r"^\d+/\d+\s*,\s*(.+)$", address)
+    if m:
+        return m.group(1).strip()
+    m = re.match(r"^(flat|unit|apt|apartment|room|suite)\s+\S+\s*,\s*(.+)$", address, re.IGNORECASE)
+    if m:
+        return m.group(2).strip()
+    return None
+
+
+def _run_cross_reference(query: str, os_data: dict, api_key: str) -> dict:
+    """Run Igor's cross_reference scoring on an OS Places result."""
+    try:
+        _ensure_uprn_maps_space_on_path()
+        from cross_reference import cross_reference  # noqa: E402
+        matched_addr = os_data.get("ADDRESS", "")
+        os_score = float(os_data.get("MATCH") or 0.0)
+        return cross_reference(query, matched_addr, os_score, os_data, api_key)
+    except Exception as exc:
+        logger.warning(f"cross_reference failed: {exc}")
+        return {"level": "RED", "confidence": 0.0, "reasons": ["cross_reference_error"]}
+
+
+def _call_flood_risk(x: float, y: float, country_code: str, postcode: str | None) -> dict | None:
+    """Get flood risk band for a BNG point via the relevant national agency."""
+    try:
+        _ensure_uprn_maps_space_on_path()
+        from flood_risk import get_flood_risk_from_coords  # noqa: E402
+        result = get_flood_risk_from_coords(x, y, country_code, postcode=postcode)
+        return result if isinstance(result, dict) else None
+    except Exception as exc:
+        logger.warning(f"Flood risk error: {exc}")
+        return None
+
+
 # ─────────────────────────────────────────────────────────────────
 # API-Priority Merge — API data overwrites SoV where API has a value
 # ─────────────────────────────────────────────────────────────────
@@ -209,26 +291,50 @@ def enrich_single_property(
     updates = {}
     sources = []
 
+    # Standardise address before sending to OS Places (handles Scottish X/Y notation)
+    std_address = _standardise_address(address) or address
+
     # 1. OS Places (must be first, with retry)
     os_data = None
     pc_normalized = _normalize_postcode(postcode) if postcode else ""
     if postcode_cache and pc_normalized in postcode_cache:
-        os_data = _match_address_to_uprn(address, postcode_cache[pc_normalized])
+        os_data = _match_address_to_uprn(std_address, postcode_cache[pc_normalized])
     if not os_data:
-        os_data = _api_call_with_retry(_call_os_places, address, postcode, places_key)
+        os_data = _api_call_with_retry(_call_os_places, std_address, postcode, places_key)
         time.sleep(RATE_LIMIT_DELAY_S)
 
     if not os_data:
         return {"enrichment_status": "failed", "enriched_at": datetime.now(timezone.utc)}
 
+    # Cross-reference the full-address result
+    full_query = f"{std_address}, {postcode}" if postcode else std_address
+    xref = _run_cross_reference(full_query, os_data, places_key)
+    uprn_confidence = xref.get("level", "RED")
+    uprn_confidence_reason = "; ".join(xref.get("reasons", [])) or uprn_confidence
+
+    # Option B: RED → try building-only query (strip flat notation)
+    if uprn_confidence == "RED":
+        building_addr = _building_only_address(std_address)
+        if building_addr:
+            fb_data = _api_call_with_retry(_call_os_places, building_addr, postcode, places_key)
+            time.sleep(RATE_LIMIT_DELAY_S)
+            if fb_data:
+                building_query = f"{building_addr}, {postcode}" if postcode else building_addr
+                fb_xref = _run_cross_reference(building_query, fb_data, places_key)
+                if fb_xref.get("level") in ("GREEN", "AMBER"):
+                    # Option B succeeded — use building UPRN with LOW confidence
+                    os_data = fb_data
+                    uprn_confidence = "LOW"
+                    uprn_confidence_reason = "flat not found in OS; building matched"
+                    logger.info(f"  UPRN fallback (building-only) for '{std_address[:40]}'")
+    # Option A: if still RED, keep original result as best-guess (logged below)
+    if uprn_confidence == "RED":
+        logger.warning(f"  RED UPRN confidence for '{std_address[:40]}': {uprn_confidence_reason}")
+
     uprn = str(os_data.get("UPRN", ""))
     parent_uprn = str(os_data.get("PARENT_UPRN") or "")
     x = os_data.get("X_COORDINATE")
     y = os_data.get("Y_COORDINATE")
-
-    conf = _call_address_confidence(address, os_data.get("ADDRESS", ""))
-    if conf and conf.get("confidence") == "LOW":
-        logger.warning(f"  Address mismatch: SoV='{address[:40]}' score={conf['score']}")
 
     updates["uprn"] = uprn if uprn else None
     updates["parent_uprn"] = parent_uprn if parent_uprn else None
@@ -237,6 +343,8 @@ def enrich_single_property(
     updates["country_code"] = os_data.get("COUNTRY_CODE")
     updates["uprn_match_score"] = float(os_data["MATCH"]) if os_data.get("MATCH") else None
     updates["uprn_match_description"] = os_data.get("MATCH_DESCRIPTION")
+    updates["uprn_confidence"] = uprn_confidence
+    updates["uprn_confidence_reason"] = uprn_confidence_reason
     sources.append("OS_PLACES")
 
     # 2. EPC + NGD + Listed in PARALLEL
@@ -316,6 +424,18 @@ def enrich_single_property(
             updates["listed_grade"] = listed_result.get("grade")
             updates["listed_name"] = listed_result.get("name")
             updates["listed_reference"] = listed_result.get("reference")
+
+    # 6. Flood Risk
+    x_val = updates.get("x_coordinate")
+    y_val = updates.get("y_coordinate")
+    country = os_data.get("COUNTRY_CODE", "")
+    if x_val and y_val and country:
+        flood_result = _call_flood_risk(float(x_val), float(y_val), country, postcode or None)
+        if flood_result:
+            updates["flood_risk_band"] = flood_result.get("flood_risk_band")
+            updates["flood_risk_source"] = flood_result.get("flood_risk_source")
+            updates["flood_risk_note"] = flood_result.get("flood_risk_note")
+            sources.append("FLOOD")
 
     updates["enrichment_status"] = "enriched"
     updates["enrichment_source"] = ",".join(sources)
