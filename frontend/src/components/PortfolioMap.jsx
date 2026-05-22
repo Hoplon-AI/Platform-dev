@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef } from "react";
+import React, { useEffect, useLayoutEffect, useMemo, useRef } from "react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 
@@ -628,7 +628,7 @@ export default function PortfolioMap({
   const activeMode = viewMode === "properties" ? "properties" : "blocks";
   const visiblePoints = activeMode === "blocks" ? blockPoints : propertyPoints;
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!mapDivRef.current || mapRef.current) return;
 
     const map = L.map(mapDivRef.current, {
@@ -640,6 +640,8 @@ export default function PortfolioMap({
     L.tileLayer("https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png", {
       subdomains: "abcd",
       maxZoom: 20,
+      crossOrigin: "anonymous",
+      keepBuffer: 4,
       attribution: "&copy; OpenStreetMap &copy; CARTO",
     }).addTo(map);
 
@@ -648,13 +650,29 @@ export default function PortfolioMap({
     overviewBlockLayerRef.current = L.layerGroup().addTo(map);
     pointLayerRef.current = L.layerGroup().addTo(map);
 
+    // Staggered invalidateSize to handle grid/flex layout settling
+    setTimeout(() => map.invalidateSize(), 0);
     setTimeout(() => map.invalidateSize(), 120);
+    setTimeout(() => map.invalidateSize(), 400);
   }, []);
 
   useEffect(() => {
     const onResize = () => mapRef.current?.invalidateSize();
     window.addEventListener("resize", onResize);
-    return () => window.removeEventListener("resize", onResize);
+
+    // ResizeObserver catches layout changes (grid settling, sidebar toggle, etc.)
+    let ro = null;
+    if (typeof ResizeObserver !== "undefined" && mapDivRef.current) {
+      ro = new ResizeObserver(() => {
+        mapRef.current?.invalidateSize();
+      });
+      ro.observe(mapDivRef.current);
+    }
+
+    return () => {
+      window.removeEventListener("resize", onResize);
+      ro?.disconnect();
+    };
   }, []);
 
   useEffect(() => {
@@ -764,7 +782,9 @@ export default function PortfolioMap({
       }
     }
 
+    map.invalidateSize();
     setTimeout(() => map.invalidateSize(), 80);
+    setTimeout(() => map.invalidateSize(), 300);
   }, [
     activeMode,
     blockPoints,

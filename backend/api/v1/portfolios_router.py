@@ -210,3 +210,46 @@ async def get_portfolio_recent_activity(
 
     return [dict(r) for r in rows]
 
+
+@router.get("/properties", response_model=list[dict])
+async def get_properties(
+    tenant: Tuple[str, str] = Depends(get_tenant_info),
+) -> List[Dict[str, Any]]:
+    """
+    Return all properties for the authenticated HA from silver.properties.
+    Used by the frontend on login to restore the portfolio dashboard.
+    """
+    import decimal
+    from datetime import date, datetime
+
+    ha_id, _user_id = tenant
+
+    async with DatabasePool.acquire() as conn:
+        rows = await conn.fetch(
+            """
+            SELECT
+                property_id, property_reference, submission_id, block_reference,
+                address, address_2, address_3, postcode, occupancy_type, sum_insured,
+                property_type, year_of_build, storeys, units, uprn, parent_uprn,
+                x_coordinate, y_coordinate, country_code, uprn_match_score,
+                uprn_match_description, built_form, total_floor_area_m2, main_fuel,
+                epc_rating, epc_potential_rating, epc_lodgement_date, height_max_m,
+                height_roofbase_m, height_confidence, building_footprint_m2,
+                is_listed, listed_grade, listed_name, listed_reference,
+                enrichment_status, enrichment_source, enriched_at, metadata
+            FROM silver.properties
+            WHERE ha_id = $1
+            ORDER BY block_reference, property_reference
+            """,
+            ha_id,
+        )
+
+    def _serial(v):
+        if isinstance(v, decimal.Decimal):
+            return float(v)
+        if isinstance(v, (datetime, date)):
+            return v.isoformat()
+        return v
+
+    return [{k: _serial(v) for k, v in dict(r).items()} for r in rows]
+

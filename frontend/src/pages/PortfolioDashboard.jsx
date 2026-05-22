@@ -261,7 +261,7 @@ const collectFireDocumentsFromIngestion = (ingestionResult, latestFireRiskPayloa
 
   const seen = new Set();
   return docs.filter((doc) => {
-    const key = [doc.document_type, doc.upload_id, doc.feature_id, doc.property_id, doc.block_reference, doc.filename]
+    const key = [doc.document_type, doc.upload_id, doc.feature_id, doc.block_reference, doc.filename]
       .map(normaliseKey)
       .join("|");
     if (seen.has(key)) return false;
@@ -798,7 +798,6 @@ export default function PortfolioDashboard({
           representativeProperty,
         };
       })
-      .filter((block) => block.hasValidCoords)
       .sort((a, b) => b.totalValue - a.totalValue);
   }, [properties]);
 
@@ -1034,11 +1033,12 @@ export default function PortfolioDashboard({
       </div>
 
       <div
+        className="dashboard-composition-map"
         style={{
           display: "grid",
-          gridTemplateColumns: "minmax(0, 1fr) minmax(0, 1fr)",
+          gridTemplateColumns: "minmax(0, 1fr) minmax(0, 1.2fr)",
           gap: 16,
-          alignItems: "stretch",
+          alignItems: "start",
         }}
       >
         <div style={{ display: "grid", gap: 16 }}>
@@ -1072,7 +1072,7 @@ export default function PortfolioDashboard({
           </div>
         </div>
 
-        <div className="card" style={{ height: "100%" }}>
+        <div className="card" style={{ minHeight: 760, overflow: "visible" }}>
           <div className="card-header row-between">
             <div>
               <div className="card-title">Block analysis map</div>

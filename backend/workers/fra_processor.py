@@ -1491,6 +1491,14 @@ from typing import Any, Optional
 
 logger = logging.getLogger(__name__)
 
+# Address tokens too generic to use alone in block matching (Strategy 3)
+_ADDR_STOP_WORDS = frozenset({
+    "road", "street", "avenue", "lane", "way", "close", "drive", "court",
+    "house", "block", "flat", "floor", "place", "gardens", "grove", "park",
+    "rise", "walk", "terrace", "crescent", "square", "mews", "row",
+    "the", "and", "for", "with", "ltd", "limited",
+})
+
 
 # ──────────────────────────────────────────────────────────────────────
 # Data classes
@@ -1550,14 +1558,6 @@ FRA_SINGLE_PASS_PROMPT = """You are an expert UK fire safety engineer. Extract A
 Return ONLY valid JSON. Use null for missing fields. Dates must be YYYY-MM-DD.
 
 UK FRA documents vary widely in format — apply the rules below regardless of layout, template, or assessor company.
-
-━━━ RAG STATUS ━━━
-Derive from the overall risk rating using these mappings:
-  RED:   High | Very High | Intolerable | Substantial | Extreme | Critical | Serious | Unacceptable | Priority 1 | Grade D | Grade E
-  AMBER: Medium | Moderate | Significant | Tolerable with conditions | Further Action Required | Priority 2 | Grade C
-  GREEN: Low | Trivial | Negligible | Acceptable | Broadly Acceptable | Tolerable | No Further Action | Priority 3 | Grade A | Grade B
-  Numeric scores (likelihood × consequence): ≥15 → RED | 8–14 → AMBER | ≤7 → GREEN
-  If rag_status cannot be determined, return null.
 
 ━━━ RISK RATING ━━━
 Copy the exact phrase used in the document (do not paraphrase).
@@ -1619,7 +1619,6 @@ List major fire safety concerns noted by the assessor that are not already captu
 Return ONLY this JSON — no markdown, no commentary:
 {{
   "risk_rating": "exact phrase or null",
-  "rag_status": "RED or AMBER or GREEN or null",
   "fra_assessment_type": "Type 1 / Type 2 / Type 3 / Type 4 — only if explicitly stated, else null",
   "assessment_date": "YYYY-MM-DD or null",
   "assessment_valid_until": "YYYY-MM-DD or null",
@@ -1628,8 +1627,9 @@ Return ONLY this JSON — no markdown, no commentary:
   "assessor_company": "company name or null",
   "assessor_qualification": "qualifications string or null",
   "responsible_person": "responsible person or organisation or null",
-  "building_name": "building name or null",
-  "building_address": "full address or null",
+  "block_reference": "short block/property code ONLY if explicitly labelled in the document (e.g. 'Block Reference: 02BR', 'BLK-A') — null otherwise. Do NOT extract organisation names here.",
+  "building_name": "building name or street address — do NOT put a short block code here (use block_reference for codes)",
+  "building_address": "full postal address of the building or null",
   "num_storeys": number or null,
   "num_units": number or null,
   "build_year": year as integer or null,
@@ -1924,9 +1924,11 @@ class FRAProcessor:
         raw_json = await self._call_llm(text)
         features = self._parse_llm_response(raw_json)
 
-        # Use LLM-provided rag_status when available (single-pass prompt extracts it directly)
-        llm_rag    = (self._extract_json(raw_json) or {}).get("rag_status")
-        rag_status = self._normalise_rag_status(features.risk_rating, llm_rag=llm_rag)
+        # Fallback: populate assessment_valid_until from next_review_date when null
+        if features.assessment_valid_until is None and features.next_review_date is not None:
+            features.assessment_valid_until = features.next_review_date
+
+        rag_status = self._normalise_rag_status(features.risk_rating)
 
         # Auto-resolve block_id from LLM-extracted building name/address if not provided
         if not block_id:
@@ -1935,6 +1937,7 @@ class FRAProcessor:
                 ha_id,
                 llm_data.get("building_name"),
                 llm_data.get("building_address"),
+                llm_data.get("block_reference"),
             )
 
         logger.info(
@@ -1967,14 +1970,48 @@ class FRAProcessor:
         ha_id: str,
         building_name: Optional[str],
         building_address: Optional[str],
+        block_reference: Optional[str] = None,
     ) -> Optional[str]:
         """
-        Three-strategy block resolution:
-          1. Exact match on block name (e.g. LLM returns '02BR')
-          2. Substring match (block name appears inside building_name/address)
+        Four-strategy block resolution:
+          0. Exact/substring match on block_reference (LLM-extracted short code,
+             e.g. '02BR' from 'Block Reference: 02BR' on CDHA template cover)
+          1. Exact match on block name using building_name/address candidates
+          2. Substring match — block name appears inside candidate (min 4 chars
+             required to avoid generic single-word false matches)
           3. Address lookup via silver.properties → block_reference → block_id
-             (handles cases like '269 Holmlea Road' → property has block_ref '02BR')
+             (handles '269 Holmlea Road' → property block_ref '02BR')
+             Stop-words filtered; ORDER BY b.name for determinism.
         """
+        all_blocks: list | None = None  # lazy-loaded once
+
+        # ── Strategy 0: explicit block_reference from LLM ────────────
+        if block_reference and block_reference.strip():
+            br = block_reference.strip()
+            row = await self.db.fetchrow(
+                "SELECT block_id::text FROM silver.blocks WHERE ha_id=$1 AND UPPER(name)=UPPER($2) LIMIT 1",
+                ha_id, br,
+            )
+            if row:
+                logger.info(
+                    "FRAProcessor: resolved block_id=%s (block_reference exact) from %r",
+                    row["block_id"], br,
+                )
+                return row["block_id"]
+            # Substring fallback — block name may contain the reference (e.g. "02BR — Holmlea Road Block")
+            all_blocks = await self.db.fetch(
+                "SELECT block_id::text, name FROM silver.blocks WHERE ha_id=$1", ha_id
+            )
+            br_upper = br.upper()
+            for b in all_blocks:
+                bn = (b["name"] or "").upper()
+                if bn and (br_upper in bn or bn in br_upper):
+                    logger.info(
+                        "FRAProcessor: resolved block_id=%s (block_reference substring) block=%r from %r",
+                        b["block_id"], b["name"], br,
+                    )
+                    return b["block_id"]
+
         candidates = [c.strip() for c in [building_name, building_address] if c and c.strip()]
         if not candidates:
             logger.info("FRAProcessor: no building_name/address extracted — block_id stays None")
@@ -1987,18 +2024,24 @@ class FRAProcessor:
                 ha_id, candidate,
             )
             if row:
-                logger.info("FRAProcessor: resolved block_id=%s (exact name) from %r", row["block_id"], candidate)
+                logger.info(
+                    "FRAProcessor: resolved block_id=%s (exact name) from %r",
+                    row["block_id"], candidate,
+                )
                 return row["block_id"]
 
         # ── Strategy 2: substring — block name inside candidate ───────
-        all_blocks = await self.db.fetch(
-            "SELECT block_id::text, name FROM silver.blocks WHERE ha_id=$1", ha_id
-        )
+        if all_blocks is None:
+            all_blocks = await self.db.fetch(
+                "SELECT block_id::text, name FROM silver.blocks WHERE ha_id=$1", ha_id
+            )
         for candidate in candidates:
             cu = candidate.upper()
             for b in all_blocks:
                 bn = (b["name"] or "").upper()
-                if bn and (bn in cu or cu in bn):
+                # Require block name ≥ 4 chars — prevents single generic words
+                # like "Cathcart" matching across all blocks in the same estate
+                if bn and len(bn) >= 4 and (bn in cu or cu in bn):
                     logger.info(
                         "FRAProcessor: resolved block_id=%s (substring) block=%r from %r",
                         b["block_id"], b["name"], candidate,
@@ -2006,12 +2049,13 @@ class FRAProcessor:
                     return b["block_id"]
 
         # ── Strategy 3: address → silver.properties → block_reference ─
-        # Extract meaningful search tokens (street name words, postcode)
         for candidate in candidates:
-            tokens = [t.strip() for t in re.split(r"[,\s]+", candidate) if len(t.strip()) >= 3]
-            if not tokens:
+            tokens = [
+                t.strip() for t in re.split(r"[,\s]+", candidate)
+                if len(t.strip()) >= 3 and t.strip().lower() not in _ADDR_STOP_WORDS
+            ]
+            if len(tokens) < 2:
                 continue
-            # Build OR conditions — match any 2+ tokens to reduce false positives
             for i in range(len(tokens)):
                 for j in range(i + 1, len(tokens)):
                     row = await self.db.fetchrow(
@@ -2026,6 +2070,7 @@ class FRAProcessor:
                              AND UPPER(p.address) LIKE '%' || UPPER($3) || '%')
                             OR (UPPER(p.postcode) LIKE '%' || UPPER($2) || '%')
                           )
+                        ORDER BY b.name
                         LIMIT 1
                         """,
                         ha_id, tokens[i], tokens[j],
@@ -2156,6 +2201,11 @@ class FRAProcessor:
             "DEFICIENCIES AND RECOMMENDATIONS", "ITEMS FOR ACTION",
             "OUTSTANDING ACTIONS", "RECOMMENDED ACTIONS",
             "SECTION 3", "ACTION NO", "ACTION REF",
+            # Additional formats
+            "AREAS OF CONCERN", "REMEDIAL MEASURES", "CORRECTIVE ACTIONS",
+            "AUDIT DETAILS", "ITEMS REQUIRING ATTENTION",
+            "RISK REDUCTION MEASURES", "FINDINGS AND RECOMMENDATIONS",
+            "FIRE SAFETY IMPROVEMENTS", "HAZARD ACTION",
         ])
 
         systems_start = find_first([
@@ -2193,19 +2243,27 @@ class FRAProcessor:
         else:
             systems = ""
 
+        # Always include the document tail — Islington-style FRAs put action
+        # cards at the very end ("Audit Details"), which marker-based splitting
+        # would otherwise miss entirely.
+        tail_budget = int(max_chars * 0.15)
+        tail = text[-tail_budget:]
+
         parts = ["=== HEADER ===", header.strip()]
         if action.strip():
             parts += ["\n\n=== ACTION PLAN / FINDINGS ===", action.strip()]
         if systems.strip():
             parts += ["\n\n=== FIRE SYSTEMS ===", systems.strip()]
+        if tail.strip():
+            parts += ["\n\n=== END OF DOCUMENT ===", tail.strip()]
 
         result = "\n".join(parts)
         if len(result) > max_chars:
             result = result[:max_chars]
 
         logger.info(
-            "Smart truncate: %d → %d chars (header=%d action=%d systems=%d)",
-            len(text), len(result), len(header), len(action), len(systems),
+            "Smart truncate: %d → %d chars (header=%d action=%d systems=%d tail=%d)",
+            len(text), len(result), len(header), len(action), len(systems), len(tail),
         )
         return result
 
@@ -2351,16 +2409,8 @@ class FRAProcessor:
 
     # ── Derived fields ────────────────────────────────────────────────
 
-    def _normalise_rag_status(self, risk_rating: Optional[str], llm_rag: Optional[str] = None) -> Optional[str]:
-        """
-        Derive RED/AMBER/GREEN.
-        Uses LLM-provided rag_status directly when valid — falls back to keyword matching.
-        """
-        if llm_rag:
-            v = llm_rag.strip().upper()
-            if v in ("RED", "AMBER", "GREEN"):
-                return v
-
+    def _normalise_rag_status(self, risk_rating: Optional[str]) -> Optional[str]:
+        """Derive RED/AMBER/GREEN from extracted risk_rating phrase."""
         if not risk_rating:
             return None
         lower = risk_rating.lower().strip()
@@ -2401,9 +2451,15 @@ class FRAProcessor:
         return valid_until >= date.today()
 
     def _count_actions(self, action_items: list) -> dict:
+        today         = date.today()
         total         = len(action_items)
         high_priority = sum(1 for a in action_items if a.priority == "high")
-        overdue       = sum(1 for a in action_items if a.status == "overdue")
+        overdue       = sum(
+            1 for a in action_items
+            if a.due_date is not None
+            and a.due_date < today
+            and a.status != "completed"
+        )
         outstanding   = sum(1 for a in action_items if a.status in ("outstanding", "overdue"))
         no_date       = sum(1 for a in action_items if not a.due_date)
         return {
@@ -2414,7 +2470,7 @@ class FRAProcessor:
             "no_date_action_count":       no_date,
         }
 
-        # ── Write to DB ───────────────────────────────────────────────────
+    # ── Write to DB ───────────────────────────────────────────────────
 
     async def _write_to_db(
         self,
@@ -2452,39 +2508,26 @@ class FRAProcessor:
             "fra_assessment_type":    features.fra_assessment_type,
             "assessment_date":        _date_to_str(features.assessment_date),
             "assessment_valid_until": _date_to_str(features.assessment_valid_until),
-            "next_review_date":       _date_to_str(features.next_review_date),
             "evacuation_strategy":    features.evacuation_strategy,
             "bsa_2022_applicable":    features.bsa_2022_applicable,
-            "action_items":           json.loads(action_items_json),
-            "significant_findings":   json.loads(significant_findings_json),
         })
 
-        def _normalize_for_dashboard(value: Optional[str]) -> Optional[str]:
-            if not value:
-                return None
-            return value.strip().lower()
-
-        normalized_risk = _normalize_for_dashboard(features.risk_rating)
-        normalized_rag  = _normalize_for_dashboard(rag_status)
-
         async with self.db.transaction():
+
             await self.db.execute("""
                 INSERT INTO silver.document_features (
                     feature_id, ha_id, upload_id, block_id, document_type,
                     assessment_date, assessor_company, features_json,
                     processed_at, created_at, updated_at
                 )
-                VALUES (
-                    $1::uuid, $2::text, $3::text, $4::text,
-                    'fra_document', $5, $6::text, $7::jsonb, $8, $9, $10
-                )
+                VALUES ($1, $2, $3::uuid, $4::uuid, 'fra_document', $5, $6,
+                        $7::jsonb, $8, $9, $10)
                 ON CONFLICT (feature_id) DO NOTHING
             """,
                 feature_id, ha_id, upload_id, block_id,
                 features.assessment_date,
                 features.assessor_company or assessor_company,
-                raw_features_json,
-                now, now, now,
+                raw_features_json, now, now, now,
             )
 
             await self.db.execute("""
@@ -2505,11 +2548,8 @@ class FRAProcessor:
                     extraction_confidence, raw_features, created_at, updated_at
                 )
                 VALUES (
-                    $1::uuid,$2::uuid,$3::text,$4::text,
-                    $5,$6,$7,
-                    $8,$9,$10,$11,
-                    $12,$13,$14,$15,
-                    $16,$17,$18,$19,
+                    $1,$2,$3,$4, $5,$6,$7, $8,$9,$10,$11,
+                    $12,$13,$14,$15, $16,$17,$18,$19,
                     $20,$21,$22,$23,$24,$25,$26,$27,$28,$29,
                     $30::jsonb,$31::jsonb,
                     $32,$33,$34,$35,$36,
@@ -2517,7 +2557,7 @@ class FRAProcessor:
                 )
             """,
                 fra_id, feature_id, ha_id, block_id,
-                normalized_risk, normalized_rag, features.fra_assessment_type,
+                features.risk_rating, rag_status, features.fra_assessment_type,
                 features.assessment_date, features.assessment_valid_until,
                 features.next_review_date, is_in_date,
                 features.assessor_name, features.assessor_company or assessor_company,

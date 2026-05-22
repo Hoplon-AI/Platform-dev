@@ -39,9 +39,13 @@ class TenantMiddleware:
         """
         try:
             payload = jwt.decode(token, self.secret_key, algorithms=[self.algorithm])
+            # Support both ha_id (singular) and ha_ids (list from auth_router)
             ha_id = payload.get("ha_id")
+            if not ha_id:
+                ha_ids = payload.get("ha_ids", [])
+                ha_id = ha_ids[0] if ha_ids else None
             user_id = payload.get("user_id") or payload.get("sub")
-            
+
             if not ha_id:
                 raise HTTPException(
                     status_code=status.HTTP_401_UNAUTHORIZED,

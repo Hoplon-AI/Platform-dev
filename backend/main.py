@@ -1,20 +1,13 @@
+
 """
 Main FastAPI application entry point.
 """
-
-from pathlib import Path
 from dotenv import load_dotenv
-
-# Load environment variables
 load_dotenv()
-load_dotenv(Path(__file__).resolve().parent / ".env", override=False)
-
 from contextlib import asynccontextmanager
-from typing import Dict, Any
-
 from fastapi import FastAPI, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
-
+from typing import Dict, Any
 from backend.api.ingestion.upload_router import router as upload_router
 from backend.api.v1.lineage_router import router as lineage_router
 from backend.api.v1.portfolios_router import router as portfolios_router
@@ -25,7 +18,6 @@ from backend.api.v1.export_router import router as export_router
 from backend.api.v1.underwriter_router import router as underwriter_router
 from backend.api.v1.pdf_test_router import router as pdf_test_router
 from backend.api.v1.auth_router import router as auth_router
-
 from backend.core.database.db_pool import DatabasePool
 from infrastructure.storage.s3_config import get_s3_config
 
@@ -51,9 +43,23 @@ app = FastAPI(
 )
 
 # CORS configuration
+import os as _os
+_cors_origins = [
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+    "http://localhost:3002",
+    "http://127.0.0.1:3002",
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+]
+# Production origins from env var (comma-separated, e.g. https://app.equirisk.ai,https://d1234.cloudfront.net)
+_extra_origins = _os.getenv("CORS_ORIGINS", "")
+if _extra_origins:
+    _cors_origins += [o.strip() for o in _extra_origins.split(",") if o.strip()]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # 🔥 TEMP FIX
+    allow_origins=_cors_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

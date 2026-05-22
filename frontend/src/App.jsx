@@ -2,10 +2,12 @@ import React, { useEffect, useMemo, useState } from "react";
 import proj4 from "proj4";
 
 import Landingpage from "./landingpage.jsx";
+import LoginPage from "./pages/LoginPage.jsx";
 import IngestionPage from "./pages/IngestionLandingPage.tsx";
 import PortfolioDashboard from "./pages/PortfolioDashboard.jsx";
 
 import { getIngestionSummary } from "./utils/ingestion";
+import { apiFetch } from "./services/apiClient";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "";
 
@@ -525,6 +527,7 @@ const getPortfolioIdFromResult = (result) => {
 
 export default function App() {
   const [showLanding, setShowLanding] = useState(true);
+  const [authUser, setAuthUser] = useState(null);
   const [activeNav, setActiveNav] = useState("uploads");
 
   const [isUploading, setIsUploading] = useState(false);
@@ -552,6 +555,53 @@ export default function App() {
 
   useEffect(() => {
     console.log("API_BASE_URL =", API_BASE_URL);
+  }, []);
+
+  const loadPropertiesFromApi = async () => {
+    try {
+      console.log("[loadPropertiesFromApi] Fetching properties from API...");
+      const res = await apiFetch("/api/v1/portfolios/properties");
+      console.log("[loadPropertiesFromApi] Response status:", res.status);
+      if (!res.ok) {
+        const text = await res.text();
+        console.error("[loadPropertiesFromApi] API error:", res.status, text);
+        return;
+      }
+      const properties = await res.json();
+      console.log("[loadPropertiesFromApi] Properties received:", Array.isArray(properties) ? properties.length : properties);
+      if (Array.isArray(properties) && properties.length > 0) {
+        const normalised = normaliseBackendIngestionResult(
+          { properties, status: "success" },
+          "Portfolio"
+        );
+        setIngestionResult(normalised);
+        setActiveNav("overview");
+      } else {
+        console.warn("[loadPropertiesFromApi] No properties returned — staying on uploads page");
+      }
+    } catch (err) {
+      console.error("[loadPropertiesFromApi] Failed:", err);
+    }
+  };
+
+  // Restore session from storage on mount
+  useEffect(() => {
+    const token =
+      localStorage.getItem("equirisk_token") ||
+      sessionStorage.getItem("equirisk_token");
+    const raw =
+      localStorage.getItem("equirisk_user") ||
+      sessionStorage.getItem("equirisk_user");
+    if (token && raw) {
+      try {
+        const user = JSON.parse(raw);
+        setAuthUser(user);
+        setShowLanding(false);
+        loadPropertiesFromApi();
+      } catch {
+        // corrupted storage — ignore
+      }
+    }
   }, []);
 
   useEffect(() => {
@@ -592,8 +642,12 @@ export default function App() {
     setFireDocumentsLoading(true);
 
     try {
+      const fireToken =
+        localStorage.getItem("equirisk_token") ||
+        sessionStorage.getItem("equirisk_token");
       const response = await fetch(
-        `${API_BASE_URL}/api/v1/underwriter/portfolios/${portfolioId}/fire-documents`
+        `${API_BASE_URL}/api/v1/underwriter/portfolios/${portfolioId}/fire-documents`,
+        { headers: fireToken ? { Authorization: `Bearer ${fireToken}` } : {} }
       );
 
       const payload = await response.json();
@@ -676,11 +730,15 @@ export default function App() {
         query.set("property_id", selectedPropertyId.trim());
       }
 
+      const uploadToken =
+        localStorage.getItem("equirisk_token") ||
+        sessionStorage.getItem("equirisk_token");
       const response = await fetch(
         `${API_BASE_URL}/api/v1/upload/ingest?${query.toString()}`,
         {
           method: "POST",
           body: formData,
+          headers: uploadToken ? { Authorization: `Bearer ${uploadToken}` } : {},
         }
       );
 
@@ -791,7 +849,18 @@ export default function App() {
       <Landingpage
         onGetStarted={() => {
           setShowLanding(false);
+        }}
+      />
+    );
+  }
+
+  if (!authUser) {
+    return (
+      <LoginPage
+        onLogin={(user) => {
+          setAuthUser(user);
           setActiveNav("uploads");
+          loadPropertiesFromApi();
         }}
       />
     );
@@ -846,8 +915,30 @@ export default function App() {
           </div>
 
           <div className="side-bottom">
-            <button className="btn btn-ghost" onClick={() => setShowLanding(true)}>
-              ⟵ Back
+            {authUser && (
+              <div style={{ marginBottom: 10, padding: "8px 10px", background: "var(--panel-soft)", borderRadius: 8, border: "1px solid var(--border-soft)" }}>
+                <div style={{ fontSize: 12, fontWeight: 600, color: "var(--text)", lineHeight: 1.3, marginBottom: 2 }}>
+                  {authUser.full_name}
+                </div>
+                <div style={{ fontSize: 11, color: "var(--muted)", lineHeight: 1.3 }}>
+                  {authUser.organisation}
+                </div>
+              </div>
+            )}
+            <button
+              className="btn btn-ghost"
+              style={{ width: "100%", textAlign: "left" }}
+              onClick={() => {
+                localStorage.removeItem("equirisk_token");
+                localStorage.removeItem("equirisk_user");
+                sessionStorage.removeItem("equirisk_token");
+                sessionStorage.removeItem("equirisk_user");
+                setAuthUser(null);
+                setIngestionResult(null);
+                setShowLanding(true);
+              }}
+            >
+              Sign out
             </button>
           </div>
         </aside>

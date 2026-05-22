@@ -1,3 +1,7 @@
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
 :root {
   --bg: #f5f7fb;
   --panel: #ffffff;
@@ -222,6 +226,8 @@ select {
   display: flex;
   flex-direction: column;
   gap: 20px;
+  max-width: 1600px;
+  width: 100%;
 }
 
 .card {
@@ -1400,6 +1406,10 @@ select {
 
   .map-panel-shell {
     grid-template-columns: 1fr;
+  }
+
+  .dashboard-composition-map {
+    grid-template-columns: 1fr !important;
   }
 }
 
