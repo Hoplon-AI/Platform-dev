@@ -8,8 +8,8 @@ const CLUSTER_ZOOM = 13;
 const BLOCK_ZOOM = 18;
 const FOCUSED_ZOOM = 19;
 const CONTEXT_BLOCK_ZOOM = 16.5;
-const CONTEXT_BLOCK_FADE_START_ZOOM = 18;
-const CONTEXT_BLOCK_HIDE_ZOOM = 18.25;
+const CONTEXT_BLOCK_FADE_START_ZOOM = 18.5;
+const CONTEXT_BLOCK_HIDE_ZOOM = 19;
 const BUILDINGS_URL = "/buildings_cathcart.geojson";
 
 const UK_LAT_BOUNDS = { min: 49.0, max: 61.5 };
@@ -632,7 +632,7 @@ export default function PortfolioMap({
     if (!mapDivRef.current || mapRef.current) return;
 
     const map = L.map(mapDivRef.current, {
-      scrollWheelZoom: false,
+      scrollWheelZoom: true,
       zoomControl: true,
       attributionControl: false,
     }).setView(DEFAULT_CENTER, DEFAULT_ZOOM);
@@ -654,6 +654,14 @@ export default function PortfolioMap({
     setTimeout(() => map.invalidateSize(), 0);
     setTimeout(() => map.invalidateSize(), 120);
     setTimeout(() => map.invalidateSize(), 400);
+
+    return () => {
+      map.remove();
+      mapRef.current = null;
+      buildingsLayerRef.current = null;
+      overviewBlockLayerRef.current = null;
+      pointLayerRef.current = null;
+    };
   }, []);
 
   useEffect(() => {
@@ -702,11 +710,15 @@ export default function PortfolioMap({
 
       blockPoints.forEach((point) => {
         const isSelected = sameBlock(selectedBlock, point.raw);
+        const baseZ = isSelected ? 1000 : 0;
         const marker = L.marker([point.lat, point.lon], {
           icon: createBlockCountIcon(point, currentZoom, isSelected),
           keyboard: false,
+          zIndexOffset: baseZ,
         });
 
+        marker.on("mouseover", () => marker.setZIndexOffset(10000));
+        marker.on("mouseout", () => marker.setZIndexOffset(baseZ));
         marker.on("click", () => {
           onSelectBlock?.(point.raw);
           onSelectProperty?.(null);
@@ -724,12 +736,15 @@ export default function PortfolioMap({
     } else {
       propertyPoints.forEach((point) => {
         const isSelected = sameProperty(selectedProperty, point.raw);
+        const baseZ = isSelected ? 1000 : 0;
         const marker = L.marker([point.lat, point.lon], {
           icon: createPropertyDotIcon(point, isSelected),
           keyboard: false,
-          zIndexOffset: isSelected ? 1000 : 500,
+          zIndexOffset: baseZ,
         });
 
+        marker.on("mouseover", () => marker.setZIndexOffset(10000));
+        marker.on("mouseout", () => marker.setZIndexOffset(baseZ));
         marker.on("click", () => onSelectProperty?.(point.raw));
         marker.bindTooltip(`${point.label} · ${point.propertyCategoryLabel}`, {
           direction: "top",
@@ -812,6 +827,7 @@ export default function PortfolioMap({
 
       blockPoints.forEach((point) => {
         const isSelected = sameBlock(selectedBlock, point.raw);
+        const baseZ = isSelected ? 760 : 260;
         const marker = L.marker([point.lat, point.lon], {
           icon: createBlockCountIcon(
             point,
@@ -821,9 +837,11 @@ export default function PortfolioMap({
             isSelected ? Math.min(1.08, visibility.scale + 0.04) : visibility.scale
           ),
           keyboard: false,
-          zIndexOffset: isSelected ? 760 : 260,
+          zIndexOffset: baseZ,
         });
 
+        marker.on("mouseover", () => marker.setZIndexOffset(10000));
+        marker.on("mouseout", () => marker.setZIndexOffset(baseZ));
         marker.on("click", () => {
           onSelectBlock?.(point.raw);
           onSelectProperty?.(null);

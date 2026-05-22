@@ -55,9 +55,20 @@ const inferPortfolioClass = (property) => {
   const combined = `${propertyType} ${builtForm} ${address}`;
 
   if (
+    propertyType.includes("lock up") ||
+    propertyType.includes("lockup") ||
+    propertyType.includes("office") ||
+    propertyType.includes("commercial") ||
+    propertyType.includes("mixed use")
+  ) {
+    return "Other";
+  }
+
+  if (
     combined.includes("flat") ||
     combined.includes("apartment") ||
-    combined.includes("maisonette")
+    combined.includes("maisonette") ||
+    combined.includes("tenement")
   ) {
     return "Flats";
   }
@@ -298,6 +309,8 @@ function KpiCard({ title, value, subtitle, tone = "default" }) {
 }
 
 function PortfolioCompositionCard({ properties, blocks }) {
+  const [flatsOpen, setFlatsOpen] = useState(false);
+
   const totalUnits = properties.length;
   const houses = properties.filter((p) => inferPortfolioClass(p) === "Houses");
   const flats = properties.filter((p) => inferPortfolioClass(p) === "Flats");
@@ -307,8 +320,18 @@ function PortfolioCompositionCard({ properties, blocks }) {
     (block) => !block.parent_uprn && block.count > 1
   ).length;
 
-  const renderRow = (label, count, total, tone = "#64748b", meta = null) => {
-    const pct = total > 0 ? Math.round((count / total) * 100) : 0;
+  const flatTypeBreakdown = useMemo(() => {
+    const counts = new Map();
+    flats.forEach((p) => {
+      const key = p.property_type || p.type || "Unknown";
+      counts.set(key, (counts.get(key) || 0) + 1);
+    });
+    return Array.from(counts.entries())
+      .sort((a, b) => b[1] - a[1])
+      .map(([label, count]) => ({ label, count }));
+  }, [flats]);
+
+  const renderRow = (label, count, _total, tone = "#64748b", meta = null) => {
     return (
       <div style={{ marginBottom: 14 }}>
         <div
@@ -317,7 +340,6 @@ function PortfolioCompositionCard({ properties, blocks }) {
             gridTemplateColumns: "16px 1fr auto",
             gap: 10,
             alignItems: "center",
-            marginBottom: 6,
           }}
         >
           <div
@@ -331,27 +353,8 @@ function PortfolioCompositionCard({ properties, blocks }) {
           />
           <div style={{ fontWeight: 600 }}>{label}</div>
           <div className="muted">
-            {count} {label === "Blocks" ? "blocks" : "units"} / {pct}%
+            {count} {label === "Blocks" ? "blocks" : "units"}
           </div>
-        </div>
-
-        <div
-          style={{
-            height: 8,
-            background: "rgba(15,23,42,0.08)",
-            borderRadius: 999,
-            overflow: "hidden",
-            marginLeft: 26,
-          }}
-        >
-          <div
-            style={{
-              width: `${pct}%`,
-              height: "100%",
-              background: tone,
-              borderRadius: 999,
-            }}
-          />
         </div>
 
         {meta ? (
@@ -368,39 +371,88 @@ function PortfolioCompositionCard({ properties, blocks }) {
       <div className="card-header row-between">
         <div>
           <div className="card-title">Portfolio Composition</div>
-          <div className="card-subtitle">
+          {/* <div className="card-subtitle">
             Summary split for the whole ingested SoV rather than raw row-by-row tables.
-          </div>
+          </div> */}
         </div>
         <span className="pill pill-muted">{totalUnits} units</span>
       </div>
 
-      {renderRow("Houses", houses.length, totalUnits, "#3b82f6")}
-      {renderRow("Flats", flats.length, totalUnits, "#6366f1")}
-      {renderRow(
-        "Blocks",
-        blockCount,
-        Math.max(blockCount, 1),
-        "#f59e0b",
-        `${thirdPartyLikeBlocks} grouped blocks without clear parent UPRN`
-      )}
+      <div className="card-body">
+        {renderRow("Houses", houses.length, totalUnits, "#3b82f6")}
 
-      {other.length > 0 ? (
-        <div
-          style={{
-            marginTop: 8,
-            padding: 12,
-            borderRadius: 12,
-            background: "rgba(245,158,11,0.12)",
-            border: "1px solid rgba(245,158,11,0.22)",
-          }}
-        >
-          <div style={{ fontWeight: 600, marginBottom: 4 }}>Other asset types</div>
-          <div className="muted">
-            {other.length} properties could not be cleanly classified as houses or flats from the current SoV fields.
+        <div style={{ marginBottom: 14 }}>
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "16px 1fr auto auto",
+              gap: 10,
+              alignItems: "center",
+              cursor: "pointer",
+              userSelect: "none",
+            }}
+            onClick={() => setFlatsOpen((o) => !o)}
+          >
+            <div style={{ width: 8, height: 8, borderRadius: 999, background: "#6366f1", marginLeft: 4 }} />
+            <div style={{ fontWeight: 600 }}>Flats</div>
+            <div className="muted">{flats.length} units</div>
+            <div className="muted" style={{ fontSize: 11, paddingRight: 2 }}>
+              {flatsOpen ? "▲" : "▼"}
+            </div>
           </div>
+
+          {flatsOpen && (
+            <div
+              style={{
+                marginTop: 8,
+                marginLeft: 26,
+                borderLeft: "2px solid rgba(99,102,241,0.2)",
+                paddingLeft: 12,
+              }}
+            >
+              {flatTypeBreakdown.map(({ label, count }) => (
+                <div
+                  key={label}
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    padding: "3px 0",
+                    fontSize: 13,
+                  }}
+                >
+                  <span className="muted">{label}</span>
+                  <span className="muted">{count}</span>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
-      ) : null}
+
+        {renderRow(
+          "Blocks",
+          blockCount,
+          Math.max(blockCount, 1),
+          "#f59e0b",
+          `${thirdPartyLikeBlocks} grouped blocks without clear parent UPRN`
+        )}
+
+        {other.length > 0 ? (
+          <div
+            style={{
+              marginTop: 8,
+              padding: 12,
+              borderRadius: 12,
+              background: "rgba(245,158,11,0.12)",
+              border: "1px solid rgba(245,158,11,0.22)",
+            }}
+          >
+            <div style={{ fontWeight: 600, marginBottom: 4 }}>Other asset types</div>
+            <div className="muted">
+              {other.length} properties could not be cleanly classified as houses or flats from the current SoV fields.
+            </div>
+          </div>
+        ) : null}
+      </div>
     </div>
   );
 }

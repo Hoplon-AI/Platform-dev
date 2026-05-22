@@ -185,7 +185,7 @@ select {
 
 .main {
   min-width: 0;
-  padding: 28px;
+  padding: 28px 72px;
 }
 
 .main-head {
@@ -226,7 +226,6 @@ select {
   display: flex;
   flex-direction: column;
   gap: 20px;
-  max-width: 1600px;
   width: 100%;
 }
 
@@ -1127,6 +1126,11 @@ select {
 .portfolio-map-canvas .leaflet-marker-icon,
 .portfolio-map-canvas .leaflet-marker-shadow {
   transition: transform 0.18s ease;
+}
+
+.portfolio-map-canvas .leaflet-div-icon {
+  background: none;
+  border: none;
 }
 
 .portfolio-map-canvas .leaflet-interactive:focus {

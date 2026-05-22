@@ -74,9 +74,9 @@ const looksLikeBritishNationalGrid = (easting, northing) => {
   return (
     Number.isFinite(e) &&
     Number.isFinite(n) &&
-    e >= OSGB_EASTING_BOUNDS.min &&
+    e > 0 &&
     e <= OSGB_EASTING_BOUNDS.max &&
-    n >= OSGB_NORTHING_BOUNDS.min &&
+    n > 0 &&
     n <= OSGB_NORTHING_BOUNDS.max
   );
 };
