@@ -308,8 +308,17 @@ function KpiCard({ title, value, subtitle, tone = "default" }) {
   );
 }
 
-function PortfolioCompositionCard({ properties, blocks }) {
+function PortfolioCompositionCard({ properties, blocks, onSelectBlock, selectedBlock }) {
   const [flatsOpen, setFlatsOpen] = useState(false);
+  const [blocksOpen, setBlocksOpen] = useState(false);
+  const [blocksSearch, setBlocksSearch] = useState("");
+  const [blocksSearchDebounced, setBlocksSearchDebounced] = useState("");
+  const [otherOpen, setOtherOpen] = useState(false);
+
+  useEffect(() => {
+    const t = setTimeout(() => setBlocksSearchDebounced(blocksSearch), 150);
+    return () => clearTimeout(t);
+  }, [blocksSearch]);
 
   const totalUnits = properties.length;
   const houses = properties.filter((p) => inferPortfolioClass(p) === "Houses");
@@ -320,51 +329,54 @@ function PortfolioCompositionCard({ properties, blocks }) {
     (block) => !block.parent_uprn && block.count > 1
   ).length;
 
-  const flatTypeBreakdown = useMemo(() => {
+  const typeBreakdown = (items) => {
     const counts = new Map();
-    flats.forEach((p) => {
+    items.forEach((p) => {
       const key = p.property_type || p.type || "Unknown";
       counts.set(key, (counts.get(key) || 0) + 1);
     });
     return Array.from(counts.entries())
       .sort((a, b) => b[1] - a[1])
       .map(([label, count]) => ({ label, count }));
-  }, [flats]);
-
-  const renderRow = (label, count, _total, tone = "#64748b", meta = null) => {
-    return (
-      <div style={{ marginBottom: 14 }}>
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "16px 1fr auto",
-            gap: 10,
-            alignItems: "center",
-          }}
-        >
-          <div
-            style={{
-              width: 8,
-              height: 8,
-              borderRadius: 999,
-              background: tone,
-              marginLeft: 4,
-            }}
-          />
-          <div style={{ fontWeight: 600 }}>{label}</div>
-          <div className="muted">
-            {count} {label === "Blocks" ? "blocks" : "units"}
-          </div>
-        </div>
-
-        {meta ? (
-          <div className="muted" style={{ marginTop: 6, marginLeft: 26 }}>
-            {meta}
-          </div>
-        ) : null}
-      </div>
-    );
   };
+
+  const flatTypeBreakdown = useMemo(() => typeBreakdown(flats), [flats]);
+  const otherTypeBreakdown = useMemo(() => typeBreakdown(other), [other]);
+
+  const renderRow = (label, count, _total, tone = "#64748b", meta = null) => (
+    <div style={{ marginBottom: 14 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "16px 1fr auto", gap: 10, alignItems: "center" }}>
+        <div style={{ width: 8, height: 8, borderRadius: 999, background: tone, marginLeft: 4 }} />
+        <div style={{ fontWeight: 600 }}>{label}</div>
+        <div className="muted">{count} {label === "Blocks" ? "blocks" : "units"}</div>
+      </div>
+      {meta ? <div className="muted" style={{ marginTop: 6, marginLeft: 26 }}>{meta}</div> : null}
+    </div>
+  );
+
+  const renderExpandableRow = (label, items, tone, open, setOpen) => (
+    <div style={{ marginBottom: 14 }}>
+      <div
+        style={{ display: "grid", gridTemplateColumns: "16px 1fr auto auto", gap: 10, alignItems: "center", cursor: "pointer", userSelect: "none" }}
+        onClick={() => setOpen((o) => !o)}
+      >
+        <div style={{ width: 8, height: 8, borderRadius: 999, background: tone, marginLeft: 4 }} />
+        <div style={{ fontWeight: 600 }}>{label}</div>
+        <div className="muted">{items.length} units</div>
+        <div className="muted" style={{ fontSize: 11, paddingRight: 2 }}>{open ? "▲" : "▼"}</div>
+      </div>
+      {open && (
+        <div style={{ marginTop: 8, marginLeft: 26, borderLeft: `2px solid ${tone}33`, paddingLeft: 12, paddingRight: 18 }}>
+          {typeBreakdown(items).map(({ label: subLabel, count }) => (
+            <div key={subLabel} style={{ display: "flex", justifyContent: "space-between", padding: "3px 0", fontSize: 13 }}>
+              <span className="muted">{subLabel}</span>
+              <span className="muted">{count}</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
 
   return (
     <div className="card" style={{ height: "100%" }}>
@@ -380,78 +392,90 @@ function PortfolioCompositionCard({ properties, blocks }) {
 
       <div className="card-body">
         {renderRow("Houses", houses.length, totalUnits, "#3b82f6")}
-
+        {renderExpandableRow("Flats", flats, "#6366f1", flatsOpen, setFlatsOpen)}
         <div style={{ marginBottom: 14 }}>
           <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "16px 1fr auto auto",
-              gap: 10,
-              alignItems: "center",
-              cursor: "pointer",
-              userSelect: "none",
-            }}
-            onClick={() => setFlatsOpen((o) => !o)}
+            style={{ display: "grid", gridTemplateColumns: "16px 1fr auto auto", gap: 10, alignItems: "center", cursor: "pointer", userSelect: "none" }}
+            onClick={() => setBlocksOpen((o) => !o)}
           >
-            <div style={{ width: 8, height: 8, borderRadius: 999, background: "#6366f1", marginLeft: 4 }} />
-            <div style={{ fontWeight: 600 }}>Flats</div>
-            <div className="muted">{flats.length} units</div>
-            <div className="muted" style={{ fontSize: 11, paddingRight: 2 }}>
-              {flatsOpen ? "▲" : "▼"}
-            </div>
+            <div style={{ width: 8, height: 8, borderRadius: 999, background: "#f59e0b", marginLeft: 4 }} />
+            <div style={{ fontWeight: 600 }}>Blocks</div>
+            <div className="muted">{blockCount} blocks</div>
+            <div className="muted" style={{ fontSize: 11, paddingRight: 2 }}>{blocksOpen ? "▲" : "▼"}</div>
           </div>
-
-          {flatsOpen && (
-            <div
-              style={{
-                marginTop: 8,
-                marginLeft: 26,
-                borderLeft: "2px solid rgba(99,102,241,0.2)",
-                paddingLeft: 12,
-              }}
-            >
-              {flatTypeBreakdown.map(({ label, count }) => (
-                <div
-                  key={label}
-                  style={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    padding: "3px 0",
-                    fontSize: 13,
-                  }}
-                >
-                  <span className="muted">{label}</span>
-                  <span className="muted">{count}</span>
-                </div>
-              ))}
+          {blocksOpen && (
+            <div style={{ marginTop: 8, marginLeft: 26 }}>
+              <input
+                type="text"
+                placeholder="Search block ID…"
+                value={blocksSearch}
+                onChange={(e) => setBlocksSearch(e.target.value)}
+                style={{
+                  width: "100%",
+                  padding: "5px 10px",
+                  marginBottom: 8,
+                  fontSize: 13,
+                  borderRadius: 6,
+                  border: "1px solid var(--border)",
+                  background: "var(--panel)",
+                  color: "var(--text)",
+                  boxSizing: "border-box",
+                  outline: "none",
+                }}
+              />
+              <div style={{ borderLeft: "2px solid rgba(245,158,11,0.3)", paddingLeft: 12, paddingRight: 18, maxHeight: 288, overflowY: "auto" }}>
+                {blocks
+                  .filter((block) => {
+                    const id = block.label || block.name || block.block_reference || block.block_id || block.id || "";
+                    return id.toLowerCase().includes(blocksSearchDebounced.toLowerCase());
+                  })
+                  .map((block) => {
+                    const id = block.label || block.name || block.block_reference || block.block_id || block.id || "—";
+                    const isSelected = selectedBlock && (
+                      (selectedBlock.id && selectedBlock.id === block.id) ||
+                      (selectedBlock.label && selectedBlock.label === block.label)
+                    );
+                    return (
+                      <div
+                        key={block.id || block.block_id || id}
+                        onClick={() => onSelectBlock?.(block)}
+                        style={{
+                          display: "flex",
+                          justifyContent: "space-between",
+                          padding: "5px 6px",
+                          fontSize: 13,
+                          borderRadius: 6,
+                          cursor: "pointer",
+                          background: isSelected ? "rgba(245,158,11,0.12)" : "transparent",
+                          fontWeight: isSelected ? 600 : 400,
+                        }}
+                      >
+                        <span style={{ color: isSelected ? "#b45309" : undefined }}>{id}</span>
+                        <span className="muted">{block.count ?? 0}</span>
+                      </div>
+                    );
+                  })}
+              </div>
             </div>
           )}
         </div>
+        {other.length > 0 && renderExpandableRow("Other", other, "#64748b", otherOpen, setOtherOpen)}
 
-        {renderRow(
-          "Blocks",
-          blockCount,
-          Math.max(blockCount, 1),
-          "#f59e0b",
-          `${thirdPartyLikeBlocks} grouped blocks without clear parent UPRN`
-        )}
-
-        {other.length > 0 ? (
+        {thirdPartyLikeBlocks > 0 && (
           <div
             style={{
               marginTop: 8,
-              padding: 12,
-              borderRadius: 12,
-              background: "rgba(245,158,11,0.12)",
-              border: "1px solid rgba(245,158,11,0.22)",
+              padding: "10px 14px",
+              borderRadius: 10,
+              background: "rgba(245,158,11,0.10)",
+              border: "1px solid rgba(245,158,11,0.30)",
             }}
           >
-            <div style={{ fontWeight: 600, marginBottom: 4 }}>Other asset types</div>
-            <div className="muted">
-              {other.length} properties could not be cleanly classified as houses or flats from the current SoV fields.
+            <div style={{ fontWeight: 600, fontSize: 13, color: "var(--muted)" }}>
+              {thirdPartyLikeBlocks} grouped blocks without clear parent UPRN
             </div>
           </div>
-        ) : null}
+        )}
       </div>
     </div>
   );
@@ -473,7 +497,7 @@ function MiniSummaryTable({ title, subtitle, rows, columns }) {
       {!rows.length ? (
         <div className="muted">No data available.</div>
       ) : (
-        <div className="table-wrap">
+        <div className="table-wrap" style={{ maxHeight: 260, overflowY: "auto" }}>
           <table className="table">
             <thead>
               <tr>
@@ -515,52 +539,54 @@ function PortfolioAnalysisWindow({ tenancyRows, blockRows, propertyTypeRows, age
         <span className="pill pill-muted">Whole SoV summary</span>
       </div>
 
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
-          gap: 16,
-        }}
-      >
-        <MiniSummaryTable
-          title="By tenancy / ownership"
-          rows={tenancyRows.slice(0, 6)}
-          columns={[
-            { key: "label", label: "Type" },
-            { key: "count", label: "Units" },
-            { key: "totalValue", label: "Sum insured", render: (row) => `£${fmtMoney(row.totalValue)}` },
-          ]}
-        />
+      <div className="card-body">
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+            gap: 16,
+          }}
+        >
+          <MiniSummaryTable
+            title="By tenancy / ownership"
+            rows={tenancyRows}
+            columns={[
+              { key: "label", label: "Type" },
+              { key: "count", label: "Units" },
+              { key: "totalValue", label: "Sum insured", render: (row) => `£${fmtMoney(row.totalValue)}` },
+            ]}
+          />
 
-        <MiniSummaryTable
-          title="By block reference"
-          rows={blockRows.slice(0, 6)}
-          columns={[
-            { key: "label", label: "Block" },
-            { key: "count", label: "Units" },
-            { key: "totalValue", label: "TIV", render: (row) => `£${fmtMoney(row.totalValue)}` },
-          ]}
-        />
+          <MiniSummaryTable
+            title="By block reference"
+            rows={blockRows}
+            columns={[
+              { key: "label", label: "Block" },
+              { key: "count", label: "Units" },
+              { key: "totalValue", label: "TIV", render: (row) => `£${fmtMoney(row.totalValue)}` },
+            ]}
+          />
 
-        <MiniSummaryTable
-          title="By property type"
-          rows={propertyTypeRows.slice(0, 6)}
-          columns={[
-            { key: "label", label: "Type" },
-            { key: "count", label: "Units" },
-            { key: "totalValue", label: "Sum insured", render: (row) => `£${fmtMoney(row.totalValue)}` },
-          ]}
-        />
+          <MiniSummaryTable
+            title="By property type"
+            rows={propertyTypeRows}
+            columns={[
+              { key: "label", label: "Type" },
+              { key: "count", label: "Units" },
+              { key: "totalValue", label: "Sum insured", render: (row) => `£${fmtMoney(row.totalValue)}` },
+            ]}
+          />
 
-        <MiniSummaryTable
-          title="By age banding"
-          rows={ageBandRows.slice(0, 6)}
-          columns={[
-            { key: "label", label: "Age" },
-            { key: "count", label: "Units" },
-            { key: "totalValue", label: "Sum insured", render: (row) => `£${fmtMoney(row.totalValue)}` },
-          ]}
-        />
+          <MiniSummaryTable
+            title="By age banding"
+            rows={ageBandRows}
+            columns={[
+              { key: "label", label: "Age" },
+              { key: "count", label: "Units" },
+              { key: "totalValue", label: "Sum insured", render: (row) => `£${fmtMoney(row.totalValue)}` },
+            ]}
+          />
+        </div>
       </div>
     </div>
   );
@@ -589,6 +615,7 @@ function FireEvidencePanel({ fireDocuments, loading, onUploadNew }) {
         </span>
       </div>
 
+      <div className="card-body">
       <div
         style={{
           display: "grid",
@@ -709,11 +736,24 @@ function FireEvidencePanel({ fireDocuments, loading, onUploadNew }) {
           })
         )}
       </div>
+      </div>
     </div>
   );
 }
 
 function BlockListPanel({ blocks, selectedBlockId, onSelectBlock, selectedProperty }) {
+  const [search, setSearch] = useState("");
+  const [searchDebounced, setSearchDebounced] = useState("");
+
+  useEffect(() => {
+    const t = setTimeout(() => setSearchDebounced(search), 150);
+    return () => clearTimeout(t);
+  }, [search]);
+
+  const filteredBlocks = searchDebounced
+    ? blocks.filter((b) => (b.label || b.name || "").toLowerCase().includes(searchDebounced.toLowerCase()))
+    : blocks;
+
   return (
     <div className="card">
       <div className="card-header row-between">
@@ -723,53 +763,73 @@ function BlockListPanel({ blocks, selectedBlockId, onSelectBlock, selectedProper
             Drill into grouped blocks without rendering the whole SoV as a long table.
           </div>
         </div>
-        <span className="pill pill-muted">Top {Math.min(blocks.length, 20)} blocks</span>
+        <span className="pill pill-muted">{blocks.length} blocks</span>
       </div>
 
-      {!blocks.length ? (
-        <div className="muted">No block-level groups are available yet.</div>
-      ) : (
-        <div className="table-wrap">
-          <table className="table">
-            <thead>
-              <tr>
-                <th>Block</th>
-                <th>Properties</th>
-                <th>Total value</th>
-                <th>Max height</th>
-                <th>FRA</th>
-                <th>FRAEW</th>
-              </tr>
-            </thead>
-            <tbody>
-              {blocks.slice(0, 20).map((block) => (
-                <tr
-                  key={block.id}
-                  onClick={() => onSelectBlock?.(block)}
-                  style={{
-                    cursor: "pointer",
-                    background:
-                      selectedBlockId === block.id && !selectedProperty
-                        ? "rgba(59,130,246,0.08)"
-                        : "transparent",
-                  }}
-                >
-                  <td>{block.label}</td>
-                  <td>{block.count}</td>
-                  <td>£{fmtMoney(block.totalValue)}</td>
-                  <td>
-                    {Number.isFinite(Number(block.maxHeight))
-                      ? `${Number(block.maxHeight).toFixed(1)} m`
-                      : "—"}
-                  </td>
-                  <td>{block.latest_fra ? <RiskBadge band={getFireRiskBand(block.latest_fra)} /> : "—"}</td>
-                  <td>{block.latest_fraew ? <RiskBadge band={getFireRiskBand(block.latest_fraew)} /> : "—"}</td>
+      <div className="card-body">
+        <input
+          type="text"
+          placeholder="Search block…"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          style={{
+            width: "100%",
+            padding: "6px 12px",
+            marginBottom: 12,
+            fontSize: 13,
+            borderRadius: 6,
+            border: "1px solid var(--border)",
+            background: "var(--panel)",
+            color: "var(--text)",
+            boxSizing: "border-box",
+            outline: "none",
+          }}
+        />
+        {!blocks.length ? (
+          <div className="muted">No block-level groups are available yet.</div>
+        ) : (
+          <div className="table-wrap" style={{ maxHeight: 510, minHeight: 510, overflowY: "auto" }}>
+            <table className="table">
+              <thead>
+                <tr>
+                  <th>Block</th>
+                  <th>Properties</th>
+                  <th>Total value</th>
+                  <th>Max height</th>
+                  <th>FRA</th>
+                  <th>FRAEW</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+              </thead>
+              <tbody>
+                {filteredBlocks.map((block) => (
+                  <tr
+                    key={block.id}
+                    onClick={() => onSelectBlock?.(block)}
+                    style={{
+                      cursor: "pointer",
+                      background:
+                        selectedBlockId === block.id && !selectedProperty
+                          ? "rgba(59,130,246,0.08)"
+                          : "transparent",
+                    }}
+                  >
+                    <td>{block.label}</td>
+                    <td>{block.count}</td>
+                    <td>£{fmtMoney(block.totalValue)}</td>
+                    <td>
+                      {Number.isFinite(Number(block.maxHeight))
+                        ? `${Number(block.maxHeight).toFixed(1)} m`
+                        : "—"}
+                    </td>
+                    <td>{block.latest_fra ? <RiskBadge band={getFireRiskBand(block.latest_fra)} /> : "—"}</td>
+                    <td>{block.latest_fraew ? <RiskBadge band={getFireRiskBand(block.latest_fraew)} /> : "—"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -1094,7 +1154,7 @@ export default function PortfolioDashboard({
         }}
       >
         <div style={{ display: "grid", gap: 16 }}>
-          <PortfolioCompositionCard properties={properties} blocks={blocks} />
+          <PortfolioCompositionCard properties={properties} blocks={blocks} onSelectBlock={handleSelectBlock} selectedBlock={resolvedSelectedBlock} />
 
           <div className="card">
             <div className="card-header row-between">
