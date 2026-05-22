@@ -669,7 +669,10 @@ if __name__ == "__main__":
         # "110 Albert Street, Riverside, Cardiff, CF11 6JP",
         # "4 Alexandra Court, Ethel Street, Canton, Cardiff, CF5 1EN",
         # "107 Bartley Wilson Way, Canton, Cardiff, CF11 8EN",
-        "40 Balmore Road, Glasgow, G22 6RN"
+       # "40 Balmore Road, Glasgow, G22 6RN",
+        "Apartment 1, 12 Ashton Gardens, Godwin Vale, York, YO41 1FU",
+        "9 Broomhill Grove, Knottingley, WF11 0DT",
+        "5A Crewe Avenue (New Build), Knottingley, WF11 8QN"
     ]
 
     os_results = get_uprns_from_addresses(test_addresses, PLACES_KEY)
