@@ -76,6 +76,16 @@ class DatabasePool:
 
             print(f"[DB_POOL] Connecting to {db_host}:{db_port}/{db_name} as {db_user}")
 
+            # Determine SSL mode: disable for local dev (localhost / Docker),
+            # use the env var PGSSLMODE otherwise (e.g. 'require' on Render).
+            pgsslmode = os.getenv("PGSSLMODE") or os.getenv("DB_SSLMODE")
+            if pgsslmode:
+                ssl_arg = pgsslmode          # e.g. 'require', 'verify-full'
+            elif db_host in ("localhost", "127.0.0.1", "::1"):
+                ssl_arg = False              # no SSL for local Docker
+            else:
+                ssl_arg = True               # default to SSL for remote hosts
+
             try:
                 cls._pool = await asyncpg.create_pool(
                     host=db_host,
@@ -86,6 +96,7 @@ class DatabasePool:
                     min_size=min_size,
                     max_size=max_size,
                     command_timeout=30,
+                    ssl=ssl_arg,
                 )
                 print(f"[DB_POOL] Connection pool created successfully")
             except Exception as e:

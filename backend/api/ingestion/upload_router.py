@@ -930,21 +930,24 @@ async def ingest_document(
         # the correct RAG colour without a separate round-trip.
         extracted_feature: dict = {}
         feature_id = result.get("feature_id")
-        if feature_id:
+        fra_id = result.get("fra_id")
+        fraew_id = result.get("fraew_id")
+        db_lookup_id = fra_id if document_type == "fra" else fraew_id
+        if db_lookup_id:
             try:
                 if document_type == "fra":
                     _row = await conn.fetchrow(
                         "SELECT risk_rating, rag_status, assessor_company, assessor_name, "
                         "assessment_date, next_review_date, evacuation_strategy "
                         "FROM silver.fra_features WHERE fra_id = $1::uuid AND ha_id = $2",
-                        feature_id, ha_id,
+                        db_lookup_id, ha_id,
                     )
                 else:
                     _row = await conn.fetchrow(
                         "SELECT building_risk_rating, rag_status, assessor_company, "
                         "assessment_date, has_combustible_cladding, eps_insulation_present "
                         "FROM silver.fraew_features WHERE fraew_id = $1::uuid AND ha_id = $2",
-                        feature_id, ha_id,
+                        db_lookup_id, ha_id,
                     )
                 if _row:
                     extracted_feature = dict(_row)
