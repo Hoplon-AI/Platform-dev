@@ -1,4 +1,6 @@
 import React, { useMemo, useRef, useState } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import ProcessingSteps from "../components/ProcessingSteps";
 
 type UploadStage = "SOV" | "FRA" | "FRAEW";
 
@@ -43,16 +45,36 @@ const stageCopy: Record<
   },
 };
 
-const pipelineSteps = [
-  "Queued",
-  "Checking file format",
-  "Uploading file",
-  "Running backend ingestion",
-  "Normalising response",
-  "Linking evidence",
-  "Preparing dashboard",
-  "Complete",
-];
+const pipelineStepsByStage: Record<string, string[]> = {
+  SOV: [
+    "Uploading file",
+    "Validating format",
+    "Parsing property schedule",
+    "Detecting blocks",
+    "Building portfolio",
+    "Preparing dashboard",
+    "Complete",
+  ],
+  FRA: [
+    "Uploading document",
+    "Extracting text from PDF",
+    "Running AI analysis",
+    "Identifying fire risk factors",
+    "Scoring risk rating",
+    "Saving to portfolio",
+    "Complete",
+  ],
+  FRAEW: [
+    "Uploading document",
+    "Extracting text from PDF",
+    "Running AI analysis",
+    "Identifying cladding & wall risks",
+    "Scoring building risk",
+    "Saving to portfolio",
+    "Complete",
+  ],
+};
+
 
 function IconUpload() {
   return (
@@ -111,13 +133,38 @@ export default function IngestionLandingPage({
   const isEvidenceStage = stage === "FRA" || stage === "FRAEW";
   const isStageLocked = isEvidenceStage && !hasSovData;
 
+  const pipelineSteps = pipelineStepsByStage[stage] ?? pipelineStepsByStage.FRA;
+
+  // App.jsx drives 8 fixed steps — map its progress ratio to display steps length
+  const APP_TOTAL_STEPS = 8;
+  const appStepNames = [
+    "uploading document", "uploading file",
+    "extracting text from pdf",
+    "running ai analysis", "running backend ingestion",
+    "identifying fire risk factors", "identifying cladding & wall risks",
+    "identifying risk factors", "parsing property schedule",
+    "scoring risk rating", "scoring building risk",
+    "detecting blocks", "building portfolio",
+    "validating format",
+    "saving to portfolio",
+    "preparing dashboard", "preparing portfolio dashboard",
+    "finalising", "complete",
+  ];
+
   const currentStepIndex = useMemo(() => {
     if (!pipelineStep) return -1;
-    const index = pipelineSteps.findIndex(
-      (step) => step.toLowerCase() === pipelineStep.toLowerCase()
+    const lower = pipelineStep.toLowerCase();
+    // First try exact match in display steps
+    const exact = pipelineSteps.findIndex(s => s.toLowerCase() === lower);
+    if (exact !== -1) return exact;
+    // Fall back: find app step index and map proportionally
+    const appIndex = appStepNames.indexOf(lower);
+    if (appIndex === -1) return 0;
+    return Math.min(
+      Math.floor((appIndex / APP_TOTAL_STEPS) * pipelineSteps.length),
+      pipelineSteps.length - 1
     );
-    return index === -1 ? 2 : index;
-  }, [pipelineStep]);
+  }, [pipelineStep, pipelineSteps]);
 
   const accept = stage === "SOV" ? ".xlsx,.xls,.csv" : ".pdf";
 
@@ -249,35 +296,118 @@ export default function IngestionLandingPage({
         <div className="formats">Supported: {activeCopy.formats}</div>
       </section>
 
-      {isUploading && (
-        <section className="processing-card">
-          <div className="processing-header">
-            <div>
-              <strong>Processing upload...</strong>
-              <p>Please wait while the backend validates, extracts, links, and prepares the dashboard.</p>
-            </div>
-            <span>{pipelineStep || "Starting"}</span>
-          </div>
-
-          <div className="processing-bar">
-            <div
-              className="processing-bar-fill"
-              style={{ width: `${Math.max(12, ((currentStepIndex + 1) / pipelineSteps.length) * 100)}%` }}
-            />
-          </div>
-
-          <div className="mini-steps">
-            {pipelineSteps.map((step, index) => (
-              <div
-                key={step}
-                className={`mini-step ${index < currentStepIndex ? "complete" : ""} ${index === currentStepIndex ? "active" : ""}`}
+      <AnimatePresence>
+        {isUploading && (
+          <motion.div
+            key="processing-overlay"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.35, ease: "easeOut" }}
+            style={{
+              position: "fixed",
+              inset: 0,
+              zIndex: 50,
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              justifyContent: "center",
+              background:
+                "linear-gradient(160deg, #f0f7ff 0%, #e8f2ff 50%, #dbeafe 100%)",
+              padding: "40px 20px",
+            }}
+          >
+            {/* AI badge */}
+            <motion.div
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.4, delay: 0.12 }}
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 8,
+                background: "rgba(37, 99, 235, 0.07)",
+                border: "1px solid rgba(37, 99, 235, 0.14)",
+                borderRadius: 100,
+                padding: "5px 14px",
+                marginBottom: 26,
+              }}
+            >
+              <motion.div
+                animate={{ rotate: 360 }}
+                transition={{ duration: 1.2, repeat: Infinity, ease: "linear" }}
+                style={{
+                  width: 11,
+                  height: 11,
+                  borderRadius: "50%",
+                  border: "1.5px solid rgba(37,99,235,0.2)",
+                  borderTopColor: "#2563eb",
+                  flexShrink: 0,
+                }}
+              />
+              <span
+                style={{
+                  fontSize: 11,
+                  fontWeight: 700,
+                  color: "#1d4ed8",
+                  letterSpacing: "0.08em",
+                  fontFamily: "Inter, ui-sans-serif, system-ui, sans-serif",
+                  textTransform: "uppercase",
+                }}
               >
-                {step}
-              </div>
-            ))}
-          </div>
-        </section>
-      )}
+                Quinn
+              </span>
+            </motion.div>
+
+            {/* Title */}
+            <motion.h2
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.45, delay: 0.18 }}
+              style={{
+                margin: "0 0 10px",
+                fontSize: 30,
+                fontWeight: 700,
+                letterSpacing: "-0.04em",
+                color: "#1e3a8a",
+                textAlign: "center",
+                fontFamily: "Inter, ui-sans-serif, system-ui, sans-serif",
+              }}
+            >
+              Quinn is Analysing your document
+            </motion.h2>
+
+            {/* Subtitle */}
+            <motion.p
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ duration: 0.4, delay: 0.24 }}
+              style={{
+                margin: "0 0 48px",
+                fontSize: 15,
+                color: "#4b72b0",
+                textAlign: "center",
+                fontFamily: "Inter, ui-sans-serif, system-ui, sans-serif",
+              }}
+            >
+              Extracting insights and building your portfolio
+            </motion.p>
+
+            {/* Steps */}
+            <motion.div
+              initial={{ opacity: 0, y: 18 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5, delay: 0.28 }}
+              style={{ width: "100%", maxWidth: 460 }}
+            >
+              <ProcessingSteps
+                steps={pipelineSteps}
+                currentIndex={currentStepIndex}
+              />
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {uploadError && <section className="error-card">{uploadError}</section>}
 
@@ -555,79 +685,7 @@ const css = `
     padding: 20px;
   }
 
-  .processing-card {
-    background: #ffffff;
-    border: 1px solid #dbeafe;
-    box-shadow: 0 10px 25px rgba(15, 23, 42, 0.05);
-  }
 
-  .processing-header {
-    display: flex;
-    justify-content: space-between;
-    gap: 16px;
-    align-items: flex-start;
-    margin-bottom: 16px;
-  }
-
-  .processing-header strong {
-    font-size: 17px;
-  }
-
-  .processing-header p {
-    margin: 4px 0 0;
-    color: #64748b;
-    font-size: 13px;
-  }
-
-  .processing-header span {
-    padding: 7px 10px;
-    border-radius: 999px;
-    background: #eff6ff;
-    color: #1d4ed8;
-    font-size: 12px;
-    font-weight: 800;
-    white-space: nowrap;
-  }
-
-  .processing-bar {
-    height: 10px;
-    background: #e5e7eb;
-    border-radius: 999px;
-    overflow: hidden;
-    margin-bottom: 14px;
-  }
-
-  .processing-bar-fill {
-    height: 100%;
-    background: linear-gradient(90deg, #2563eb, #22c55e);
-    border-radius: 999px;
-    transition: width 0.25s ease;
-  }
-
-  .mini-steps {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
-  }
-
-  .mini-step {
-    padding: 7px 10px;
-    border-radius: 999px;
-    background: #f1f5f9;
-    color: #64748b;
-    font-size: 12px;
-    font-weight: 700;
-  }
-
-  .mini-step.active {
-    background: #dbeafe;
-    color: #1d4ed8;
-  }
-
-  .mini-step.complete {
-    background: #dcfce7;
-    color: #166534;
-  }
 
   .error-card {
     background: #fee2e2;

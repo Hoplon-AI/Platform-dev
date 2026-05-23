@@ -615,13 +615,11 @@ export default function PropertyDetails({
     return (
       <div className="details-body">
         <div className="details-block">
-          <div className="details-h">Block</div>
-          <div className="details-title">
-            {selectedBlock.label || selectedBlock.name || "Unnamed block"}
+          <div className="details-h">
+            BLOCK
           </div>
 
           <DetailRow label="Block reference" value={selectedBlock.block_reference} />
-          <DetailRow label="Block ID" value={selectedBlock.block_id ?? selectedBlock.id} />
           <DetailRow label="Parent UPRN" value={selectedBlock.parent_uprn} />
           <DetailRow
             label="Properties"

@@ -55,9 +55,20 @@ const inferPortfolioClass = (property) => {
   const combined = `${propertyType} ${builtForm} ${address}`;
 
   if (
+    propertyType.includes("lock up") ||
+    propertyType.includes("lockup") ||
+    propertyType.includes("office") ||
+    propertyType.includes("commercial") ||
+    propertyType.includes("mixed use")
+  ) {
+    return "Other";
+  }
+
+  if (
     combined.includes("flat") ||
     combined.includes("apartment") ||
-    combined.includes("maisonette")
+    combined.includes("maisonette") ||
+    combined.includes("tenement")
   ) {
     return "Flats";
   }
@@ -217,44 +228,6 @@ const collectFireDocumentsFromIngestion = (ingestionResult, latestFireRiskPayloa
     if (normalised) docs.push(normalised);
   });
 
-  (ingestionResult?.properties || []).forEach((property, propertyIndex) => {
-    const fra = property.latest_fra ?? property.fire_documents?.fra ?? null;
-    const fraew = property.latest_fraew ?? property.fire_documents?.fraew ?? null;
-
-    if (fra) {
-      docs.push({
-        id: `property-fra-${property.id ?? propertyIndex}`,
-        filename: fra.filename ?? "Linked FRA",
-        document_type: "FRA",
-        block_reference: property.block_reference ?? property.parent_uprn ?? "",
-        property_id: property.property_id ?? property.id ?? property.uprn ?? "",
-        risk_level: getFireDocumentRisk(fra),
-        rag_status: getFireDocumentRisk(fra),
-        summary: fra.summary ?? fra.executive_summary ?? "Linked FRA data from portfolio.",
-        actions: normaliseActions(fra.recommendations ?? fra.actions ?? fra.significant_findings),
-        fra,
-        fraew: null,
-        raw: fra,
-      });
-    }
-
-    if (fraew) {
-      docs.push({
-        id: `property-fraew-${property.id ?? propertyIndex}`,
-        filename: fraew.filename ?? "Linked FRAEW",
-        document_type: "FRAEW",
-        block_reference: property.block_reference ?? property.parent_uprn ?? "",
-        property_id: property.property_id ?? property.id ?? property.uprn ?? "",
-        risk_level: getFireDocumentRisk(fraew),
-        rag_status: getFireDocumentRisk(fraew),
-        summary: fraew.summary ?? fraew.interim_measures_detail ?? "Linked FRAEW data from portfolio.",
-        actions: normaliseActions(fraew.recommendations ?? fraew.actions ?? fraew.remedial_actions),
-        fra: null,
-        fraew,
-        raw: fraew,
-      });
-    }
-  });
 
   const latest = normaliseFirePayloadToDocument(latestFireRiskPayload, docs.length);
   if (latest) docs.unshift(latest);
@@ -297,7 +270,18 @@ function KpiCard({ title, value, subtitle, tone = "default" }) {
   );
 }
 
-function PortfolioCompositionCard({ properties, blocks }) {
+function PortfolioCompositionCard({ properties, blocks, onSelectBlock, selectedBlock }) {
+  const [flatsOpen, setFlatsOpen] = useState(false);
+  const [blocksOpen, setBlocksOpen] = useState(false);
+  const [blocksSearch, setBlocksSearch] = useState("");
+  const [blocksSearchDebounced, setBlocksSearchDebounced] = useState("");
+  const [otherOpen, setOtherOpen] = useState(false);
+
+  useEffect(() => {
+    const t = setTimeout(() => setBlocksSearchDebounced(blocksSearch), 150);
+    return () => clearTimeout(t);
+  }, [blocksSearch]);
+
   const totalUnits = properties.length;
   const houses = properties.filter((p) => inferPortfolioClass(p) === "Houses");
   const flats = properties.filter((p) => inferPortfolioClass(p) === "Flats");
@@ -307,100 +291,154 @@ function PortfolioCompositionCard({ properties, blocks }) {
     (block) => !block.parent_uprn && block.count > 1
   ).length;
 
-  const renderRow = (label, count, total, tone = "#64748b", meta = null) => {
-    const pct = total > 0 ? Math.round((count / total) * 100) : 0;
-    return (
-      <div style={{ marginBottom: 14 }}>
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "16px 1fr auto",
-            gap: 10,
-            alignItems: "center",
-            marginBottom: 6,
-          }}
-        >
-          <div
-            style={{
-              width: 8,
-              height: 8,
-              borderRadius: 999,
-              background: tone,
-              marginLeft: 4,
-            }}
-          />
-          <div style={{ fontWeight: 600 }}>{label}</div>
-          <div className="muted">
-            {count} {label === "Blocks" ? "blocks" : "units"} / {pct}%
-          </div>
-        </div>
-
-        <div
-          style={{
-            height: 8,
-            background: "rgba(15,23,42,0.08)",
-            borderRadius: 999,
-            overflow: "hidden",
-            marginLeft: 26,
-          }}
-        >
-          <div
-            style={{
-              width: `${pct}%`,
-              height: "100%",
-              background: tone,
-              borderRadius: 999,
-            }}
-          />
-        </div>
-
-        {meta ? (
-          <div className="muted" style={{ marginTop: 6, marginLeft: 26 }}>
-            {meta}
-          </div>
-        ) : null}
-      </div>
-    );
+  const typeBreakdown = (items) => {
+    const counts = new Map();
+    items.forEach((p) => {
+      const key = p.property_type || p.type || "Unknown";
+      counts.set(key, (counts.get(key) || 0) + 1);
+    });
+    return Array.from(counts.entries())
+      .sort((a, b) => b[1] - a[1])
+      .map(([label, count]) => ({ label, count }));
   };
+
+  const flatTypeBreakdown = useMemo(() => typeBreakdown(flats), [flats]);
+  const otherTypeBreakdown = useMemo(() => typeBreakdown(other), [other]);
+
+  const renderRow = (label, count, _total, tone = "#64748b", meta = null) => (
+    <div style={{ marginBottom: 14 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "16px 1fr auto", gap: 10, alignItems: "center" }}>
+        <div style={{ width: 8, height: 8, borderRadius: 999, background: tone, marginLeft: 4 }} />
+        <div style={{ fontWeight: 600 }}>{label}</div>
+        <div className="muted">{count} {label === "Blocks" ? "blocks" : "units"}</div>
+      </div>
+      {meta ? <div className="muted" style={{ marginTop: 6, marginLeft: 26 }}>{meta}</div> : null}
+    </div>
+  );
+
+  const renderExpandableRow = (label, items, tone, open, setOpen) => (
+    <div style={{ marginBottom: 14 }}>
+      <div
+        style={{ display: "grid", gridTemplateColumns: "16px 1fr auto auto", gap: 10, alignItems: "center", cursor: "pointer", userSelect: "none" }}
+        onClick={() => setOpen((o) => !o)}
+      >
+        <div style={{ width: 8, height: 8, borderRadius: 999, background: tone, marginLeft: 4 }} />
+        <div style={{ fontWeight: 600 }}>{label}</div>
+        <div className="muted">{items.length} units</div>
+        <div className="muted" style={{ fontSize: 11, paddingRight: 2 }}>{open ? "▲" : "▼"}</div>
+      </div>
+      {open && (
+        <div style={{ marginTop: 8, marginLeft: 26, borderLeft: `2px solid ${tone}33`, paddingLeft: 12, paddingRight: 18 }}>
+          {typeBreakdown(items).map(({ label: subLabel, count }) => (
+            <div key={subLabel} style={{ display: "flex", justifyContent: "space-between", padding: "3px 0", fontSize: 13 }}>
+              <span className="muted">{subLabel}</span>
+              <span className="muted">{count}</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
 
   return (
     <div className="card" style={{ height: "100%" }}>
       <div className="card-header row-between">
         <div>
           <div className="card-title">Portfolio Composition</div>
-          <div className="card-subtitle">
+          {/* <div className="card-subtitle">
             Summary split for the whole ingested SoV rather than raw row-by-row tables.
-          </div>
+          </div> */}
         </div>
         <span className="pill pill-muted">{totalUnits} units</span>
       </div>
 
-      {renderRow("Houses", houses.length, totalUnits, "#3b82f6")}
-      {renderRow("Flats", flats.length, totalUnits, "#6366f1")}
-      {renderRow(
-        "Blocks",
-        blockCount,
-        Math.max(blockCount, 1),
-        "#f59e0b",
-        `${thirdPartyLikeBlocks} grouped blocks without clear parent UPRN`
-      )}
-
-      {other.length > 0 ? (
-        <div
-          style={{
-            marginTop: 8,
-            padding: 12,
-            borderRadius: 12,
-            background: "rgba(245,158,11,0.12)",
-            border: "1px solid rgba(245,158,11,0.22)",
-          }}
-        >
-          <div style={{ fontWeight: 600, marginBottom: 4 }}>Other asset types</div>
-          <div className="muted">
-            {other.length} properties could not be cleanly classified as houses or flats from the current SoV fields.
+      <div className="card-body">
+        {renderRow("Houses", houses.length, totalUnits, "#3b82f6")}
+        {renderExpandableRow("Flats", flats, "#6366f1", flatsOpen, setFlatsOpen)}
+        <div style={{ marginBottom: 14 }}>
+          <div
+            style={{ display: "grid", gridTemplateColumns: "16px 1fr auto auto", gap: 10, alignItems: "center", cursor: "pointer", userSelect: "none" }}
+            onClick={() => setBlocksOpen((o) => !o)}
+          >
+            <div style={{ width: 8, height: 8, borderRadius: 999, background: "#f59e0b", marginLeft: 4 }} />
+            <div style={{ fontWeight: 600 }}>Blocks</div>
+            <div className="muted">{blockCount} blocks</div>
+            <div className="muted" style={{ fontSize: 11, paddingRight: 2 }}>{blocksOpen ? "▲" : "▼"}</div>
           </div>
+          {blocksOpen && (
+            <div style={{ marginTop: 8, marginLeft: 26 }}>
+              <input
+                type="text"
+                placeholder="Search block ID…"
+                value={blocksSearch}
+                onChange={(e) => setBlocksSearch(e.target.value)}
+                style={{
+                  width: "100%",
+                  padding: "5px 10px",
+                  marginBottom: 8,
+                  fontSize: 13,
+                  borderRadius: 6,
+                  border: "1px solid var(--border)",
+                  background: "var(--panel)",
+                  color: "var(--text)",
+                  boxSizing: "border-box",
+                  outline: "none",
+                }}
+              />
+              <div style={{ borderLeft: "2px solid rgba(245,158,11,0.3)", paddingLeft: 12, paddingRight: 18, maxHeight: 288, overflowY: "auto" }}>
+                {blocks
+                  .filter((block) => {
+                    const id = block.label || block.name || block.block_reference || block.block_id || block.id || "";
+                    return id.toLowerCase().includes(blocksSearchDebounced.toLowerCase());
+                  })
+                  .map((block) => {
+                    const id = block.label || block.name || block.block_reference || block.block_id || block.id || "—";
+                    const isSelected = selectedBlock && (
+                      (selectedBlock.id && selectedBlock.id === block.id) ||
+                      (selectedBlock.label && selectedBlock.label === block.label)
+                    );
+                    return (
+                      <div
+                        key={block.id || block.block_id || id}
+                        onClick={() => onSelectBlock?.(block)}
+                        style={{
+                          display: "flex",
+                          justifyContent: "space-between",
+                          padding: "5px 6px",
+                          fontSize: 13,
+                          borderRadius: 6,
+                          cursor: "pointer",
+                          background: isSelected ? "rgba(245,158,11,0.12)" : "transparent",
+                          fontWeight: isSelected ? 600 : 400,
+                        }}
+                      >
+                        <span style={{ color: isSelected ? "#b45309" : undefined }}>{id}</span>
+                        <span className="muted">{block.count ?? 0}</span>
+                      </div>
+                    );
+                  })}
+              </div>
+            </div>
+          )}
         </div>
-      ) : null}
+        {other.length > 0 && renderExpandableRow("Other", other, "#64748b", otherOpen, setOtherOpen)}
+
+        {thirdPartyLikeBlocks > 0 && (
+          <div
+            style={{
+              marginTop: 8,
+              padding: "10px 14px",
+              borderRadius: 10,
+              background: "rgba(245,158,11,0.10)",
+              border: "1px solid rgba(245,158,11,0.30)",
+            }}
+          >
+            <div style={{ fontWeight: 600, fontSize: 13, color: "var(--muted)" }}>
+              {thirdPartyLikeBlocks} blocks were grouped without clear parent UPRN
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -421,7 +459,7 @@ function MiniSummaryTable({ title, subtitle, rows, columns }) {
       {!rows.length ? (
         <div className="muted">No data available.</div>
       ) : (
-        <div className="table-wrap">
+        <div className="table-wrap" style={{ maxHeight: 260, overflowY: "auto" }}>
           <table className="table">
             <thead>
               <tr>
@@ -463,52 +501,54 @@ function PortfolioAnalysisWindow({ tenancyRows, blockRows, propertyTypeRows, age
         <span className="pill pill-muted">Whole SoV summary</span>
       </div>
 
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
-          gap: 16,
-        }}
-      >
-        <MiniSummaryTable
-          title="By tenancy / ownership"
-          rows={tenancyRows.slice(0, 6)}
-          columns={[
-            { key: "label", label: "Type" },
-            { key: "count", label: "Units" },
-            { key: "totalValue", label: "Sum insured", render: (row) => `£${fmtMoney(row.totalValue)}` },
-          ]}
-        />
+      <div className="card-body">
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+            gap: 16,
+          }}
+        >
+          <MiniSummaryTable
+            title="By tenancy / ownership"
+            rows={tenancyRows}
+            columns={[
+              { key: "label", label: "Type" },
+              { key: "count", label: "Units" },
+              { key: "totalValue", label: "Sum insured", render: (row) => `£${fmtMoney(row.totalValue)}` },
+            ]}
+          />
 
-        <MiniSummaryTable
-          title="By block reference"
-          rows={blockRows.slice(0, 6)}
-          columns={[
-            { key: "label", label: "Block" },
-            { key: "count", label: "Units" },
-            { key: "totalValue", label: "TIV", render: (row) => `£${fmtMoney(row.totalValue)}` },
-          ]}
-        />
+          <MiniSummaryTable
+            title="By block reference"
+            rows={blockRows}
+            columns={[
+              { key: "label", label: "Block" },
+              { key: "count", label: "Units" },
+              { key: "totalValue", label: "TIV", render: (row) => `£${fmtMoney(row.totalValue)}` },
+            ]}
+          />
 
-        <MiniSummaryTable
-          title="By property type"
-          rows={propertyTypeRows.slice(0, 6)}
-          columns={[
-            { key: "label", label: "Type" },
-            { key: "count", label: "Units" },
-            { key: "totalValue", label: "Sum insured", render: (row) => `£${fmtMoney(row.totalValue)}` },
-          ]}
-        />
+          <MiniSummaryTable
+            title="By property type"
+            rows={propertyTypeRows}
+            columns={[
+              { key: "label", label: "Type" },
+              { key: "count", label: "Units" },
+              { key: "totalValue", label: "Sum insured", render: (row) => `£${fmtMoney(row.totalValue)}` },
+            ]}
+          />
 
-        <MiniSummaryTable
-          title="By age banding"
-          rows={ageBandRows.slice(0, 6)}
-          columns={[
-            { key: "label", label: "Age" },
-            { key: "count", label: "Units" },
-            { key: "totalValue", label: "Sum insured", render: (row) => `£${fmtMoney(row.totalValue)}` },
-          ]}
-        />
+          <MiniSummaryTable
+            title="By age banding"
+            rows={ageBandRows}
+            columns={[
+              { key: "label", label: "Age" },
+              { key: "count", label: "Units" },
+              { key: "totalValue", label: "Sum insured", render: (row) => `£${fmtMoney(row.totalValue)}` },
+            ]}
+          />
+        </div>
       </div>
     </div>
   );
@@ -537,6 +577,7 @@ function FireEvidencePanel({ fireDocuments, loading, onUploadNew }) {
         </span>
       </div>
 
+      <div className="card-body">
       <div
         style={{
           display: "grid",
@@ -657,11 +698,24 @@ function FireEvidencePanel({ fireDocuments, loading, onUploadNew }) {
           })
         )}
       </div>
+      </div>
     </div>
   );
 }
 
 function BlockListPanel({ blocks, selectedBlockId, onSelectBlock, selectedProperty }) {
+  const [search, setSearch] = useState("");
+  const [searchDebounced, setSearchDebounced] = useState("");
+
+  useEffect(() => {
+    const t = setTimeout(() => setSearchDebounced(search), 150);
+    return () => clearTimeout(t);
+  }, [search]);
+
+  const filteredBlocks = searchDebounced
+    ? blocks.filter((b) => (b.label || b.name || "").toLowerCase().includes(searchDebounced.toLowerCase()))
+    : blocks;
+
   return (
     <div className="card">
       <div className="card-header row-between">
@@ -671,53 +725,73 @@ function BlockListPanel({ blocks, selectedBlockId, onSelectBlock, selectedProper
             Drill into grouped blocks without rendering the whole SoV as a long table.
           </div>
         </div>
-        <span className="pill pill-muted">Top {Math.min(blocks.length, 20)} blocks</span>
+        <span className="pill pill-muted">{blocks.length} blocks</span>
       </div>
 
-      {!blocks.length ? (
-        <div className="muted">No block-level groups are available yet.</div>
-      ) : (
-        <div className="table-wrap">
-          <table className="table">
-            <thead>
-              <tr>
-                <th>Block</th>
-                <th>Properties</th>
-                <th>Total value</th>
-                <th>Max height</th>
-                <th>FRA</th>
-                <th>FRAEW</th>
-              </tr>
-            </thead>
-            <tbody>
-              {blocks.slice(0, 20).map((block) => (
-                <tr
-                  key={block.id}
-                  onClick={() => onSelectBlock?.(block)}
-                  style={{
-                    cursor: "pointer",
-                    background:
-                      selectedBlockId === block.id && !selectedProperty
-                        ? "rgba(59,130,246,0.08)"
-                        : "transparent",
-                  }}
-                >
-                  <td>{block.label}</td>
-                  <td>{block.count}</td>
-                  <td>£{fmtMoney(block.totalValue)}</td>
-                  <td>
-                    {Number.isFinite(Number(block.maxHeight))
-                      ? `${Number(block.maxHeight).toFixed(1)} m`
-                      : "—"}
-                  </td>
-                  <td>{block.latest_fra ? <RiskBadge band={getFireRiskBand(block.latest_fra)} /> : "—"}</td>
-                  <td>{block.latest_fraew ? <RiskBadge band={getFireRiskBand(block.latest_fraew)} /> : "—"}</td>
+      <div className="card-body">
+        <input
+          type="text"
+          placeholder="Search block…"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          style={{
+            width: "100%",
+            padding: "6px 12px",
+            marginBottom: 12,
+            fontSize: 13,
+            borderRadius: 6,
+            border: "1px solid var(--border)",
+            background: "var(--panel)",
+            color: "var(--text)",
+            boxSizing: "border-box",
+            outline: "none",
+          }}
+        />
+        {!blocks.length ? (
+          <div className="muted">No block-level groups are available yet.</div>
+        ) : (
+          <div className="table-wrap" style={{ maxHeight: 510, minHeight: 510, overflowY: "auto" }}>
+            <table className="table">
+              <thead>
+                <tr>
+                  <th>Block</th>
+                  <th>Properties</th>
+                  <th>Total value</th>
+                  <th>Max height</th>
+                  <th>FRA</th>
+                  <th>FRAEW</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+              </thead>
+              <tbody>
+                {filteredBlocks.map((block) => (
+                  <tr
+                    key={block.id}
+                    onClick={() => onSelectBlock?.(block)}
+                    style={{
+                      cursor: "pointer",
+                      background:
+                        selectedBlockId === block.id && !selectedProperty
+                          ? "rgba(59,130,246,0.08)"
+                          : "transparent",
+                    }}
+                  >
+                    <td>{block.label}</td>
+                    <td>{block.count}</td>
+                    <td>£{fmtMoney(block.totalValue)}</td>
+                    <td>
+                      {Number.isFinite(Number(block.maxHeight))
+                        ? `${Number(block.maxHeight).toFixed(1)} m`
+                        : "—"}
+                    </td>
+                    <td>{block.latest_fra ? <RiskBadge band={getFireRiskBand(block.latest_fra)} /> : "—"}</td>
+                    <td>{block.latest_fraew ? <RiskBadge band={getFireRiskBand(block.latest_fraew)} /> : "—"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -729,10 +803,17 @@ export default function PortfolioDashboard({
   latestFireRiskPayload = null,
   fireDocumentsLoading = false,
   refetchFireDocuments,
+  portfolioId = null,
+  onLoadMapData,
 }) {
   const properties = ingestionResult?.properties || [];
   const [selectedBlock, setSelectedBlock] = useState(null);
   const [selectedProperty, setSelectedProperty] = useState(null);
+  const [mapFocusBlockId, setMapFocusBlockId] = useState(null);
+  const [mapDataLoading, setMapDataLoading] = useState(false);
+
+  // Fall back to ha_demo portfolio ID if ingestionResult doesn't carry one
+  const resolvedPortfolioId = portfolioId || (ingestionSummary ? "11111111-1111-1111-1111-111111111111" : null);
 
   const fireDocuments = useMemo(
     () => collectFireDocumentsFromIngestion(ingestionResult, latestFireRiskPayload),
@@ -886,10 +967,31 @@ export default function PortfolioDashboard({
     [properties]
   );
 
+  // On mount, if no blocks have valid coordinates, auto-fetch enriched data from the API.
+  // This handles the case where the user sees the dashboard after a fresh SoV upload
+  // (no enrichment yet) or after page refresh (enrichment may have run since last load).
+  useEffect(() => {
+    if (typeof onLoadMapData !== "function") return;
+    // Only auto-fetch once on mount, and only when coords are missing
+    const hasAnyCoords = properties.some((p) => p.hasValidCoords);
+    if (!hasAnyCoords && properties.length > 0) {
+      setMapDataLoading(true);
+      onLoadMapData().finally(() => setMapDataLoading(false));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const handleLoadMapData = () => {
+    if (typeof onLoadMapData !== "function" || mapDataLoading) return;
+    setMapDataLoading(true);
+    onLoadMapData().finally(() => setMapDataLoading(false));
+  };
+
   useEffect(() => {
     if (!properties.length) {
       setSelectedBlock(null);
       setSelectedProperty(null);
+      setMapFocusBlockId(null);
       return;
     }
 
@@ -900,7 +1002,10 @@ export default function PortfolioDashboard({
 
     if (selectedBlock) {
       const matchingBlock = blocks.find((b) => sameBlock(b, selectedBlock));
-      if (!matchingBlock) setSelectedBlock(null);
+      if (!matchingBlock) {
+        setSelectedBlock(null);
+        setMapFocusBlockId(null);
+      }
     }
   }, [properties, blocks, selectedProperty, selectedBlock]);
 
@@ -940,6 +1045,7 @@ export default function PortfolioDashboard({
     );
   }, [blocks]);
 
+  // Called by list panels (BlockListPanel, PortfolioCompositionCard) — updates details only, no map zoom
   const handleSelectBlock = (block) => {
     if (!block) {
       setSelectedBlock(null);
@@ -951,6 +1057,20 @@ export default function PortfolioDashboard({
     setSelectedProperty(null);
   };
 
+  // Called by PortfolioMap — updates details AND zooms map into that block's properties
+  const handleMapSelectBlock = (block) => {
+    if (!block) {
+      setSelectedBlock(null);
+      setSelectedProperty(null);
+      setMapFocusBlockId(null);
+      return;
+    }
+    const matchingBlock = blocks.find((b) => sameBlock(b, block)) || block;
+    setSelectedBlock(matchingBlock);
+    setSelectedProperty(null);
+    setMapFocusBlockId(matchingBlock.id ?? null);
+  };
+
   const handleSelectProperty = (property) => {
     if (!property) {
       setSelectedProperty(null);
@@ -960,11 +1080,24 @@ export default function PortfolioDashboard({
     setSelectedProperty(matchingProperty);
     const parentBlock = blocks.find((block) => block.properties.some((p) => sameProperty(p, matchingProperty))) || null;
     setSelectedBlock(parentBlock);
+    setMapFocusBlockId(parentBlock?.id ?? null);
   };
 
   const handleClearMapSelection = () => {
     setSelectedBlock(null);
     setSelectedProperty(null);
+    setMapFocusBlockId(null);
+  };
+
+  const handleExport = (docType) => {
+    if (!resolvedPortfolioId) return;
+    const url = `/api/v1/portfolios/${resolvedPortfolioId}/export/${docType}`;
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
   };
 
   if (!ingestionSummary) {
@@ -982,8 +1115,9 @@ export default function PortfolioDashboard({
 
   const hasActiveBlockSelection = Boolean(resolvedSelectedBlock);
   const hasActivePropertySelection = Boolean(resolvedSelectedProperty);
-  const mapMode = hasActiveBlockSelection ? "properties" : "blocks";
-  const mapProperties = mapMode === "properties" ? resolvedSelectedBlock?.properties || [] : properties;
+  const mapFocusBlock = mapFocusBlockId ? blocks.find((b) => b.id === mapFocusBlockId) ?? null : null;
+  const mapMode = mapFocusBlock ? "properties" : "blocks";
+  const mapProperties = mapMode === "properties" ? mapFocusBlock?.properties || [] : properties;
 
   return (
     <div className="content-wrap">
@@ -1042,7 +1176,7 @@ export default function PortfolioDashboard({
         }}
       >
         <div style={{ display: "grid", gap: 16 }}>
-          <PortfolioCompositionCard properties={properties} blocks={blocks} />
+          <PortfolioCompositionCard properties={properties} blocks={blocks} onSelectBlock={handleSelectBlock} selectedBlock={resolvedSelectedBlock} />
 
           <div className="card">
             <div className="card-header row-between">
@@ -1057,7 +1191,7 @@ export default function PortfolioDashboard({
                 {hasActivePropertySelection
                   ? "Property selected"
                   : hasActiveBlockSelection
-                  ? "Block selected"
+                  ? `Block : ${resolvedSelectedBlock?.block_id ?? resolvedSelectedBlock?.id ?? resolvedSelectedBlock?.name ?? "?"}`
                   : "None"}
               </span>
             </div>
@@ -1080,8 +1214,34 @@ export default function PortfolioDashboard({
                 Clustered map view with clear block counts at map level and colour-coded properties once a block is selected.
               </div>
             </div>
-            <span className="pill pill-muted">{mappedBlocksCount} mapped blocks</span>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <span className="pill pill-muted">{mappedBlocksCount} mapped blocks</span>
+              {typeof onLoadMapData === "function" && (
+                <button
+                  className="btn"
+                  style={{ padding: "4px 10px", fontSize: 12 }}
+                  onClick={handleLoadMapData}
+                  disabled={mapDataLoading}
+                >
+                  {mapDataLoading ? "Loading…" : "Refresh map"}
+                </button>
+              )}
+            </div>
           </div>
+
+          {mappedBlocksCount === 0 && !mapDataLoading && (
+            <div style={{ padding: "10px 22px 0", fontSize: 13, color: "var(--muted)" }}>
+              No block coordinates yet — enrichment may still be running.{" "}
+              {typeof onLoadMapData === "function" && (
+                <span
+                  style={{ cursor: "pointer", textDecoration: "underline" }}
+                  onClick={handleLoadMapData}
+                >
+                  Reload enriched data
+                </span>
+              )}
+            </div>
+          )}
 
           <div className="map-wrap">
             <PortfolioMap
@@ -1090,7 +1250,7 @@ export default function PortfolioDashboard({
               viewMode={mapMode}
               selectedBlock={resolvedSelectedBlock}
               selectedProperty={resolvedSelectedProperty}
-              onSelectBlock={handleSelectBlock}
+              onSelectBlock={handleMapSelectBlock}
               onSelectProperty={handleSelectProperty}
             />
           </div>
@@ -1100,13 +1260,13 @@ export default function PortfolioDashboard({
             style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center", flexWrap: "wrap" }}
           >
             <span>
-              {mapMode === "properties"
-                ? "Zoomed into the selected block. Coloured property dots show the property mix inside that block."
-                : "Click a block circle on the map to inspect that block in detail."}
+              {mapFocusBlock
+                ? `Zoomed into block ${mapFocusBlock.label ?? ""}. Coloured dots show the property mix inside.`
+                : "Click a block circle on the map to zoom in and inspect its properties."}
             </span>
 
-            {hasActiveBlockSelection ? (
-              <button className="btn" onClick={handleClearMapSelection}>Back to blocks</button>
+            {mapFocusBlock ? (
+              <button className="btn" onClick={handleClearMapSelection}>Clear selection</button>
             ) : null}
           </div>
         </div>
@@ -1131,6 +1291,112 @@ export default function PortfolioDashboard({
         onSelectBlock={handleSelectBlock}
         selectedProperty={resolvedSelectedProperty}
       />
+
+      <UnderwriterDocumentsPanel
+        portfolioId={resolvedPortfolioId}
+        propertyCount={ingestionSummary?.propertyCount || 0}
+        properties={properties}
+        blocks={blocks}
+        onExport={handleExport}
+      />
+    </div>
+  );
+}
+
+function UnderwriterDocumentsPanel({ portfolioId, propertyCount, properties, blocks, onExport }) {
+  const enrichedCount = properties.filter(p => p.uprn || p.enrichment_status === "enriched").length;
+  const docACompletion = propertyCount > 0 ? Math.min(100, Math.round(((enrichedCount + (propertyCount - enrichedCount) * 0.6) / propertyCount) * 100)) : 0;
+
+  const highValueBlocks = blocks.filter(b => (b.height_max_m || 0) >= 18);
+  const blocksWithData = blocks.filter(b => b.height_max_m || b.unit_count);
+  const docBCompletion = blocks.length > 0 ? Math.round((blocksWithData.length / blocks.length) * 100) : 0;
+
+  const completionColor = (pct) => {
+    if (pct >= 90) return { bg: "#dcfce7", color: "#16a34a" };
+    if (pct >= 70) return { bg: "#fef9c3", color: "#ca8a04" };
+    return { bg: "#fee2e2", color: "#dc2626" };
+  };
+
+  return (
+    <div className="card" style={{ marginTop: 24, padding: 28 }}>
+      {/* Header */}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 24 }}>
+        <div>
+          <div style={{ fontSize: 16, fontWeight: 700, color: "#111827", marginBottom: 4 }}>Underwriter Working Documents</div>
+          <div style={{ fontSize: 13, color: "#6b7280" }}>Pre-populated from HA submission data</div>
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: "#6b7280", flexShrink: 0 }}>
+          <span>Export using:</span>
+          <select style={{ border: "1px solid #d1d5db", borderRadius: 7, padding: "5px 10px", fontSize: 13, background: "#fff", cursor: "pointer", color: "#374151" }}>
+            <option>Aviva Doc A v2.1</option>
+          </select>
+        </div>
+      </div>
+
+      {/* Doc cards */}
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+        {/* Doc A */}
+        <div style={{ border: "1px solid #e5e7eb", borderRadius: 12, padding: "20px 24px", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 20, minWidth: 0 }}>
+          <div style={{ display: "flex", gap: 14, alignItems: "flex-start", minWidth: 0 }}>
+            <div style={{ width: 42, height: 42, borderRadius: 10, background: "#eff6ff", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/>
+              </svg>
+            </div>
+            <div style={{ minWidth: 0 }}>
+              <div style={{ fontWeight: 600, fontSize: 14, color: "#111827", marginBottom: 4 }}>Document A — Stock Listing</div>
+              <div style={{ fontSize: 12, color: "#6b7280", marginBottom: 10 }}>{propertyCount} properties · 35 fields populated</div>
+              <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                <span style={{ fontSize: 11, fontWeight: 600, padding: "3px 10px", borderRadius: 20, background: completionColor(docACompletion).bg, color: completionColor(docACompletion).color }}>{docACompletion}% complete</span>
+                <span style={{ fontSize: 11, fontWeight: 500, padding: "3px 10px", borderRadius: 20, background: "#eff6ff", color: "#3b82f6" }}>Aviva format</span>
+              </div>
+            </div>
+          </div>
+          <button
+            className="btn"
+            onClick={() => onExport("doc-a")}
+            disabled={!portfolioId}
+            style={{ whiteSpace: "nowrap", display: "flex", alignItems: "center", gap: 6, flexShrink: 0, padding: "8px 16px" }}
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            Download .xlsx
+          </button>
+        </div>
+
+        {/* Doc B */}
+        <div style={{ border: "1px solid #e5e7eb", borderRadius: 12, padding: "20px 24px", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 20, minWidth: 0 }}>
+          <div style={{ display: "flex", gap: 14, alignItems: "flex-start", minWidth: 0 }}>
+            <div style={{ width: 42, height: 42, borderRadius: 10, background: "#fffbeb", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 9h6M9 12h6M9 15h4"/>
+              </svg>
+            </div>
+            <div style={{ minWidth: 0 }}>
+              <div style={{ fontWeight: 600, fontSize: 14, color: "#111827", marginBottom: 4 }}>Document B — High Value</div>
+              <div style={{ fontSize: 12, color: "#6b7280", marginBottom: 10 }}>{highValueBlocks.length} block{highValueBlocks.length !== 1 ? "s" : ""} (18m+) · 65 fields populated</div>
+              <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                <span style={{ fontSize: 11, fontWeight: 600, padding: "3px 10px", borderRadius: 20, background: completionColor(docBCompletion).bg, color: completionColor(docBCompletion).color }}>{docBCompletion}% complete</span>
+                <span style={{ fontSize: 11, fontWeight: 500, padding: "3px 10px", borderRadius: 20, background: "#eff6ff", color: "#3b82f6" }}>Aviva format</span>
+              </div>
+            </div>
+          </div>
+          <div style={{ display: "flex", gap: 8, alignItems: "center", flexShrink: 0 }}>
+            <select style={{ border: "1px solid #d1d5db", borderRadius: 7, padding: "7px 10px", fontSize: 13, background: "#fff", cursor: "pointer", color: "#374151" }}>
+              <option>Aviva v3.0</option>
+            </select>
+            <button
+              className="btn btn-primary"
+              onClick={() => onExport("doc-b")}
+              disabled={!portfolioId}
+              style={{ whiteSpace: "nowrap", display: "flex", alignItems: "center", gap: 6, padding: "8px 16px" }}
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+              Download
+            </button>
+          </div>
+        </div>
+      </div>
+
     </div>
   );
 }

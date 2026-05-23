@@ -637,12 +637,11 @@ export default function PortfolioMap({
       attributionControl: false,
     }).setView(DEFAULT_CENTER, DEFAULT_ZOOM);
 
-    L.tileLayer("https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png", {
-      subdomains: "abcd",
-      maxZoom: 20,
-      crossOrigin: "anonymous",
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      subdomains: "abc",
+      maxZoom: 19,
       keepBuffer: 4,
-      attribution: "&copy; OpenStreetMap &copy; CARTO",
+      attribution: "&copy; <a href='https://www.openstreetmap.org/copyright'>OpenStreetMap</a> contributors",
     }).addTo(map);
 
     mapRef.current = map;
@@ -654,6 +653,7 @@ export default function PortfolioMap({
     setTimeout(() => map.invalidateSize(), 0);
     setTimeout(() => map.invalidateSize(), 120);
     setTimeout(() => map.invalidateSize(), 400);
+    setTimeout(() => map.invalidateSize(), 1000);
   }, []);
 
   useEffect(() => {

@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import proj4 from "proj4";
 
 import Landingpage from "./landingpage.jsx";
@@ -559,25 +559,16 @@ export default function App() {
 
   const loadPropertiesFromApi = async () => {
     try {
-      console.log("[loadPropertiesFromApi] Fetching properties from API...");
       const res = await apiFetch("/api/v1/portfolios/properties");
-      console.log("[loadPropertiesFromApi] Response status:", res.status);
-      if (!res.ok) {
-        const text = await res.text();
-        console.error("[loadPropertiesFromApi] API error:", res.status, text);
-        return;
-      }
       const properties = await res.json();
-      console.log("[loadPropertiesFromApi] Properties received:", Array.isArray(properties) ? properties.length : properties);
       if (Array.isArray(properties) && properties.length > 0) {
         const normalised = normaliseBackendIngestionResult(
           { properties, status: "success" },
           "Portfolio"
         );
         setIngestionResult(normalised);
-        setActiveNav("overview");
-      } else {
-        console.warn("[loadPropertiesFromApi] No properties returned — staying on uploads page");
+        // Do NOT redirect here — navigation is controlled by explicit user actions
+        // (SoV upload → overview, login → uploads, hard refresh → stays on uploads)
       }
     } catch (err) {
       console.error("[loadPropertiesFromApi] Failed:", err);
@@ -618,21 +609,46 @@ export default function App() {
       .catch((err) => console.error("Backend error:", err));
   }, []);
 
-  const PIPELINE_STEPS = [
-    "Queued",
-    "Checking file format",
-    "Uploading file",
-    "Running backend ingestion",
-    "Normalising response",
-    "Preparing portfolio dashboard",
-    "Finalising",
-    "Complete",
-  ];
+  const pipelineTimersRef = useRef([]);
 
-  const runPipeline = () => {
-    setPipelineStep(PIPELINE_STEPS[0]);
-    PIPELINE_STEPS.slice(1).forEach((step, i) => {
-      setTimeout(() => setPipelineStep(step), 380 * (i + 1));
+  const STAGE_PIPELINE_STEPS = {
+    sov: [
+      "Uploading file",
+      "Validating format",
+      "Parsing property schedule",
+      "Detecting blocks",
+      "Building portfolio",
+      "Preparing dashboard",
+    ],
+    fra: [
+      "Uploading document",
+      "Extracting text from PDF",
+      "Running AI analysis",
+      "Identifying fire risk factors",
+      "Scoring risk rating",
+      "Saving to portfolio",
+    ],
+    fraew: [
+      "Uploading document",
+      "Extracting text from PDF",
+      "Running AI analysis",
+      "Identifying cladding & wall risks",
+      "Scoring building risk",
+      "Saving to portfolio",
+    ],
+  };
+
+  const runPipeline = (docType = "sov") => {
+    // Cancel any previous timers so they can't fire after backend finishes
+    pipelineTimersRef.current.forEach((id) => clearTimeout(id));
+    pipelineTimersRef.current = [];
+
+    const steps = STAGE_PIPELINE_STEPS[docType] ?? STAGE_PIPELINE_STEPS.sov;
+    setPipelineStep(steps[0]);
+
+    steps.slice(1).forEach((step, i) => {
+      const id = setTimeout(() => setPipelineStep(step), 3500 * (i + 1));
+      pipelineTimersRef.current.push(id);
     });
   };
 
@@ -696,26 +712,22 @@ export default function App() {
 
     const file = files[0];
 
+    // Compute documentType early so runPipeline gets the right steps
+    const stage = String(stageOverride || "").toUpperCase();
+    const documentType =
+      stage === "FRA"   ? "fra"
+      : stage === "FRAEW" ? "fraew"
+      : stage === "SOV"   ? "sov"
+      : uploadMode === "fire" ? pdfDocumentType
+      : "sov";
+
     setUploadError(null);
     setIsUploading(true);
-    runPipeline();
+    runPipeline(documentType);
 
     try {
       const formData = new FormData();
       formData.append("file", file);
-
-      const stage = String(stageOverride || "").toUpperCase();
-
-      const documentType =
-        stage === "FRA"
-          ? "fra"
-          : stage === "FRAEW"
-          ? "fraew"
-          : stage === "SOV"
-          ? "sov"
-          : uploadMode === "fire"
-          ? pdfDocumentType
-          : "sov";
 
       const isPdfMode = documentType === "fra" || documentType === "fraew";
 
@@ -824,11 +836,15 @@ export default function App() {
         setActiveNav("overview");
       }
 
+      // Cancel any remaining fake-step timers before showing Complete
+      pipelineTimersRef.current.forEach((id) => clearTimeout(id));
+      pipelineTimersRef.current = [];
+
       setPipelineStep("Complete");
 
       setTimeout(() => {
         setPipelineStep(null);
-      }, 900);
+      }, 2200);
     } catch (err) {
       console.error("Backend ingestion error:", err);
       setUploadError(err?.message || "Upload failed");
@@ -884,7 +900,7 @@ export default function App() {
       <div className="shell">
         <aside className="sidebar">
           <div className="brand">
-            <div className="brand-title">EquiRisk</div>
+            <img src="/logo.png" alt="EquiRisk" style={{ height: 36, width: "auto", display: "block", marginBottom: 8 }} />
             <div className="pill pill-muted">UNDERWRITER</div>
           </div>
 
@@ -1078,6 +1094,8 @@ export default function App() {
               latestFireRiskPayload={latestFireRiskPayload}
               fireDocumentsLoading={fireDocumentsLoading}
               refetchFireDocuments={refetchFireDocuments}
+              portfolioId={getPortfolioIdFromResult(ingestionResult)}
+              onLoadMapData={loadPropertiesFromApi}
             />
           )}
         </main>

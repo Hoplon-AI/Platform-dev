@@ -61,7 +61,7 @@ export default function LoginPage({ onLogin }) {
       <div style={styles.card}>
         {/* Brand */}
         <div style={styles.brandRow}>
-          <span style={styles.brandName}>EquiRisk</span>
+          <img src="/logo.png" alt="EquiRisk" style={{ height: 40, width: "auto", display: "block", marginBottom: 8 }} />
           <span style={styles.brandBadge}>UNDERWRITER PORTAL</span>
         </div>
 
