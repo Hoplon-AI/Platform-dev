@@ -616,7 +616,7 @@ export default function PropertyDetails({
       <div className="details-body">
         <div className="details-block">
           <div className="details-h">
-            BLOCK {selectedBlock.block_id ?? selectedBlock.id ?? selectedBlock.label ?? selectedBlock.name ?? "—"}
+            BLOCK
           </div>
 
           <DetailRow label="Block reference" value={selectedBlock.block_reference} />

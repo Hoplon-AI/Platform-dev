@@ -472,7 +472,7 @@ function PortfolioCompositionCard({ properties, blocks, onSelectBlock, selectedB
             }}
           >
             <div style={{ fontWeight: 600, fontSize: 13, color: "var(--muted)" }}>
-              {thirdPartyLikeBlocks} grouped blocks without clear parent UPRN
+              {thirdPartyLikeBlocks} blocks were grouped without clear parent UPRN
             </div>
           </div>
         )}
