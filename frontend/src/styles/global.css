@@ -1067,6 +1067,16 @@ select {
   font-family: inherit;
 }
 
+.portfolio-map-canvas .marker-cluster-small,
+.portfolio-map-canvas .marker-cluster-medium,
+.portfolio-map-canvas .marker-cluster-large,
+.portfolio-map-canvas .marker-cluster-small div,
+.portfolio-map-canvas .marker-cluster-medium div,
+.portfolio-map-canvas .marker-cluster-large div {
+  background: none !important;
+  box-shadow: none !important;
+}
+
 .portfolio-map-canvas .leaflet-control-zoom {
   border: 1px solid rgba(226, 232, 240, 0.95);
   box-shadow: 0 12px 24px rgba(15, 23, 42, 0.1);

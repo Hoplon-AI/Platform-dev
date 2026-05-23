@@ -845,6 +845,7 @@ export default function PortfolioDashboard({
   const properties = ingestionResult?.properties || [];
   const [selectedBlock, setSelectedBlock] = useState(null);
   const [selectedProperty, setSelectedProperty] = useState(null);
+  const [suppressMapFit, setSuppressMapFit] = useState(false);
 
   const fireDocuments = useMemo(
     () => collectFireDocumentsFromIngestion(ingestionResult, latestFireRiskPayload),
@@ -1075,9 +1076,17 @@ export default function PortfolioDashboard({
   };
 
   const handleClearMapSelection = () => {
+    setSuppressMapFit(true);
     setSelectedBlock(null);
     setSelectedProperty(null);
   };
+
+  useEffect(() => {
+    if (suppressMapFit) {
+      const t = setTimeout(() => setSuppressMapFit(false), 50);
+      return () => clearTimeout(t);
+    }
+  }, [suppressMapFit]);
 
   if (!ingestionSummary) {
     return (
@@ -1094,7 +1103,15 @@ export default function PortfolioDashboard({
 
   const hasActiveBlockSelection = Boolean(resolvedSelectedBlock);
   const hasActivePropertySelection = Boolean(resolvedSelectedProperty);
-  const mapMode = hasActiveBlockSelection ? "properties" : "blocks";
+  const blockHasMapCoords = Boolean(
+    resolvedSelectedBlock?.lat ??
+    resolvedSelectedBlock?.latitude ??
+    resolvedSelectedBlock?.centroid_lat ??
+    resolvedSelectedBlock?.center_lat ??
+    resolvedSelectedBlock?.centre_lat ??
+    resolvedSelectedBlock?.__lat
+  );
+  const mapMode = hasActiveBlockSelection && blockHasMapCoords ? "properties" : "blocks";
   const mapProperties = mapMode === "properties" ? resolvedSelectedBlock?.properties || [] : properties;
 
   return (
@@ -1169,7 +1186,7 @@ export default function PortfolioDashboard({
                 {hasActivePropertySelection
                   ? "Property selected"
                   : hasActiveBlockSelection
-                  ? "Block selected"
+                  ? `Block : ${resolvedSelectedBlock?.block_id ?? resolvedSelectedBlock?.id ?? resolvedSelectedBlock?.name ?? "?"}`
                   : "None"}
               </span>
             </div>
@@ -1204,6 +1221,7 @@ export default function PortfolioDashboard({
               selectedProperty={resolvedSelectedProperty}
               onSelectBlock={handleSelectBlock}
               onSelectProperty={handleSelectProperty}
+              suppressFit={suppressMapFit}
             />
           </div>
 
@@ -1218,7 +1236,7 @@ export default function PortfolioDashboard({
             </span>
 
             {hasActiveBlockSelection ? (
-              <button className="btn" onClick={handleClearMapSelection}>Back to blocks</button>
+              <button className="btn" onClick={handleClearMapSelection}>Clear selection</button>
             ) : null}
           </div>
         </div>
