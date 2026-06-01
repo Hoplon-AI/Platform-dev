@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 
 import PortfolioMap from "../components/PortfolioMap.jsx";
 import PropertyDetails from "../components/PropertyDetails.jsx";
@@ -298,6 +298,41 @@ function RiskBadge({ band }) {
   );
 }
 
+function HoverTooltip({ children, tip, badgeStyle }) {
+  const [visible, setVisible] = useState(false);
+  return (
+    <span
+      style={{ position: "relative", display: "inline-flex", alignItems: "center" }}
+      onMouseEnter={() => setVisible(true)}
+      onMouseLeave={() => setVisible(false)}
+    >
+      <span style={badgeStyle}>{children}</span>
+      <span style={{
+        position: "absolute",
+        top: "calc(100% + 8px)",
+        left: "50%",
+        transform: "translateX(-50%)",
+        width: 160,
+        background: "var(--panel)",
+        color: "var(--text-light)",
+        fontSize: 12,
+        fontWeight: 400,
+        lineHeight: 1.5,
+        borderRadius: 8,
+        border: "1px solid var(--border, #e2e8f0)",
+        padding: "9px 12px",
+        pointerEvents: "none",
+        zIndex: 50,
+        boxShadow: "0 4px 12px rgba(0,0,0,0.08)",
+        opacity: visible ? 1 : 0,
+        transition: "opacity 0.18s ease",
+      }}>
+        {tip}
+      </span>
+    </span>
+  );
+}
+
 function KpiCard({ title, value, subtitle, tone = "default" }) {
   return (
     <div className={`dashboard-card dashboard-card-${tone}`}>
@@ -527,65 +562,83 @@ function MiniSummaryTable({ title, subtitle, rows, columns }) {
 }
 
 function PortfolioAnalysisWindow({ tenancyRows, blockRows, propertyTypeRows, ageBandRows }) {
+  const [collapsed, setCollapsed] = React.useState(false);
   return (
     <div className="card">
-      <div className="card-header row-between">
+      <div
+        className="card-header row-between"
+        style={{ cursor: "pointer", userSelect: "none", paddingBottom: collapsed ? 16 : undefined }}
+        onClick={() => setCollapsed((c) => !c)}
+      >
         <div>
           <div className="card-title">Portfolio Analysis</div>
           <div className="card-subtitle">
             Compact whole-portfolio analysis for tenancy, block reference, property type, and age.
           </div>
         </div>
-        <span className="pill pill-muted">Whole SoV summary</span>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <span className="pill pill-muted">Whole SoV summary</span>
+          <span style={{ fontSize: 18, lineHeight: 1, color: "var(--text-muted, #888)" }}>
+            {collapsed ? "▸" : "▾"}
+          </span>
+        </div>
       </div>
 
-      <div className="card-body">
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
-            gap: 16,
-          }}
-        >
-          <MiniSummaryTable
-            title="By tenancy / ownership"
-            rows={tenancyRows}
-            columns={[
-              { key: "label", label: "Type" },
-              { key: "count", label: "Units" },
-              { key: "totalValue", label: "Sum insured", render: (row) => `£${fmtMoney(row.totalValue)}` },
-            ]}
-          />
+      <div
+        style={{
+          overflow: "hidden",
+          maxHeight: collapsed ? 0 : 1000,
+          transition: "max-height 0.35s ease",
+        }}
+      >
+        <div className="card-body">
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+              gap: 16,
+            }}
+          >
+            <MiniSummaryTable
+              title="By tenancy / ownership"
+              rows={tenancyRows}
+              columns={[
+                { key: "label", label: "Type" },
+                { key: "count", label: "Units" },
+                { key: "totalValue", label: "Sum insured", render: (row) => `£${fmtMoney(row.totalValue)}` },
+              ]}
+            />
 
-          <MiniSummaryTable
-            title="By block reference"
-            rows={blockRows}
-            columns={[
-              { key: "label", label: "Block" },
-              { key: "count", label: "Units" },
-              { key: "totalValue", label: "TIV", render: (row) => `£${fmtMoney(row.totalValue)}` },
-            ]}
-          />
+            <MiniSummaryTable
+              title="By block reference"
+              rows={blockRows}
+              columns={[
+                { key: "label", label: "Block" },
+                { key: "count", label: "Units" },
+                { key: "totalValue", label: "TIV", render: (row) => `£${fmtMoney(row.totalValue)}` },
+              ]}
+            />
 
-          <MiniSummaryTable
-            title="By property type"
-            rows={propertyTypeRows}
-            columns={[
-              { key: "label", label: "Type" },
-              { key: "count", label: "Units" },
-              { key: "totalValue", label: "Sum insured", render: (row) => `£${fmtMoney(row.totalValue)}` },
-            ]}
-          />
+            <MiniSummaryTable
+              title="By property type"
+              rows={propertyTypeRows}
+              columns={[
+                { key: "label", label: "Type" },
+                { key: "count", label: "Units" },
+                { key: "totalValue", label: "Sum insured", render: (row) => `£${fmtMoney(row.totalValue)}` },
+              ]}
+            />
 
-          <MiniSummaryTable
-            title="By age banding"
-            rows={ageBandRows}
-            columns={[
-              { key: "label", label: "Age" },
-              { key: "count", label: "Units" },
-              { key: "totalValue", label: "Sum insured", render: (row) => `£${fmtMoney(row.totalValue)}` },
-            ]}
-          />
+            <MiniSummaryTable
+              title="By age banding"
+              rows={ageBandRows}
+              columns={[
+                { key: "label", label: "Age" },
+                { key: "count", label: "Units" },
+                { key: "totalValue", label: "Sum insured", render: (row) => `£${fmtMoney(row.totalValue)}` },
+              ]}
+            />
+          </div>
         </div>
       </div>
     </div>
@@ -593,6 +646,8 @@ function PortfolioAnalysisWindow({ tenancyRows, blockRows, propertyTypeRows, age
 }
 
 function FireEvidencePanel({ fireDocuments, loading, onUploadNew }) {
+  const [collapsed, setCollapsed] = useState(false);
+
   const fireRiskSummary = useMemo(() => {
     const totals = { Red: 0, Amber: 0, Green: 0, Unknown: 0 };
     fireDocuments.forEach((doc) => {
@@ -603,18 +658,34 @@ function FireEvidencePanel({ fireDocuments, loading, onUploadNew }) {
 
   return (
     <div className="card">
-      <div className="card-header row-between">
+      <div
+        className="card-header row-between"
+        style={{ cursor: "pointer", userSelect: "none", paddingBottom: collapsed ? 16 : undefined }}
+        onClick={() => setCollapsed((c) => !c)}
+      >
         <div>
           <div className="card-title">Fire risk evidence</div>
           <div className="card-subtitle">
             Upload FRA and FRAEW evidence after the SoV so documents can be matched against existing blocks and properties.
           </div>
         </div>
-        <span className="pill pill-muted">
-          {loading ? "Refreshing…" : `${fireDocuments.length} documents`}
-        </span>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <span className="pill pill-muted">
+            {loading ? "Refreshing…" : `${fireDocuments.length} documents`}
+          </span>
+          <span style={{ fontSize: 18, lineHeight: 1, color: "var(--text-muted, #888)" }}>
+            {collapsed ? "▸" : "▾"}
+          </span>
+        </div>
       </div>
 
+      <div
+        style={{
+          overflow: "hidden",
+          maxHeight: collapsed ? 0 : 1200,
+          transition: "max-height 0.35s ease",
+        }}
+      >
       <div className="card-body">
       <div
         style={{
@@ -737,6 +808,7 @@ function FireEvidencePanel({ fireDocuments, loading, onUploadNew }) {
         )}
       </div>
       </div>
+      </div>
     </div>
   );
 }
@@ -744,6 +816,7 @@ function FireEvidencePanel({ fireDocuments, loading, onUploadNew }) {
 function BlockListPanel({ blocks, selectedBlockId, onSelectBlock, selectedProperty }) {
   const [search, setSearch] = useState("");
   const [searchDebounced, setSearchDebounced] = useState("");
+  const [collapsed, setCollapsed] = useState(false);
 
   useEffect(() => {
     const t = setTimeout(() => setSearchDebounced(search), 150);
@@ -756,16 +829,32 @@ function BlockListPanel({ blocks, selectedBlockId, onSelectBlock, selectedProper
 
   return (
     <div className="card">
-      <div className="card-header row-between">
+      <div
+        className="card-header row-between"
+        style={{ cursor: "pointer", userSelect: "none", paddingBottom: collapsed ? 16 : undefined }}
+        onClick={() => setCollapsed((c) => !c)}
+      >
         <div>
           <div className="card-title">Block analysis list</div>
           <div className="card-subtitle">
             Drill into grouped blocks without rendering the whole SoV as a long table.
           </div>
         </div>
-        <span className="pill pill-muted">{blocks.length} blocks</span>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <span className="pill pill-muted">{blocks.length} blocks</span>
+          <span style={{ fontSize: 18, lineHeight: 1, color: "var(--text-muted, #888)" }}>
+            {collapsed ? "▸" : "▾"}
+          </span>
+        </div>
       </div>
 
+      <div
+        style={{
+          overflow: "hidden",
+          maxHeight: collapsed ? 0 : 700,
+          transition: "max-height 0.35s ease",
+        }}
+      >
       <div className="card-body">
         <input
           type="text"
@@ -829,6 +918,7 @@ function BlockListPanel({ blocks, selectedBlockId, onSelectBlock, selectedProper
             </table>
           </div>
         )}
+      </div>
       </div>
     </div>
   );
@@ -1032,8 +1122,8 @@ export default function PortfolioDashboard({
 
   const selectedBlockId = resolvedSelectedBlock?.id ?? null;
   const geoCompletenessPct = ingestionSummary?.geoCompletenessPct ?? 0;
-  const highRiseBlocks = blocks.filter((b) => Number(b.maxHeight) > 18).length;
-  const amberBlocks = blocks.filter((b) => Number(b.maxHeight) > 11 && Number(b.maxHeight) <= 18).length;
+  const highRiseBlocks = blocks.filter((b) => Number(b.maxHeight) >= 18 || Number(b.max_storeys) >= 7).length;
+  const amberBlocks = blocks.filter((b) => (Number(b.maxHeight) >= 11 && Number(b.maxHeight) < 18) || (Number(b.max_storeys) >= 4 && Number(b.max_storeys) < 7)).length;
   const mappedBlocksCount = blocks.filter((b) => b.hasValidCoords).length;
 
   const fireRiskCounts = useMemo(() => {
@@ -1059,6 +1149,7 @@ export default function PortfolioDashboard({
       setSelectedProperty(null);
       return;
     }
+    setSuppressMapFit(true);
     const matchingBlock = blocks.find((b) => sameBlock(b, block)) || block;
     setSelectedBlock(matchingBlock);
     setSelectedProperty(null);
@@ -1066,9 +1157,11 @@ export default function PortfolioDashboard({
 
   const handleSelectProperty = (property) => {
     if (!property) {
+      setSuppressMapFit(true);
       setSelectedProperty(null);
       return;
     }
+    setSuppressMapFit(true);
     const matchingProperty = properties.find((p) => sameProperty(p, property)) || property;
     setSelectedProperty(matchingProperty);
     const parentBlock = blocks.find((block) => block.properties.some((p) => sameProperty(p, matchingProperty))) || null;
@@ -1088,6 +1181,13 @@ export default function PortfolioDashboard({
     }
   }, [suppressMapFit]);
 
+  const detailsScrollRef = useRef(null);
+  useEffect(() => {
+    if (detailsScrollRef.current) {
+      detailsScrollRef.current.scrollTop = 0;
+    }
+  }, [selectedProperty, selectedBlock]);
+
   if (!ingestionSummary) {
     return (
       <div className="content-wrap">
@@ -1103,16 +1203,8 @@ export default function PortfolioDashboard({
 
   const hasActiveBlockSelection = Boolean(resolvedSelectedBlock);
   const hasActivePropertySelection = Boolean(resolvedSelectedProperty);
-  const blockHasMapCoords = Boolean(
-    resolvedSelectedBlock?.lat ??
-    resolvedSelectedBlock?.latitude ??
-    resolvedSelectedBlock?.centroid_lat ??
-    resolvedSelectedBlock?.center_lat ??
-    resolvedSelectedBlock?.centre_lat ??
-    resolvedSelectedBlock?.__lat
-  );
-  const mapMode = hasActiveBlockSelection && blockHasMapCoords ? "properties" : "blocks";
-  const mapProperties = mapMode === "properties" ? resolvedSelectedBlock?.properties || [] : properties;
+  const mapMode = "blocks";
+  const mapProperties = properties;
 
   return (
     <div className="content-wrap">
@@ -1144,7 +1236,22 @@ export default function PortfolioDashboard({
         <KpiCard
           title="Blocks detected"
           value={blocks.length}
-          subtitle={`${highRiseBlocks} high-rise · ${amberBlocks} mid-rise`}
+          subtitle={
+            <span style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+              <HoverTooltip
+                tip="18 m+ or 7+ storeys — defined as higher-risk under the Building Safety Act 2022"
+                badgeStyle={{ padding: "2px 8px", borderRadius: 6, background: "rgba(225,29,72,0.09)", border: "1px solid rgba(225,29,72,0.28)", fontWeight: 600, fontSize: 13, color: "var(--muted)", cursor: "default" }}
+              >
+                {highRiseBlocks} high-risk
+              </HoverTooltip>
+              <HoverTooltip
+                tip="11–18 m or 4–6 storeys — medium-rise under Approved Document B (2022)"
+                badgeStyle={{ padding: "2px 8px", borderRadius: 6, background: "rgba(245,158,11,0.10)", border: "1px solid rgba(245,158,11,0.30)", fontWeight: 600, fontSize: 13, color: "var(--muted)", cursor: "default" }}
+              >
+                {amberBlocks} mid-risk
+              </HoverTooltip>
+            </span>
+          }
           tone="blue"
         />
         <KpiCard
@@ -1191,11 +1298,12 @@ export default function PortfolioDashboard({
               </span>
             </div>
 
-            <div className="details-body" style={{ maxHeight: 420, overflowY: "auto", paddingRight: 6 }}>
+            <div ref={detailsScrollRef} className="details-body" style={{ minHeight: 420, maxHeight: 420, overflowY: "auto", paddingRight: 6 }}>
               <PropertyDetails
                 property={resolvedSelectedProperty}
                 selectedBlock={resolvedSelectedBlock}
                 blockMode={!resolvedSelectedProperty}
+                onSelectProperty={handleSelectProperty}
               />
             </div>
           </div>
@@ -1206,7 +1314,7 @@ export default function PortfolioDashboard({
             <div>
               <div className="card-title">Block analysis map</div>
               <div className="card-subtitle">
-                Clustered map view with clear block counts at map level and colour-coded properties once a block is selected.
+                Interactive block map. Select a block to explore the details.
               </div>
             </div>
             <span className="pill pill-muted">{mappedBlocksCount} mapped blocks</span>
@@ -1230,14 +1338,20 @@ export default function PortfolioDashboard({
             style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center", flexWrap: "wrap" }}
           >
             <span>
-              {mapMode === "properties"
-                ? "Zoomed into the selected block. Coloured property dots show the property mix inside that block."
+              {hasActivePropertySelection
+                ? `Viewing flat details for ${resolvedSelectedProperty?.block_reference ?? "selected block"}. Select another flat from the block popup or clear the selection.`
+                : hasActiveBlockSelection
+                ? "Block selected. Click the marker to open the flat list, or clear the selection below."
                 : "Click a block circle on the map to inspect that block in detail."}
             </span>
 
-            {hasActiveBlockSelection ? (
-              <button className="btn" onClick={handleClearMapSelection}>Clear selection</button>
-            ) : null}
+            <button
+              className="btn"
+              onClick={handleClearMapSelection}
+              style={{ visibility: hasActiveBlockSelection || hasActivePropertySelection ? "visible" : "hidden" }}
+            >
+              Clear selection
+            </button>
           </div>
         </div>
       </div>
