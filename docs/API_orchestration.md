@@ -2,9 +2,9 @@
 
 ## Overview
 
-The `backend/geo/uprn maps/` module resolves free-text addresses or raw UPRNs into fully enriched property records by orchestrating four external APIs in sequence. The entry point is `address_to_final.py`; all other modules are called by it.
+The `backend/geo/uprn maps/` module resolves free-text addresses or raw UPRNs into fully enriched property records by orchestrating several external data sources in sequence. The entry point is `address_to_final.py`; all other modules are called by it.
 
-The central concept is **resolve once, share everywhere**: OS Places is called first to get BNG coordinates, and those coordinates are passed directly to NGD and Listed Building lookups so no downstream call needs to re-resolve the UPRN.
+The central concept is **resolve once, share everywhere**: OS Places is called first to get the UPRN and BNG coordinates, and those coordinates (plus country code and postcode) are passed directly to the NGD, Listed Building, and Flood Risk lookups so no downstream call needs to re-resolve the UPRN.
 
 ---
 
@@ -16,6 +16,9 @@ The central concept is **resolve once, share everywhere**: OS Places is called f
 | OS NGD Buildings (`bld-fts-building-4`) | `uprn_to_height.py` | API key (separate NGD key) | GB |
 | Open Data Communities EPC | `uprn_to_epc.py` | Basic auth (email + key) | England & Wales only |
 | planning.data.gov.uk / Historic Environment Scotland WFS | `uprn_to_listed.py` | None (open) | England + Scotland |
+| EA RoFRS (CSV) / NRW FRAW (WFS) / SEPA (ArcGIS) | `flood_risk.py` | None (open) | England, Wales, Scotland |
+
+Flood risk dispatches to a different national agency per country — see [Flood_Risk.md](./Flood_Risk.md) for the full per-country detail.
 
 ---
 
@@ -28,7 +31,8 @@ Free-text address
       │
       ▼
  OS Places (find)
- → UPRN, BNG coordinates (X/Y), canonical address, MATCH score
+ → UPRN, BNG coordinates (X/Y), canonical address,
+   MATCH score, COUNTRY_CODE, POSTCODE
       │
       ├──────────────────────────────────────────────┐
       │                                              │
@@ -47,13 +51,26 @@ Free-text address
                     → grade, name, list reference
                              │
                              ▼
+                    Cross-reference scoring (address-based lookups only)
+                    → match level / confidence / reasons
+                      (reuses the place record; parent-UPRN lookup
+                       only fires in AMBER cases)
+                             │
+                             ▼
+                    Flood Risk check (by BNG + country + postcode)
+                    → England: EA RoFRS (postcode CSV)
+                    → Wales:   NRW FRAW (WFS)
+                    → Scotland: SEPA (ArcGIS)
+                    → band, source, note
+                             │
+                             ▼
                     Merge (EPC preferred for construction fields)
                     → single result dict
 ```
 
 ### UPRN path (`get_final_info_from_uprn`)
 
-Same pipeline but the first call is `get_coordinates_from_uprn` (OS Places UPRN endpoint) instead of the free-text search. No MATCH score is generated.
+Same pipeline but the first call is `get_coordinates_from_uprn` (OS Places UPRN endpoint) instead of the free-text search. No MATCH score is generated, and the cross-reference scoring step is skipped (there is no input address to compare against).
 
 ---
 
@@ -61,15 +78,17 @@ Same pipeline but the first call is `get_coordinates_from_uprn` (OS Places UPRN 
 
 The batch orchestrators (`get_final_info_from_addresses` / `get_final_info_from_uprns`) cut redundant API calls significantly.
 
-**Without batching:** each of 4 lookups would call OS Places independently → ~4N OS API calls for N properties.
+**Without batching:** each downstream lookup would call OS Places independently → many redundant OS API calls for N properties.
 
-**With batching:** OS Places is called once per property to resolve coordinates. Those coordinates are passed directly into the downstream batch calls. NGD, EPC, and Listed all use `requests.Session` to reuse the underlying TCP/SSL connection across calls.
+**With batching:** OS Places is called once per property to resolve coordinates. Those coordinates (plus country code and postcode) are passed directly into the downstream batch calls. NGD, EPC, Listed, and Flood all use `requests.Session` to reuse the underlying TCP/SSL connection across calls.
 
 ```
 N addresses → 1 batch OS Places call (N requests, 1 session)
-           → 1 batch EPC call        (N requests, 1 session)
-           → 1 batch NGD call        (N requests, 1 session)
-           → 1 batch Listed call     (N lookups, pre-resolved coordinates)
+           → 1 batch EPC call          (N requests, 1 session)
+           → 1 batch NGD call          (N requests, 1 session)
+           → 1 batch Listed call       (N lookups, pre-resolved coordinates)
+           → 1 batch cross-reference   (reuses place records; parent-UPRN lookups only in AMBER cases)
+           → 1 batch Flood Risk call   (N lookups, pre-resolved coordinates, 1 session)
 ```
 
 ---
@@ -87,7 +106,7 @@ N addresses → 1 batch OS Places call (N requests, 1 session)
 
 The DPA/LPI record contains: `UPRN`, `PARENT_UPRN`, `ADDRESS`, `POSTCODE`, `X_COORDINATE`, `Y_COORDINATE`, `COUNTRY_CODE`, `CLASSIFICATION_CODE`, `MATCH`, `MATCH_DESCRIPTION`.
 
-`PARENT_UPRN` is used by `block_detection.py` to group flats into their parent building. `COUNTRY_CODE` drives the Scotland vs England branching in the listed building and cross-reference modules.
+`PARENT_UPRN` is used by `block_detection.py` to group flats into their parent building. `COUNTRY_CODE` drives the country branching in the listed building, cross-reference, and flood risk modules. `POSTCODE` is also passed to the flood risk lookup (used for the England EA RoFRS CSV match).
 
 ---
 
@@ -154,6 +173,29 @@ Grade conventions differ by country:
 
 ---
 
+### `flood_risk.py` — Flood risk band
+
+Spatial lookup using the BNG coordinates, `COUNTRY_CODE`, and `POSTCODE` already resolved by OS Places in Step 1 — no extra geocoding call. The country code dispatches to the relevant national agency:
+
+| Country | Agency | Method |
+|---|---|---|
+| England | EA RoFRS | Postcode lookup against a cached `Postcodes_Risk_Assessment_All.csv` |
+| Wales | NRW FRAW | WFS point-intersect across three layers |
+| Scotland | SEPA | ArcGIS MapServer point-in-polygon across six layers |
+| Northern Ireland | — | Not supported (no public API) |
+
+Returns three fields — `flood_risk_band`, `flood_risk_source`, `flood_risk_note`. Bands are **not directly comparable across countries** (different probability thresholds; Scotland is undefended). The batch variant (`get_flood_risks_from_coords_batch`) accepts pre-resolved `(uprn, x, y, country_code, postcode)` tuples and shares one `requests.Session`.
+
+See [Flood_Risk.md](./Flood_Risk.md) for per-country bands, thresholds, data sources, and maintenance.
+
+---
+
+### `cross_reference.py` — Address match scoring
+
+Runs only on address-based lookups (not UPRN-based — there is no input address to compare). Scores how well the OS Places result matches the user's input address, returning a `level` (GREEN/AMBER/RED), a `confidence` score, and human-readable `reasons`. Reuses the already-fetched place record; an extra OS Places parent-UPRN lookup only fires for ambiguous (AMBER) cases. Built on `address_confidence.compare_addresses()` (threshold 0.6).
+
+---
+
 ### `address_confidence.py` — Address cross-validation
 
 Standalone utility used internally to validate that downstream API responses (EPC, parent UPRN) refer to the same property as the OS Places result. Scores two addresses using `SequenceMatcher` ratio and token overlap, returning the higher of the two.
@@ -189,6 +231,7 @@ When both EPC and NGD return the same conceptual field, EPC is used if available
 | Height / floors | — | direct | NGD only |
 | EPC ratings | direct | — | EPC only |
 | Listed status | — | — | Listed API only |
+| Flood risk | — | — | Flood agency only |
 
 `construction_data_source` in the output is set to `"EPC"` or `"NGD"` to indicate which source was used.
 
@@ -201,8 +244,9 @@ When both EPC and NGD return the same conceptual field, EPC is used if available
 | `uprn`, `address`, `postcode` | OS Places |
 | `x_coordinate`, `y_coordinate` | OS Places (BNG EPSG:27700) |
 | `country_code`, `parent_uprn` | OS Places |
-| `classification_code`, `classification_description` | OS Places |
-| `match_score`, `match_description` | OS Places (address search only) |
+| `classification_code`, `classification_description`, `logical_status` | OS Places |
+| `match_score_OS`, `match_description_OS` | OS Places |
+| `match_level_via_metric`, `match_score_metric`, `match_reasons` | cross-reference (address lookups only; `None` for UPRN lookups) |
 | `height_relativemax_m`, `height_relativeroofbase_m` | NGD |
 | `height_absolutemax_m`, `height_absolutemin_m`, `height_absoluteroofbase_m` | NGD |
 | `height_confidencelevel`, `numberoffloors`, `geometry_area_m2` | NGD |
@@ -215,4 +259,7 @@ When both EPC and NGD return the same conceptual field, EPC is used if available
 | `lighting_cost_current`, `heating_cost_current`, `hot_water_cost_current` | EPC |
 | `epc_lodgement_date` | EPC |
 | `is_listed`, `listed_grade`, `listed_name`, `listed_reference` | Listed API |
+| `flood_risk_band`, `flood_risk_source`, `flood_risk_note` | Flood agency |
 | `osid` | NGD |
+
+All four orchestrator functions emit the same field names for shared attributes (the single-property paths mirror the merger's canonical keys used by `_merge_property_result`).
