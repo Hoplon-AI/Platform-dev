@@ -9,11 +9,16 @@ const fmtMoney = (n) => {
   return x.toLocaleString(undefined, { maximumFractionDigits: 0 });
 };
 
-const hasValidLatLon = (lat, lon) =>
-  Number.isFinite(Number(lat)) &&
-  Number.isFinite(Number(lon)) &&
-  Number(lat) !== 0 &&
-  Number(lon) !== 0;
+const hasValidLatLon = (lat, lon) => {
+  const la = Number(lat);
+  const lo = Number(lon);
+  return (
+    Number.isFinite(la) && Number.isFinite(lo) &&
+    la !== 0 && lo !== 0 &&
+    la >= 49.0 && la <= 61.5 &&
+    lo >= -8.8 && lo <= 2.8
+  );
+};
 
 const normaliseKey = (value) => String(value ?? "").trim().toLowerCase();
 
@@ -967,17 +972,33 @@ export default function PortfolioDashboard({
     [properties]
   );
 
-  // On mount, if no blocks have valid coordinates, auto-fetch enriched data from the API.
-  // This handles the case where the user sees the dashboard after a fresh SoV upload
-  // (no enrichment yet) or after page refresh (enrichment may have run since last load).
+  // Auto-poll for enriched coordinates after SoV upload.
+  // Fires every 15s while properties exist but none have coords, up to 3 minutes.
   useEffect(() => {
     if (typeof onLoadMapData !== "function") return;
-    // Only auto-fetch once on mount, and only when coords are missing
-    const hasAnyCoords = properties.some((p) => p.hasValidCoords);
-    if (!hasAnyCoords && properties.length > 0) {
+    if (!properties.length) return;
+
+    const hasAnyCoords = () => properties.some((p) => p.hasValidCoords);
+
+    // Do an immediate fetch first
+    if (!hasAnyCoords()) {
       setMapDataLoading(true);
       onLoadMapData().finally(() => setMapDataLoading(false));
     }
+
+    // Then poll every 15s for up to 3 minutes (12 attempts)
+    let attempts = 0;
+    const MAX_ATTEMPTS = 12;
+    const interval = setInterval(() => {
+      if (hasAnyCoords() || attempts >= MAX_ATTEMPTS) {
+        clearInterval(interval);
+        return;
+      }
+      attempts++;
+      onLoadMapData();
+    }, 15000);
+
+    return () => clearInterval(interval);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -1089,15 +1110,33 @@ export default function PortfolioDashboard({
     setMapFocusBlockId(null);
   };
 
-  const handleExport = (docType) => {
+  const handleExport = async (docType) => {
     if (!resolvedPortfolioId) return;
     const url = `/api/v1/portfolios/${resolvedPortfolioId}/export/${docType}`;
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "";
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
+    const token =
+      localStorage.getItem("equirisk_token") ||
+      sessionStorage.getItem("equirisk_token") ||
+      "";
+    try {
+      const res = await fetch(url, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      if (!res.ok) throw new Error(`Export failed: ${res.status}`);
+      const blob = await res.blob();
+      const filename =
+        res.headers.get("content-disposition")?.match(/filename="?([^"]+)"?/)?.[1] ||
+        `${docType.replace("-", "_")}.xlsx`;
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(a.href);
+    } catch (err) {
+      console.error("[handleExport]", err);
+      alert(`Download failed: ${err.message}`);
+    }
   };
 
   if (!ingestionSummary) {
@@ -1206,7 +1245,7 @@ export default function PortfolioDashboard({
           </div>
         </div>
 
-        <div className="card" style={{ minHeight: 760, overflow: "visible" }}>
+        <div className="card" style={{ minHeight: 760, overflow: "visible", isolation: "isolate" }}>
           <div className="card-header row-between">
             <div>
               <div className="card-title">Block analysis map</div>

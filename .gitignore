@@ -283,6 +283,14 @@ backend/geo/os_dh_fun_keys
 
 # Claude session docs (internal dev notes)
 .claude/docs/
+.claude/references/
+.claude/skills/
+.claude/testing_doc/
+.claude/*.html
+
+# Local dev session notes / transcripts (not for repo)
+docs/session-summaries/
+*-this-session-is-being-continued-from-a-previous-co.txt
 
 # Internal dev notes and docs (not for repo)
 claude/

@@ -394,22 +394,22 @@ function FireRiskSection({
               <DetailRow label="Company" value={fra?.assessor_company} />
               <DetailRow label="Responsible person" value={fra?.responsible_person} />
               <DetailRow label="Evacuation" value={fra?.evacuation_strategy} />
-              <DetailRow label="Fire doors" value={normaliseBooleanLabel(fra?.fire_doors)} />
+              <DetailRow label="Fire doors" value={normaliseBooleanLabel(fra?.has_fire_doors ?? fra?.fire_doors)} />
               <DetailRow
                 label="Compartmentation"
-                value={normaliseBooleanLabel(fra?.compartmentation)}
+                value={normaliseBooleanLabel(fra?.has_compartmentation ?? fra?.compartmentation)}
               />
               <DetailRow
                 label="Fire alarm"
-                value={normaliseBooleanLabel(fra?.fire_alarm_system)}
+                value={normaliseBooleanLabel(fra?.has_fire_alarm_system ?? fra?.fire_alarm_system)}
               />
               <DetailRow
                 label="Smoke detection"
-                value={normaliseBooleanLabel(fra?.smoke_detection)}
+                value={normaliseBooleanLabel(fra?.has_smoke_detection ?? fra?.smoke_detection)}
               />
               <DetailRow
                 label="Sprinklers"
-                value={normaliseBooleanLabel(fra?.sprinkler_system)}
+                value={normaliseBooleanLabel(fra?.has_sprinkler_system ?? fra?.sprinkler_system)}
               />
               <DetailRow label="Total actions" value={fraActions.total} />
               <DetailRow label="Overdue actions" value={fraActions.overdue} />
@@ -474,7 +474,15 @@ function FireRiskSection({
               <DetailRow label="Storeys" value={fraew?.num_storeys} />
               <DetailRow label="Units" value={fraew?.num_units} />
               <DetailRow label="Cladding type" value={fraew?.cladding_type} />
-              <DetailRow label="Wall types" value={asArray(fraew?.wall_types).join(", ")} />
+              <DetailRow
+                label="Wall types"
+                value={(() => {
+                  let wt = fraew?.wall_types;
+                  if (typeof wt === "string") { try { wt = JSON.parse(wt); } catch { return wt; } }
+                  if (!Array.isArray(wt) || wt.length === 0) return "—";
+                  return wt.map((w) => w?.type_ref ?? w).filter(Boolean).join(", ");
+                })()}
+              />
               <DetailRow
                 label="Combustible cladding"
                 value={normaliseBooleanLabel(
@@ -505,10 +513,20 @@ function FireRiskSection({
                   fraew?.remediation_required ?? fraew?.has_remedial_actions
                 )}
               />
-              <DetailRow label="Evacuation" value={fraew?.evacuation_strategy} />
+              <DetailRow
+                label="Evacuation"
+                value={fraew?.evacuation_strategy
+                  ? fraew.evacuation_strategy.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())
+                  : "—"}
+              />
               <DetailRow label="Dry riser" value={normaliseBooleanLabel(fraew?.dry_riser_present)} />
               <DetailRow label="Wet riser" value={normaliseBooleanLabel(fraew?.wet_riser_present)} />
-              <DetailRow label="ADB compliant" value={fraew?.adb_compliant} />
+              <DetailRow
+                label="ADB compliant"
+                value={fraew?.adb_compliant
+                  ? fraew.adb_compliant.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())
+                  : "—"}
+              />
 
               {fraew.summary ? (
                 <div className="details-sub" style={{ marginTop: 10 }}>

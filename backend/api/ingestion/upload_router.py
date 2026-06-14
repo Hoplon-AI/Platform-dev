@@ -780,10 +780,10 @@ async def ingest_document(
             db_pool=pool,
         )
 
-        # Auto-trigger enrichment in background (limit 50 for now)
+        # Auto-trigger enrichment in background (limit 20 blocks for demo)
         from backend.workers.enrichment_worker import enrich_portfolio
         background_tasks.add_task(enrich_portfolio, ha_id, limit=50)
-        logger.info("[INGEST] SoV done — enrichment queued for ha_id=%s limit=50", ha_id)
+        logger.info("[INGEST] SoV done — enrichment queued for ha_id=%s limit=20", ha_id)
 
         # Fetch property rows back so the frontend can render them immediately
         async with pool.acquire() as conn:
@@ -938,14 +938,22 @@ async def ingest_document(
                 if document_type == "fra":
                     _row = await conn.fetchrow(
                         "SELECT risk_rating, rag_status, assessor_company, assessor_name, "
-                        "assessment_date, next_review_date, evacuation_strategy "
+                        "assessment_date, next_review_date, evacuation_strategy, "
+                        "has_fire_doors, has_sprinkler_system, has_compartmentation, "
+                        "has_fire_alarm_system, has_smoke_detection, "
+                        "total_action_count, overdue_action_count, outstanding_action_count "
                         "FROM silver.fra_features WHERE fra_id = $1::uuid AND ha_id = $2",
                         db_lookup_id, ha_id,
                     )
                 else:
                     _row = await conn.fetchrow(
                         "SELECT building_risk_rating, rag_status, assessor_company, "
-                        "assessment_date, has_combustible_cladding, eps_insulation_present "
+                        "assessment_date, assessment_valid_until, is_in_date, "
+                        "has_combustible_cladding, eps_insulation_present, wall_types, "
+                        "cavity_barriers_present, pas_9980_compliant, pas_9980_version, "
+                        "interim_measures_required, interim_measures_detail, has_remedial_actions, "
+                        "evacuation_strategy, dry_riser_present, wet_riser_present, adb_compliant, "
+                        "building_height_m, building_height_category, num_storeys, num_units "
                         "FROM silver.fraew_features WHERE fraew_id = $1::uuid AND ha_id = $2",
                         db_lookup_id, ha_id,
                     )

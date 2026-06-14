@@ -1,6 +1,9 @@
 import React, { useEffect, useLayoutEffect, useMemo, useRef } from "react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
+import "leaflet.markercluster/dist/MarkerCluster.css";
+import "leaflet.markercluster/dist/MarkerCluster.Default.css";
+import "leaflet.markercluster";
 
 const DEFAULT_CENTER = [54.5, -3];
 const DEFAULT_ZOOM = 5;
@@ -273,6 +276,33 @@ const formatCountLabel = (count) => {
     return Number.isInteger(compact) ? `${compact}k` : `${compact.toFixed(1)}k`;
   }
   return String(safe);
+};
+
+const RISK_PRIORITY = { "#ef4444": 3, "#f59e0b": 2, "#22c55e": 1, "#64748b": 0 };
+
+const createClusterIcon = (cluster) => {
+  const markers = cluster.getAllChildMarkers();
+  const totalUnits = markers.reduce((sum, m) => sum + (m.options._units || 0), 0);
+  const ringColor = markers.reduce((best, m) => {
+    const c = m.options._ringColor || "#64748b";
+    return (RISK_PRIORITY[c] ?? 0) > (RISK_PRIORITY[best] ?? 0) ? c : best;
+  }, "#64748b");
+  const count = totalUnits || cluster.getChildCount();
+  const size = Math.min(72, 44 + Math.sqrt(count) * 2.2);
+  const fontSize = size >= 64 ? 15 : size >= 52 ? 14 : 13;
+  return L.divIcon({
+    className: "portfolio-block-count-icon",
+    iconSize: [size, size],
+    iconAnchor: [size / 2, size / 2],
+    html: `<div style="
+      width:${size}px;height:${size}px;border-radius:999px;
+      background:rgba(255,255,255,0.94);border:3px solid ${ringColor};
+      box-shadow:0 10px 24px rgba(15,23,42,0.14);
+      display:flex;align-items:center;justify-content:center;
+      font-weight:800;font-size:${fontSize}px;color:#0f172a;
+      backdrop-filter:blur(8px);
+    ">${formatCountLabel(count)}</div>`,
+  });
 };
 
 const createBlockCountIcon = (point, zoom, isSelected, opacity = 1, scale = 1) => {
@@ -637,11 +667,12 @@ export default function PortfolioMap({
       attributionControl: false,
     }).setView(DEFAULT_CENTER, DEFAULT_ZOOM);
 
-    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-      subdomains: "abc",
-      maxZoom: 19,
+    L.tileLayer("https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png", {
+      subdomains: "abcd",
+      maxZoom: 20,
+      crossOrigin: "anonymous",
       keepBuffer: 4,
-      attribution: "&copy; <a href='https://www.openstreetmap.org/copyright'>OpenStreetMap</a> contributors",
+      attribution: "&copy; OpenStreetMap &copy; CARTO",
     }).addTo(map);
 
     mapRef.current = map;
@@ -654,6 +685,14 @@ export default function PortfolioMap({
     setTimeout(() => map.invalidateSize(), 120);
     setTimeout(() => map.invalidateSize(), 400);
     setTimeout(() => map.invalidateSize(), 1000);
+
+    return () => {
+      map.remove();
+      mapRef.current = null;
+      buildingsLayerRef.current = null;
+      overviewBlockLayerRef.current = null;
+      pointLayerRef.current = null;
+    };
   }, []);
 
   useEffect(() => {
@@ -700,27 +739,56 @@ export default function PortfolioMap({
       buildingsLayer.clearLayers();
       overviewBlockLayer.clearLayers();
 
+      const clusterGroup = L.markerClusterGroup({
+        iconCreateFunction: createClusterIcon,
+        maxClusterRadius: (zoom) => {
+          if (zoom <= 5)  return 160;
+          if (zoom <= 7)  return 120;
+          if (zoom <= 9)  return 90;
+          if (zoom <= 11) return 60;
+          return 40;
+        },
+        spiderfyOnMaxZoom: false,
+        showCoverageOnHover: false,
+        zoomToBoundsOnClick: false,
+        disableClusteringAtZoom: 13,
+        animate: true,
+      });
+
+      clusterGroup.on("clusterclick", (e) => {
+        const bounds = e.layer.getBounds();
+        if (bounds.isValid()) {
+          map.flyToBounds(bounds.pad(0.2), { duration: 0.5, maxZoom: 13 });
+        }
+      });
+
       blockPoints.forEach((point) => {
         const isSelected = sameBlock(selectedBlock, point.raw);
+        const baseZ = isSelected ? 1000 : 0;
         const marker = L.marker([point.lat, point.lon], {
           icon: createBlockCountIcon(point, currentZoom, isSelected),
           keyboard: false,
+          zIndexOffset: baseZ,
+          _units: point.units,
+          _ringColor: riskColor(point.raw),
         });
 
+        marker.on("mouseover", () => marker.setZIndexOffset(10000));
+        marker.on("mouseout", () => marker.setZIndexOffset(baseZ));
         marker.on("click", () => {
           onSelectBlock?.(point.raw);
           onSelectProperty?.(null);
         });
-
         marker.bindTooltip(
           `${point.name} · ${getBlockPropertyCount(point.raw) || 0} properties · ${fmtMoney(point.totalValue)}`,
           { direction: "top", sticky: true, opacity: 0.95 }
         );
-
         marker.bindPopup(getBlockPopupHtml(point));
-        marker.addTo(pointLayer);
+        clusterGroup.addLayer(marker);
         if (isSelected) selectedMarkerRef.current = marker;
       });
+
+      clusterGroup.addTo(pointLayer);
     } else {
       propertyPoints.forEach((point) => {
         const isSelected = sameProperty(selectedProperty, point.raw);

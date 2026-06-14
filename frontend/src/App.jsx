@@ -31,12 +31,12 @@ const UK_LON_BOUNDS = {
 };
 
 const OSGB_EASTING_BOUNDS = {
-  min: 0,
+  min: 1,     // exclude 0: Number(null)=0, proj4(0,0) → lat≈49.7 lon≈-7.5 (Atlantic)
   max: 700000,
 };
 
 const OSGB_NORTHING_BOUNDS = {
-  min: 0,
+  min: 1,     // same fix — reject null/missing coordinates
   max: 1300000,
 };
 
@@ -588,7 +588,8 @@ export default function App() {
         const user = JSON.parse(raw);
         setAuthUser(user);
         setShowLanding(false);
-        loadPropertiesFromApi();
+        // Demo mode: do NOT pre-load portfolio from DB on session restore.
+        // Data lives in React state for this session only.
       } catch {
         // corrupted storage — ignore
       }
@@ -876,7 +877,7 @@ export default function App() {
         onLogin={(user) => {
           setAuthUser(user);
           setActiveNav("uploads");
-          loadPropertiesFromApi();
+          // Demo mode: start with empty state, let Ewan upload fresh.
         }}
       />
     );
