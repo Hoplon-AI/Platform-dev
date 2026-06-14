@@ -43,17 +43,23 @@ app = FastAPI(
 )
 
 # CORS configuration
+import os as _os
+_cors_origins = [
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+    "http://localhost:3002",
+    "http://127.0.0.1:3002",
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+]
+# Production origins from env var (comma-separated, e.g. https://app.equirisk.ai,https://d1234.cloudfront.net)
+_extra_origins = _os.getenv("CORS_ORIGINS", "")
+if _extra_origins:
+    _cors_origins += [o.strip() for o in _extra_origins.split(",") if o.strip()]
+
 app.add_middleware(
     CORSMiddleware,
-    # Local dev: support both localhost and 127.0.0.1 for Vite/React dev servers.
-    allow_origins=[
-        "http://localhost:3000",
-        "http://127.0.0.1:3000",
-        "http://localhost:3002",
-        "http://127.0.0.1:3002",
-        "http://localhost:5173",
-        "http://127.0.0.1:5173",
-    ],
+    allow_origins=_cors_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

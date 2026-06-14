@@ -1,6 +1,13 @@
 export const API_BASE_URL =
   import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000";
 
+function getAuthHeader(): Record<string, string> {
+  const token =
+    localStorage.getItem("equirisk_token") ||
+    sessionStorage.getItem("equirisk_token");
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
 export async function apiFetch(path: string, init?: RequestInit) {
   const url = new URL(path, API_BASE_URL).toString();
 
@@ -15,6 +22,7 @@ export async function apiFetch(path: string, init?: RequestInit) {
     ...init,
     headers: {
       ...(isJsonBody ? { "Content-Type": "application/json" } : {}),
+      ...getAuthHeader(),
       ...(init?.headers ?? {}),
     },
   });

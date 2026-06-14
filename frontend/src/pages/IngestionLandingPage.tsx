@@ -1,511 +1,747 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Link, useLocation } from "react-router-dom";
-import { apiFetch } from "../services/apiClient";
+import React, { useMemo, useRef, useState } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import ProcessingSteps from "../components/ProcessingSteps";
 
-// Icons as inline SVGs
-const Icons = {
-  Upload: () => (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-      <polyline points="17 8 12 3 7 8" />
-      <line x1="12" y1="3" x2="12" y2="15" />
-    </svg>
-  ),
-  Clock: () => (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-      <circle cx="12" cy="12" r="10" />
-      <polyline points="12 6 12 12 16 14" />
-    </svg>
-  ),
-  Home: () => (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-      <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
-      <polyline points="9 22 9 12 15 12 15 22" />
-    </svg>
-  ),
-  FileText: () => (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-      <polyline points="14 2 14 8 20 8" />
-      <line x1="16" y1="13" x2="8" y2="13" />
-      <line x1="16" y1="17" x2="8" y2="17" />
-    </svg>
-  ),
-  Download: () => (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-      <polyline points="7 10 12 15 17 10" />
-      <line x1="12" y1="15" x2="12" y2="3" />
-    </svg>
-  ),
-  Check: () => (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-      <polyline points="20 6 9 17 4 12" />
-    </svg>
-  ),
-  AlertCircle: () => (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-      <circle cx="12" cy="12" r="10" />
-      <line x1="12" y1="8" x2="12" y2="12" />
-      <line x1="12" y1="16" x2="12.01" y2="16" />
-    </svg>
-  ),
-  Zap: () => (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-      <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
-    </svg>
-  ),
-  Shield: () => (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-      <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
-    </svg>
-  ),
-  RefreshCw: () => (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-      <polyline points="23 4 23 10 17 10" />
-      <polyline points="1 20 1 14 7 14" />
-      <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
-    </svg>
-  ),
-  BarChart: () => (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-      <line x1="18" y1="20" x2="18" y2="10" />
-      <line x1="12" y1="20" x2="12" y2="4" />
-      <line x1="6" y1="20" x2="6" y2="14" />
-    </svg>
-  ),
-  Link: () => (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-      <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
-      <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
-    </svg>
-  ),
-  ChevronRight: () => (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-      <polyline points="9 18 15 12 9 6" />
-    </svg>
-  ),
+type UploadStage = "SOV" | "FRA" | "FRAEW";
+
+type IngestionLandingPageProps = {
+  hasSovData?: boolean;
+  isUploading?: boolean;
+  uploadError?: string | null;
+  pipelineStep?: string | null;
+  selectedBlockReference?: string;
+  selectedPropertyId?: string;
+  onSelectedBlockReferenceChange?: (value: string) => void;
+  onSelectedPropertyIdChange?: (value: string) => void;
+  onFilesSelected?: (files: File[], stage: UploadStage) => void;
 };
 
-type Submission = {
-  upload_id: string;
-  ha_id: string;
-  filename: string;
-  file_type: string;
-  status: string;
-  uploaded_at: string;
-  file_size: number;
-  checksum: string;
-  metadata?: unknown;
-};
-
-type ListResponse = {
-  items: Submission[];
-};
-
-type BatchUploadResponse = {
-  total_files: number;
-  successful: number;
-  failed: number;
-  results: Array<{
-    upload_id: string;
-    filename: string;
-    file_type: string;
-    s3_key: string;
-    manifest_s3_key?: string | null;
-    metadata_s3_key?: string | null;
-    checksum: string;
-    file_size: number;
-  }>;
-  errors: Array<{ filename: string; error: string; error_type?: string }>;
-};
-
-function formatDateTime(iso: string) {
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return iso;
-  return d.toLocaleString();
-}
-
-function formatBytes(n: number) {
-  if (!Number.isFinite(n)) return "-";
-  const units = ["B", "KB", "MB", "GB"];
-  let i = 0;
-  let v = n;
-  while (v >= 1024 && i < units.length - 1) {
-    v /= 1024;
-    i += 1;
+const stageCopy: Record<
+  UploadStage,
+  {
+    title: string;
+    subtitle: string;
+    formats: string;
+    badge: string;
   }
-  return `${v.toFixed(i === 0 ? 0 : 1)} ${units[i]}`;
-}
+> = {
+  SOV: {
+    title: "Upload Schedule of Values",
+    subtitle: "Start here. This creates the portfolio, properties, and block records used by later evidence uploads.",
+    formats: "Excel (.xlsx / .xls) or CSV",
+    badge: "Required first",
+  },
+  FRA: {
+    title: "Upload FRA evidence",
+    subtitle: "Attach Fire Risk Assessment PDFs to the blocks created from the SoV upload.",
+    formats: "PDF only",
+    badge: "Requires SoV",
+  },
+  FRAEW: {
+    title: "Upload FRAEW evidence",
+    subtitle: "Attach external wall fire review reports after the SoV has loaded the block data.",
+    formats: "PDF only",
+    badge: "Requires SoV",
+  },
+};
 
-function getFileTypeLabel(fileType: string): string {
-  const labels: Record<string, string> = {
-    property_schedule: "Property Schedule",
-    fra_document: "Fire Risk Assessment",
-    fraew_document: "EWS1 / PAS 9980",
-    scr_document: "Safety Case Report",
-    epc_data: "EPC Data",
-  };
-  return labels[fileType] || fileType;
-}
+const pipelineStepsByStage: Record<string, string[]> = {
+  SOV: [
+    "Uploading file",
+    "Validating format",
+    "Parsing property schedule",
+    "Detecting blocks",
+    "Building portfolio",
+    "Preparing dashboard",
+    "Complete",
+  ],
+  FRA: [
+    "Uploading document",
+    "Extracting text from PDF",
+    "Running AI analysis",
+    "Identifying fire risk factors",
+    "Scoring risk rating",
+    "Saving to portfolio",
+    "Complete",
+  ],
+  FRAEW: [
+    "Uploading document",
+    "Extracting text from PDF",
+    "Running AI analysis",
+    "Identifying cladding & wall risks",
+    "Scoring building risk",
+    "Saving to portfolio",
+    "Complete",
+  ],
+};
 
-export function IngestionLandingPage() {
-  const location = useLocation();
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const [items, setItems] = useState<Submission[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [uploading, setUploading] = useState(false);
-  const [uploadResult, setUploadResult] = useState<BatchUploadResponse | null>(null);
-  const [dragOver, setDragOver] = useState(false);
 
-  const sorted = useMemo(() => {
-    return [...items].sort(
-      (a, b) => new Date(b.uploaded_at).getTime() - new Date(a.uploaded_at).getTime()
-    );
-  }, [items]);
-
-  const refresh = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const res = await apiFetch("/api/v1/upload/submissions?limit=50");
-      const data = (await res.json()) as ListResponse;
-      setItems(data.items ?? []);
-    } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : String(e));
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    void refresh();
-  }, [refresh]);
-
-  async function onUpload(files: FileList | null) {
-    if (!files || files.length === 0) return;
-    setUploading(true);
-    setUploadResult(null);
-    setError(null);
-    try {
-      const form = new FormData();
-      Array.from(files).forEach((f) => form.append("files", f));
-      const res = await apiFetch("/api/v1/upload/batch", {
-        method: "POST",
-        body: form,
-      });
-      const data = (await res.json()) as BatchUploadResponse;
-      setUploadResult(data);
-      await refresh();
-    } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : String(e));
-    } finally {
-      setUploading(false);
-    }
-  }
-
-  const handleDragOver = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    setDragOver(true);
-  }, []);
-
-  const handleDragLeave = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    setDragOver(false);
-  }, []);
-
-  const handleDrop = useCallback(
-    (e: React.DragEvent) => {
-      e.preventDefault();
-      setDragOver(false);
-      const files = e.dataTransfer.files;
-      if (files.length > 0) {
-        void onUpload(files);
-      }
-    },
-    [onUpload]
+function IconUpload() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <path d="M7 16a4 4 0 0 1-.88-7.903A5 5 0 1 1 15.9 6L16 6a5 5 0 0 1 1 9.9" />
+      <path d="M12 12v9" />
+      <path d="m9 15 3-3 3 3" />
+    </svg>
   );
+}
 
-  const handleBrowseClick = () => {
+function IconCheck() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <path d="m5 13 4 4L19 7" />
+    </svg>
+  );
+}
+
+function IconLock() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <rect x="5" y="11" width="14" height="10" rx="2" />
+      <path d="M8 11V8a4 4 0 0 1 8 0v3" />
+    </svg>
+  );
+}
+
+function IconDoc() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <path d="M14 2H7a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z" />
+      <path d="M14 2v6h6" />
+      <path d="M9 13h6" />
+      <path d="M9 17h6" />
+    </svg>
+  );
+}
+
+export default function IngestionLandingPage({
+  hasSovData = false,
+  isUploading = false,
+  uploadError = null,
+  pipelineStep = null,
+  selectedBlockReference = "",
+  selectedPropertyId = "",
+  onSelectedBlockReferenceChange,
+  onSelectedPropertyIdChange,
+  onFilesSelected,
+}: IngestionLandingPageProps) {
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const [stage, setStage] = useState<UploadStage>("SOV");
+  const [isDragOver, setIsDragOver] = useState(false);
+
+  const activeCopy = stageCopy[stage];
+  const isEvidenceStage = stage === "FRA" || stage === "FRAEW";
+  const isStageLocked = isEvidenceStage && !hasSovData;
+
+  const pipelineSteps = pipelineStepsByStage[stage] ?? pipelineStepsByStage.FRA;
+
+  // App.jsx drives 8 fixed steps — map its progress ratio to display steps length
+  const APP_TOTAL_STEPS = 8;
+  const appStepNames = [
+    "uploading document", "uploading file",
+    "extracting text from pdf",
+    "running ai analysis", "running backend ingestion",
+    "identifying fire risk factors", "identifying cladding & wall risks",
+    "identifying risk factors", "parsing property schedule",
+    "scoring risk rating", "scoring building risk",
+    "detecting blocks", "building portfolio",
+    "validating format",
+    "saving to portfolio",
+    "preparing dashboard", "preparing portfolio dashboard",
+    "finalising", "complete",
+  ];
+
+  const currentStepIndex = useMemo(() => {
+    if (!pipelineStep) return -1;
+    const lower = pipelineStep.toLowerCase();
+    // First try exact match in display steps
+    const exact = pipelineSteps.findIndex(s => s.toLowerCase() === lower);
+    if (exact !== -1) return exact;
+    // Fall back: find app step index and map proportionally
+    const appIndex = appStepNames.indexOf(lower);
+    if (appIndex === -1) return 0;
+    return Math.min(
+      Math.floor((appIndex / APP_TOTAL_STEPS) * pipelineSteps.length),
+      pipelineSteps.length - 1
+    );
+  }, [pipelineStep, pipelineSteps]);
+
+  const accept = stage === "SOV" ? ".xlsx,.xls,.csv" : ".pdf";
+
+  const handleFiles = (files: FileList | File[] | null) => {
+    if (!files || files.length === 0 || isStageLocked || isUploading) return;
+    onFilesSelected?.(Array.from(files), stage);
+  };
+
+  const browseFiles = () => {
+    if (isStageLocked || isUploading) return;
     fileInputRef.current?.click();
   };
 
-  const navLinks = [
-    { path: "/", label: "Uploads", icon: Icons.Upload },
-    { path: "/previous", label: "Previous Uploads", icon: Icons.Clock },
-    { path: "/portfolio", label: "Portfolio Overview", icon: Icons.Home },
-    { path: "/data-quality", label: "Data Quality", icon: Icons.FileText },
-    { path: "/exports", label: "Exports", icon: Icons.Download },
-  ];
-
   return (
-    <div className="app-layout">
-      {/* Sidebar */}
-      <aside className="sidebar">
-        <div className="sidebar-logo">
-          <Icons.Shield />
-          EquiRisk
+    <div className="ingestion-page">
+      <style>{css}</style>
+
+      <section className="hero-card">
+        <div>
+          <div className="eyebrow">Portfolio ingestion</div>
+          <h1>Upload Your Portfolio Data</h1>
+          <p>
+            Upload the SoV first, then add FRA and FRAEW evidence against matched blocks.
+          </p>
         </div>
-        <nav className="sidebar-nav">
-          <div className="sidebar-section">Navigation</div>
-          {navLinks.map((link) => (
-            <Link
-              key={link.path}
-              to={link.path}
-              className={`sidebar-link ${location.pathname === link.path ? "active" : ""}`}
+        <div className={hasSovData ? "status-pill ready" : "status-pill waiting"}>
+          {hasSovData ? "SoV loaded" : "Waiting for SoV"}
+        </div>
+      </section>
+
+      <section className="journey-grid" aria-label="Upload journey">
+        {(["SOV", "FRA", "FRAEW"] as UploadStage[]).map((item, index) => {
+          const locked = item !== "SOV" && !hasSovData;
+          const complete = item === "SOV" && hasSovData;
+          const active = stage === item;
+
+          return (
+            <button
+              key={item}
+              type="button"
+              className={`journey-card ${active ? "active" : ""} ${complete ? "complete" : ""} ${locked ? "locked" : ""}`}
+              onClick={() => !locked && setStage(item)}
+              disabled={locked}
             >
-              <link.icon />
-              {link.label}
-            </Link>
-          ))}
-        </nav>
-      </aside>
+              <div className="journey-number">
+                {complete ? <IconCheck /> : locked ? <IconLock /> : index + 1}
+              </div>
+              <div>
+                <strong>{index + 1}. {stageCopy[item].title.replace(" evidence", "").replace("Schedule of Values", "SoV")}</strong>
+                <span>{locked ? "Upload SoV first" : stageCopy[item].badge}</span>
+              </div>
+            </button>
+          );
+        })}
+      </section>
 
-      {/* Main content */}
-      <main className="main-content">
-        {/* Header */}
-        <header className="top-header">
-          <span className="header-org">Example Housing Association - 2025 Renewal</span>
-          <span className="header-badge">
-            <Icons.Shield />
-            Asset data only - GDPR compliant
-          </span>
-        </header>
-
-        {/* Page content */}
-        <div className="page-content">
-          {/* Title */}
-          <div className="page-title">
-            <h1>Upload Your Portfolio Data</h1>
-            <div className="subtitle">Premium Intelligence</div>
-            <p className="description">
-              Get your insurance submission ready in three simple steps
+      {isEvidenceStage && (
+        <section className="linkage-card">
+          <div className="linkage-copy">
+            <h3>Link {stage} to portfolio data</h3>
+            <p>
+              Use the block reference from the SoV so the uploaded PDF appears on the correct dashboard block.
             </p>
           </div>
 
-          {/* Steps */}
-          <div className="steps-container">
-            <div className="step">
-              <div className="step-number active">1</div>
-              <div className="step-title">Upload SoV</div>
-              <div className="step-desc">
-                Drop your Schedule of Values and supporting documents
-              </div>
-            </div>
-            <div className="step">
-              <div className="step-number inactive">2</div>
-              <div className="step-title">Portfolio Overview</div>
-              <div className="step-desc">See your readiness score and TIV summary</div>
-            </div>
-            <div className="step">
-              <div className="step-number inactive">3</div>
-              <div className="step-title">Data Quality</div>
-              <div className="step-desc">Review gaps and add missing documentation</div>
-            </div>
+          <div className="linkage-fields">
+            <label>
+              <span>Block reference</span>
+              <input
+                value={selectedBlockReference}
+                onChange={(e) => onSelectedBlockReferenceChange?.(e.target.value)}
+                placeholder="Example: 01BR"
+                disabled={isStageLocked || isUploading}
+              />
+            </label>
+
+            <label>
+              <span>Property ID / UPRN</span>
+              <input
+                value={selectedPropertyId}
+                onChange={(e) => onSelectedPropertyIdChange?.(e.target.value)}
+                placeholder="Optional direct property linkage"
+                disabled={isStageLocked || isUploading}
+              />
+            </label>
           </div>
+        </section>
+      )}
 
-          {/* Upload zone */}
-          <div
-            className={`upload-zone ${dragOver ? "dragover" : ""} ${uploading ? "uploading" : ""}`}
-            onDragOver={handleDragOver}
-            onDragLeave={handleDragLeave}
-            onDrop={handleDrop}
-            onClick={handleBrowseClick}
-          >
-            <div className="upload-icon-prominent">
-              <Icons.Upload />
-            </div>
-            <h3>Drag & drop your files here</h3>
-            <p>or click to browse from your computer</p>
-            <div className="upload-formats">Supported: Excel (.xlsx, .xls), CSV, PDF, DOCX, ZIP</div>
-            <input
-              ref={fileInputRef}
-              type="file"
-              multiple
-              style={{ display: "none" }}
-              onChange={(e) => void onUpload(e.target.files)}
-              accept=".xlsx,.xls,.csv,.pdf,.docx,.zip"
-            />
-          </div>
+      <section
+        className={`upload-zone ${isDragOver ? "dragover" : ""} ${isStageLocked ? "locked" : ""}`}
+        onClick={browseFiles}
+        onDragOver={(e) => {
+          e.preventDefault();
+          if (!isStageLocked && !isUploading) setIsDragOver(true);
+        }}
+        onDragLeave={() => setIsDragOver(false)}
+        onDrop={(e) => {
+          e.preventDefault();
+          setIsDragOver(false);
+          handleFiles(e.dataTransfer.files);
+        }}
+        role="button"
+        tabIndex={0}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") browseFiles();
+        }}
+      >
+        <input
+          ref={fileInputRef}
+          type="file"
+          multiple
+          accept={accept}
+          style={{ display: "none" }}
+          onChange={(e) => handleFiles(e.target.files)}
+        />
 
-          {/* Upload progress/result */}
-          {uploading && (
-            <div className="upload-result">
-              <h4>Uploading...</h4>
-              <p>Please wait while your files are being uploaded.</p>
-            </div>
-          )}
-
-          {uploadResult && !uploading && (
-            <div className={`upload-result ${uploadResult.failed > 0 ? "error" : ""}`}>
-              <h4>
-                {uploadResult.failed === 0
-                  ? "Upload Complete"
-                  : `Upload completed with ${uploadResult.failed} error(s)`}
-              </h4>
-              <p>
-                Successfully uploaded {uploadResult.successful} of {uploadResult.total_files}{" "}
-                file(s).
-              </p>
-              {uploadResult.errors?.length > 0 && (
-                <ul>
-                  {uploadResult.errors.map((err, idx) => (
-                    <li key={idx}>
-                      {err.filename}: {err.error}
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
-          )}
-
-          {error && (
-            <div className="upload-result error">
-              <h4>Error</h4>
-              <p>{error}</p>
-            </div>
-          )}
-
-          {/* Info box */}
-          <div className="info-box-yellow">
-            <div className="info-box-header">
-              What to upload for best results
-            </div>
-            <div className="info-box-grid">
-              <div className="info-item">
-                <Icons.FileText />
-                Schedule of Values (SoV) <span className="required">Required</span>
-              </div>
-              <div className="info-item">
-                <Icons.FileText />
-                Fire Risk Assessments (FRAs)
-              </div>
-              <div className="info-item muted">
-                <Icons.FileText />
-                EICR Certificates <span className="coming-soon">Coming soon</span>
-              </div>
-              <div className="info-item">
-                <Icons.FileText />
-                EWS1 / PAS 9980 reports
-              </div>
-              <div className="info-item muted">
-                <Icons.FileText />
-                Gas Safety Certificates <span className="coming-soon">Coming soon</span>
-              </div>
-              <div className="info-item muted">
-                <Icons.FileText />
-                Asbestos Register <span className="coming-soon">Coming soon</span>
-              </div>
-            </div>
-          </div>
-
-          {/* Integration box */}
-          <div className="integration-box">
-            <div className="integration-icon">
-              <Icons.Link />
-            </div>
-            <div className="integration-content">
-              <h4>Connect Your Asset Management System</h4>
-              <p>
-                Reduce manual uploads by connecting directly to your AMS. We support Civica CX,
-                NEC Housing, MRI Software, and others. Our team will work with your IT to set
-                up a secure connection.
-              </p>
-            </div>
-            <button className="btn-outline">
-              Request Integration
-              <Icons.ChevronRight />
-            </button>
-          </div>
-
-          {/* Feature cards */}
-          <div className="features-grid">
-            <div className="feature-card">
-              <div className="feature-icon green">
-                <Icons.Zap />
-              </div>
-              <h4>Smart Ingestion</h4>
-              <ul className="feature-list">
-                <li>
-                  <Icons.Check />
-                  Address normalisation
-                </li>
-                <li>
-                  <Icons.Check />
-                  UPRN verification
-                </li>
-                <li>
-                  <Icons.Check />
-                  AI document extraction
-                </li>
-              </ul>
-            </div>
-            <div className="feature-card">
-              <div className="feature-icon blue">
-                <Icons.Shield />
-              </div>
-              <h4>Data Quality Checks</h4>
-              <ul className="feature-list">
-                <li>
-                  <Icons.Check />
-                  Coverage by domain
-                </li>
-                <li>
-                  <Icons.Check />
-                  Missing document flags
-                </li>
-                <li>
-                  <Icons.Check />
-                  Policy impact warnings
-                </li>
-              </ul>
-            </div>
-            <div className="feature-card">
-              <div className="feature-icon purple">
-                <Icons.RefreshCw />
-              </div>
-              <h4>Fast Processing</h4>
-              <ul className="feature-list">
-                <li>
-                  <Icons.Check />
-                  Real-time progress
-                </li>
-                <li>
-                  <Icons.Check />
-                  Instant overview
-                </li>
-              </ul>
-            </div>
-          </div>
-
-          {/* Recent submissions */}
-          {sorted.length > 0 && (
-            <div className="submissions-section">
-              <div className="submissions-header">
-                <h3>Recent Uploads</h3>
-                <button className="btn btn-secondary" onClick={refresh} disabled={loading}>
-                  {loading ? <div className="spinner" /> : <Icons.RefreshCw />}
-                  Refresh
-                </button>
-              </div>
-              {sorted.slice(0, 5).map((s) => (
-                <div key={s.upload_id} className="submission-card">
-                  <div className="submission-info">
-                    <h4>{s.filename}</h4>
-                    <div className="submission-meta">
-                      <span>{getFileTypeLabel(s.file_type)}</span>
-                      <span>{formatBytes(s.file_size)}</span>
-                      <span className={`status-badge ${s.status}`}>{s.status}</span>
-                    </div>
-                  </div>
-                  <div className="submission-time">{formatDateTime(s.uploaded_at)}</div>
-                </div>
-              ))}
-            </div>
-          )}
+        <div className="upload-icon">
+          {isStageLocked ? <IconLock /> : <IconUpload />}
         </div>
-      </main>
+
+        <h2>{isStageLocked ? "Upload SoV before evidence PDFs" : activeCopy.title}</h2>
+        <p>{isStageLocked ? "FRA and FRAEW files need block data from the SoV first." : activeCopy.subtitle}</p>
+
+        <button className="primary-btn" type="button" disabled={isStageLocked || isUploading}>
+          {isUploading ? "Uploading..." : "Browse files"}
+        </button>
+
+        <div className="formats">Supported: {activeCopy.formats}</div>
+      </section>
+
+      <AnimatePresence>
+        {isUploading && (
+          <motion.div
+            key="processing-overlay"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.35, ease: "easeOut" }}
+            style={{
+              position: "fixed",
+              inset: 0,
+              zIndex: 50,
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              justifyContent: "center",
+              background:
+                "linear-gradient(160deg, #f0f7ff 0%, #e8f2ff 50%, #dbeafe 100%)",
+              padding: "40px 20px",
+            }}
+          >
+            {/* AI badge */}
+            <motion.div
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.4, delay: 0.12 }}
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 8,
+                background: "rgba(37, 99, 235, 0.07)",
+                border: "1px solid rgba(37, 99, 235, 0.14)",
+                borderRadius: 100,
+                padding: "5px 14px",
+                marginBottom: 26,
+              }}
+            >
+              <motion.div
+                animate={{ rotate: 360 }}
+                transition={{ duration: 1.2, repeat: Infinity, ease: "linear" }}
+                style={{
+                  width: 11,
+                  height: 11,
+                  borderRadius: "50%",
+                  border: "1.5px solid rgba(37,99,235,0.2)",
+                  borderTopColor: "#2563eb",
+                  flexShrink: 0,
+                }}
+              />
+              <span
+                style={{
+                  fontSize: 11,
+                  fontWeight: 700,
+                  color: "#1d4ed8",
+                  letterSpacing: "0.08em",
+                  fontFamily: "Inter, ui-sans-serif, system-ui, sans-serif",
+                  textTransform: "uppercase",
+                }}
+              >
+                Quinn
+              </span>
+            </motion.div>
+
+            {/* Title */}
+            <motion.h2
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.45, delay: 0.18 }}
+              style={{
+                margin: "0 0 10px",
+                fontSize: 30,
+                fontWeight: 700,
+                letterSpacing: "-0.04em",
+                color: "#1e3a8a",
+                textAlign: "center",
+                fontFamily: "Inter, ui-sans-serif, system-ui, sans-serif",
+              }}
+            >
+              Quinn is Analysing your document
+            </motion.h2>
+
+            {/* Subtitle */}
+            <motion.p
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ duration: 0.4, delay: 0.24 }}
+              style={{
+                margin: "0 0 48px",
+                fontSize: 15,
+                color: "#4b72b0",
+                textAlign: "center",
+                fontFamily: "Inter, ui-sans-serif, system-ui, sans-serif",
+              }}
+            >
+              Extracting insights and building your portfolio
+            </motion.p>
+
+            {/* Steps */}
+            <motion.div
+              initial={{ opacity: 0, y: 18 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5, delay: 0.28 }}
+              style={{ width: "100%", maxWidth: 460 }}
+            >
+              <ProcessingSteps
+                steps={pipelineSteps}
+                currentIndex={currentStepIndex}
+              />
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {uploadError && <section className="error-card">{uploadError}</section>}
+
+      <section className="guidance-card">
+        <div>
+          <strong>Recommended upload order</strong>
+          <p>SoV creates the portfolio structure. FRA and FRAEW then attach evidence to blocks.</p>
+        </div>
+        <div className="guidance-list">
+          <div><IconDoc /> Upload SoV first</div>
+          <div><IconDoc /> Add FRA PDFs after blocks exist</div>
+          <div><IconDoc /> Add FRAEW reports where available</div>
+        </div>
+      </section>
     </div>
   );
 }
+
+const css = `
+  .ingestion-page {
+    max-width: 1180px;
+    margin: 0 auto;
+    padding: 12px 0 40px;
+    font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    color: #111827;
+  }
+
+  .hero-card {
+    display: flex;
+    justify-content: space-between;
+    gap: 20px;
+    align-items: flex-start;
+    margin-bottom: 22px;
+  }
+
+  .eyebrow {
+    color: #2563eb;
+    font-size: 13px;
+    font-weight: 800;
+    margin-bottom: 8px;
+  }
+
+  .hero-card h1 {
+    margin: 0;
+    font-size: 34px;
+    line-height: 1.1;
+    letter-spacing: -0.04em;
+  }
+
+  .hero-card p {
+    margin: 8px 0 0;
+    color: #64748b;
+    font-size: 15px;
+  }
+
+  .status-pill {
+    padding: 8px 12px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 800;
+    white-space: nowrap;
+    border: 1px solid;
+  }
+
+  .status-pill.ready {
+    background: #dcfce7;
+    color: #166534;
+    border-color: #86efac;
+  }
+
+  .status-pill.waiting {
+    background: #eff6ff;
+    color: #1d4ed8;
+    border-color: #bfdbfe;
+  }
+
+  .journey-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 16px;
+    margin-bottom: 20px;
+  }
+
+  .journey-card {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 18px;
+    border: 1px solid #e5e7eb;
+    background: #ffffff;
+    border-radius: 16px;
+    text-align: left;
+    cursor: pointer;
+    box-shadow: 0 10px 25px rgba(15, 23, 42, 0.04);
+  }
+
+  .journey-card.active {
+    border-color: #2563eb;
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+  }
+
+  .journey-card.complete {
+    border-color: #86efac;
+    background: #f0fdf4;
+  }
+
+  .journey-card.locked {
+    cursor: not-allowed;
+    opacity: 0.72;
+    background: #f8fafc;
+  }
+
+  .journey-number {
+    width: 42px;
+    height: 42px;
+    border-radius: 999px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #dbeafe;
+    color: #2563eb;
+    font-weight: 900;
+    flex-shrink: 0;
+  }
+
+  .journey-number svg {
+    width: 20px;
+    height: 20px;
+  }
+
+  .journey-card strong,
+  .journey-card span {
+    display: block;
+  }
+
+  .journey-card strong {
+    font-size: 15px;
+  }
+
+  .journey-card span {
+    margin-top: 4px;
+    font-size: 12px;
+    color: #64748b;
+  }
+
+  .linkage-card {
+    display: grid;
+    grid-template-columns: 0.9fr 1.4fr;
+    gap: 24px;
+    padding: 22px;
+    border: 1px solid #dbeafe;
+    background: #f8fbff;
+    border-radius: 18px;
+    margin-bottom: 20px;
+  }
+
+  .linkage-card h3 {
+    margin: 0 0 6px;
+    font-size: 18px;
+  }
+
+  .linkage-card p {
+    margin: 0;
+    color: #64748b;
+    font-size: 14px;
+    line-height: 1.5;
+  }
+
+  .linkage-fields {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+  }
+
+  .linkage-fields label span {
+    display: block;
+    margin-bottom: 6px;
+    font-size: 13px;
+    font-weight: 800;
+    color: #334155;
+  }
+
+  .linkage-fields input {
+    width: 100%;
+    border: 1px solid #dbe3ef;
+    border-radius: 12px;
+    padding: 12px 14px;
+    font-size: 14px;
+    outline: none;
+    background: #fff;
+  }
+
+  .linkage-fields input:focus {
+    border-color: #2563eb;
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+  }
+
+  .upload-zone {
+    border: 2px dashed #cbd5e1;
+    background: #ffffff;
+    border-radius: 20px;
+    padding: 44px 32px;
+    text-align: center;
+    cursor: pointer;
+    transition: 0.2s ease;
+  }
+
+  .upload-zone.dragover,
+  .upload-zone:hover {
+    border-color: #2563eb;
+    background: #eff6ff;
+  }
+
+  .upload-zone.locked {
+    cursor: not-allowed;
+    background: #f8fafc;
+  }
+
+  .upload-icon {
+    width: 62px;
+    height: 62px;
+    margin: 0 auto 16px;
+    border-radius: 18px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #dbeafe;
+    color: #2563eb;
+  }
+
+  .upload-icon svg {
+    width: 30px;
+    height: 30px;
+  }
+
+  .upload-zone h2 {
+    margin: 0 0 8px;
+    font-size: 24px;
+    letter-spacing: -0.03em;
+  }
+
+  .upload-zone p {
+    max-width: 560px;
+    margin: 0 auto 20px;
+    color: #64748b;
+    line-height: 1.5;
+  }
+
+  .primary-btn {
+    border: 0;
+    border-radius: 12px;
+    padding: 12px 22px;
+    background: #2563eb;
+    color: #fff;
+    font-weight: 800;
+    cursor: pointer;
+  }
+
+  .primary-btn:disabled {
+    background: #94a3b8;
+    cursor: not-allowed;
+  }
+
+  .formats {
+    margin-top: 16px;
+    font-size: 12px;
+    color: #64748b;
+  }
+
+  .processing-card,
+  .guidance-card,
+  .error-card {
+    margin-top: 22px;
+    border-radius: 18px;
+    padding: 20px;
+  }
+
+
+
+  .error-card {
+    background: #fee2e2;
+    border: 1px solid #fecaca;
+    color: #991b1b;
+    font-weight: 700;
+  }
+
+  .guidance-card {
+    display: grid;
+    grid-template-columns: 0.9fr 1.5fr;
+    gap: 20px;
+    background: #fffbeb;
+    border: 1px solid #f59e0b;
+  }
+
+  .guidance-card p {
+    margin: 6px 0 0;
+    color: #92400e;
+    font-size: 13px;
+  }
+
+  .guidance-list {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 10px;
+  }
+
+  .guidance-list div {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    font-weight: 700;
+    color: #78350f;
+  }
+
+  .guidance-list svg {
+    width: 16px;
+    height: 16px;
+    color: #d97706;
+  }
+
+  @media (max-width: 900px) {
+    .hero-card,
+    .processing-header,
+    .guidance-card,
+    .linkage-card {
+      grid-template-columns: 1fr;
+      flex-direction: column;
+    }
+
+    .journey-grid,
+    .linkage-fields,
+    .guidance-list {
+      grid-template-columns: 1fr;
+    }
+  }
+`;

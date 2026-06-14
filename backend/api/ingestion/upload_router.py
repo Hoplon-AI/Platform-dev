@@ -780,13 +780,67 @@ async def ingest_document(
             db_pool=pool,
         )
 
-        # Auto-trigger enrichment in background (limit 50 for now)
+        # Auto-trigger enrichment in background (limit 20 blocks for demo)
         from backend.workers.enrichment_worker import enrich_portfolio
         background_tasks.add_task(enrich_portfolio, ha_id, limit=50)
-        logger.info("[INGEST] SoV done — enrichment queued for ha_id=%s limit=50", ha_id)
+        logger.info("[INGEST] SoV done — enrichment queued for ha_id=%s limit=20", ha_id)
+
+        # Fetch property rows back so the frontend can render them immediately
+        async with pool.acquire() as conn:
+            db_rows = await conn.fetch(
+                """
+                SELECT
+                    property_id,
+                    property_reference,
+                    submission_id,
+                    block_reference,
+                    address,
+                    address_2,
+                    address_3,
+                    postcode,
+                    occupancy_type,
+                    sum_insured,
+                    property_type,
+                    year_of_build,
+                    storeys,
+                    units,
+                    uprn,
+                    parent_uprn,
+                    x_coordinate,
+                    y_coordinate,
+                    country_code,
+                    uprn_match_score,
+                    uprn_match_description,
+                    built_form,
+                    total_floor_area_m2,
+                    main_fuel,
+                    epc_rating,
+                    epc_potential_rating,
+                    epc_lodgement_date,
+                    height_max_m,
+                    height_roofbase_m,
+                    height_confidence,
+                    building_footprint_m2,
+                    is_listed,
+                    listed_grade,
+                    listed_name,
+                    listed_reference,
+                    enrichment_status,
+                    enrichment_source,
+                    enriched_at,
+                    metadata
+                FROM silver.properties
+                WHERE ha_id = $1
+                  AND submission_id = $2::uuid
+                ORDER BY property_reference
+                """,
+                ha_id, upload_id,
+            )
+        properties = [dict(r) for r in db_rows]
 
         return JSONResponse(content=_make_serializable({
             "status": "success",
+            "success": True,
             "document_type": "sov",
             "upload_id": upload_id,
             "filename": filename,
@@ -795,7 +849,9 @@ async def ingest_document(
             "auto_detected": auto_detected.value,
             "user_selected": document_type,
             "detection_warning": detection_warning,
-            "message": "SoV processed and written to silver.properties. Enrichment running in background (limit 50).",
+            "properties": properties,
+            "property_count": len(properties),
+            "message": f"SoV processed. {len(properties)} properties written to silver. Enrichment running in background.",
         }))
 
     # FRA / FRAEW → pdfplumber text extraction → Bedrock LLM → silver.*
@@ -870,12 +926,50 @@ async def ingest_document(
                 "detection_warning": detection_warning,
             }))
 
+        # Fetch the extracted risk data back from DB so the frontend can show
+        # the correct RAG colour without a separate round-trip.
+        extracted_feature: dict = {}
+        feature_id = result.get("feature_id")
+        fra_id = result.get("fra_id")
+        fraew_id = result.get("fraew_id")
+        db_lookup_id = fra_id if document_type == "fra" else fraew_id
+        if db_lookup_id:
+            try:
+                if document_type == "fra":
+                    _row = await conn.fetchrow(
+                        "SELECT risk_rating, rag_status, assessor_company, assessor_name, "
+                        "assessment_date, next_review_date, evacuation_strategy, "
+                        "has_fire_doors, has_sprinkler_system, has_compartmentation, "
+                        "has_fire_alarm_system, has_smoke_detection, "
+                        "total_action_count, overdue_action_count, outstanding_action_count "
+                        "FROM silver.fra_features WHERE fra_id = $1::uuid AND ha_id = $2",
+                        db_lookup_id, ha_id,
+                    )
+                else:
+                    _row = await conn.fetchrow(
+                        "SELECT building_risk_rating, rag_status, assessor_company, "
+                        "assessment_date, assessment_valid_until, is_in_date, "
+                        "has_combustible_cladding, eps_insulation_present, wall_types, "
+                        "cavity_barriers_present, pas_9980_compliant, pas_9980_version, "
+                        "interim_measures_required, interim_measures_detail, has_remedial_actions, "
+                        "evacuation_strategy, dry_riser_present, wet_riser_present, adb_compliant, "
+                        "building_height_m, building_height_category, num_storeys, num_units "
+                        "FROM silver.fraew_features WHERE fraew_id = $1::uuid AND ha_id = $2",
+                        db_lookup_id, ha_id,
+                    )
+                if _row:
+                    extracted_feature = dict(_row)
+            except Exception:
+                pass
+
     return JSONResponse(content=_make_serializable({
         "status": "success",
+        "success": True,
         "document_type": document_type,
         "upload_id": upload_id,
         "feature_id": result.get("feature_id"),
         "block_id": resolved_block_id,
+        "block_reference": block_reference,
         "filename": filename,
         "file_size": len(file_content),
         "s3_key": s3_key,
@@ -884,4 +978,12 @@ async def ingest_document(
         "user_selected": document_type,
         "detection_warning": detection_warning,
         "message": f"{document_type.upper()} extracted by Bedrock and written to silver.{document_type}_features",
+        "fire_risk_payload": {
+            "document_type": document_type,
+            "upload_id": str(upload_id),
+            "feature_id": result.get("feature_id"),
+            "block_id": resolved_block_id,
+            "block_reference": block_reference,
+            document_type: extracted_feature,
+        },
     }))

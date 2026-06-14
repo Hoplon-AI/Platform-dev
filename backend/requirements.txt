@@ -1,0 +1,17 @@
+fastapi
+uvicorn[standard]
+python-dotenv
+python-multipart
+pandas>=2.2.2
+openpyxl
+requests
+numpy
+boto3
+groq
+pdfplumber
+asyncpg
+pyproj
+PyJWT
+psycopg2-binary
+bcrypt
+email-validator

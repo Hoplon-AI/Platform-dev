@@ -1,5 +1,7 @@
 import React, { useMemo } from "react";
 
+/* ========================= HELPERS ========================= */
+
 const fmt = (n, digits = 2) => {
   const x = Number(n);
   return Number.isFinite(x) ? x.toFixed(digits) : "—";
@@ -8,248 +10,764 @@ const fmt = (n, digits = 2) => {
 const fmtMoney = (n, digits = 0) => {
   const x = Number(n);
   if (!Number.isFinite(x)) return "—";
-  return x.toLocaleString("en-GB", {
+  return `£${x.toLocaleString("en-GB", {
     maximumFractionDigits: digits,
     minimumFractionDigits: digits,
-  });
+  })}`;
 };
 
-function bandMeta(band) {
-  const b = (band || "").toString().toUpperCase();
-  if (b.includes("HIGH") || b.includes("GREEN")) return { label: "Green", cls: "band-green" };
-  if (b.includes("MED") || b.includes("YELLOW")) return { label: "Yellow", cls: "band-yellow" };
-  return { label: "Red", cls: "band-red" };
-}
+const toNumberOrNull = (value) => {
+  const n = Number(value);
+  return Number.isFinite(n) ? n : null;
+};
 
-function readinessFromProperty(p) {
-  const score =
-    Number(p.readiness_score ?? p.readinessScore ?? p.readiness ?? p.data_readiness ?? NaN);
-  const band =
-    p.readiness_band ?? p.readinessBand ?? p.readiness_colour ?? p.readinessColor ?? "";
+const isPresent = (value) => {
+  if (value === null || value === undefined) return false;
+  if (typeof value === "string") return value.trim().length > 0;
+  if (typeof value === "number") return Number.isFinite(value);
+  if (typeof value === "boolean") return true;
+  if (Array.isArray(value)) return value.length > 0;
+  return true;
+};
 
-  if (!Number.isFinite(score) && band) {
-    const b = band.toString().toLowerCase();
-    if (b.includes("green")) return { score: 85, band: "Green" };
-    if (b.includes("yellow")) return { score: 60, band: "Yellow" };
-    if (b.includes("red")) return { score: 35, band: "Red" };
+const asArray = (value) => {
+  if (!value) return [];
+  if (Array.isArray(value)) return value.filter(Boolean);
+  if (typeof value === "string") return value.trim() ? [value.trim()] : [];
+  return [value];
+};
+
+const truncate = (value, maxLength = 140) => {
+  const text = String(value ?? "").trim();
+  if (!text) return "—";
+  return text.length > maxLength ? `${text.slice(0, maxLength)}…` : text;
+};
+
+const bandMeta = (bandOrScore) => {
+  const text = String(bandOrScore ?? "").toLowerCase();
+
+  if (
+    text.includes("green") ||
+    text.includes("low risk") ||
+    text.includes("low") ||
+    text.includes("acceptable") ||
+    text.includes("broadly acceptable")
+  ) {
+    return { label: "Low Risk", cls: "band-green" };
+  }
+  if (
+    text.includes("amber") ||
+    text.includes("yellow") ||
+    text.includes("medium") ||
+    text.includes("moderate") ||
+    text.includes("tolerable")
+  ) {
+    return { label: "Medium Risk", cls: "band-yellow" };
+  }
+  if (
+    text.includes("red") ||
+    text.includes("high risk") ||
+    text.includes("high") ||
+    text.includes("intolerable") ||
+    text.includes("not acceptable")
+  ) {
+    return { label: "High Risk", cls: "band-red" };
   }
 
-  if (Number.isFinite(score)) {
-    const inferred = score >= 80 ? "Green" : score >= 50 ? "Yellow" : "Red";
-    return { score, band: band || inferred };
+  const numeric = Number(bandOrScore);
+  if (Number.isFinite(numeric)) {
+    if (numeric >= 80) return { label: "Low Risk", cls: "band-green" };
+    if (numeric >= 50) return { label: "Medium Risk", cls: "band-yellow" };
+    return { label: "High Risk", cls: "band-red" };
   }
 
-  return { score: null, band: band || "—" };
-}
+  return { label: "Unknown", cls: "band-muted" };
+};
 
-function RawFieldsTableInline({ raw }) {
-  const rows = useMemo(() => {
-    if (!raw || typeof raw !== "object") return [];
-    return Object.entries(raw)
-      .filter(([k]) => !String(k).startsWith("__")) // hide internal ids
-      .map(([k, v]) => {
-        let value = v;
-        if (value === null || value === undefined || value === "") value = "—";
-        else if (typeof value === "object") value = JSON.stringify(value);
-        return { key: k, value: String(value) };
-      });
-  }, [raw]);
+const getDisplayAddress = (property) => {
+  const line1 =
+    property?.address_line_1 ??
+    property?.address1 ??
+    property?.address ??
+    property?.property_address ??
+    "—";
 
-  if (!rows.length) return <div className="muted">No raw fields available.</div>;
+  const line2 =
+    property?.address_line_2 ??
+    property?.address2 ??
+    property?.address_2 ??
+    "";
 
+  const city =
+    property?.city ??
+    property?.town ??
+    property?.locality ??
+    property?.address_3 ??
+    "";
+
+  const postcode =
+    property?.post_code ??
+    property?.postcode ??
+    property?.zip ??
+    "";
+
+  return { line1, line2, city, postcode };
+};
+
+const getLatLon = (property) => {
+  const directLat =
+    toNumberOrNull(property?.latitude) ??
+    toNumberOrNull(property?.lat) ??
+    toNumberOrNull(property?.__lat);
+
+  const directLon =
+    toNumberOrNull(property?.longitude) ??
+    toNumberOrNull(property?.lon) ??
+    toNumberOrNull(property?.lng) ??
+    toNumberOrNull(property?.__lon);
+
+  const fallbackY =
+    toNumberOrNull(property?.y_coordinate) ??
+    toNumberOrNull(property?.y);
+
+  const fallbackX =
+    toNumberOrNull(property?.x_coordinate) ??
+    toNumberOrNull(property?.x);
+
+  const lat = directLat ?? fallbackY;
+  const lon = directLon ?? fallbackX;
+
+  const validLat = Number.isFinite(lat) && lat !== 0;
+  const validLon = Number.isFinite(lon) && lon !== 0;
+
+  return {
+    lat: validLat ? lat : null,
+    lon: validLon ? lon : null,
+  };
+};
+
+const getSovValues = (property) => {
+  return {
+    sumInsured:
+      toNumberOrNull(property?.sum_insured) ??
+      toNumberOrNull(property?.sumInsured) ??
+      toNumberOrNull(property?.total_sum_insured) ??
+      toNumberOrNull(property?.tiv),
+
+    propertyType:
+      property?.property_type ??
+      property?.propertyType ??
+      property?.type ??
+      "—",
+
+    occupancy:
+      property?.occupancy_type ??
+      property?.occupancyType ??
+      property?.occupancy ??
+      "—",
+
+    height:
+      toNumberOrNull(property?.height_m) ??
+      toNumberOrNull(property?.height) ??
+      toNumberOrNull(property?.height_max_m) ??
+      toNumberOrNull(property?.building_height_m),
+
+    storeys:
+      toNumberOrNull(property?.storeys) ??
+      toNumberOrNull(property?.max_storeys),
+
+    units:
+      toNumberOrNull(property?.units) ??
+      toNumberOrNull(property?.unit_count) ??
+      toNumberOrNull(property?.number_of_flats),
+
+    yearBuilt:
+      toNumberOrNull(property?.year_of_build) ??
+      toNumberOrNull(property?.year_built),
+  };
+};
+
+const normaliseFireDoc = (doc, type) => {
+  if (!doc) return null;
+
+  const raw = doc.raw && typeof doc.raw === "object" ? doc.raw : {};
+  const merged = { ...raw, ...doc };
+
+  return {
+    ...merged,
+    document_type: String(merged.document_type ?? type ?? "").toUpperCase(),
+    risk_level:
+      merged.risk_level ??
+      merged.rag_status ??
+      merged.raw_rating ??
+      merged.overall_risk_rating ??
+      merged.risk_rating ??
+      merged.external_wall_risk ??
+      merged.building_risk_rating ??
+      null,
+    summary:
+      merged.summary ??
+      merged.executive_summary ??
+      merged.overview ??
+      merged.findings_summary ??
+      merged.significant_findings_summary ??
+      "",
+    recommendations:
+      merged.recommendations ??
+      merged.actions ??
+      merged.action_items ??
+      merged.remedial_actions ??
+      merged.significant_findings ??
+      [],
+    feature_id: merged.feature_id ?? merged.id ?? merged.document_id ?? null,
+    upload_id: merged.upload_id ?? null,
+    filename: merged.filename ?? merged.source_filename ?? "Uploaded PDF",
+  };
+};
+
+const getFireAssessment = (source) => {
+  const fra = normaliseFireDoc(
+    source?.latest_fra ??
+      source?.fire_documents?.fra ??
+      source?.fire_documents?.FRA ??
+      source?.fra ??
+      null,
+    "FRA"
+  );
+
+  const fraew = normaliseFireDoc(
+    source?.latest_fraew ??
+      source?.fire_documents?.fraew ??
+      source?.fire_documents?.FRAEW ??
+      source?.fraew ??
+      null,
+    "FRAEW"
+  );
+
+  const all = [
+    ...asArray(source?.fire_documents?.all),
+    ...asArray(source?.fire_documents?.documents),
+    ...asArray(source?.fire_documents),
+  ]
+    .filter((item) => typeof item === "object" && item !== null)
+    .map((item) => normaliseFireDoc(item, item.document_type));
+
+  return {
+    fra,
+    fraew,
+    all,
+    hasAny: Boolean(fra || fraew || all.length),
+  };
+};
+
+const normaliseBooleanLabel = (value, yes = "Yes", no = "No") => {
+  if (value === true) return yes;
+  if (value === false) return no;
+  if (typeof value === "string") {
+    const lower = value.trim().toLowerCase();
+    if (["true", "yes", "y", "1", "required", "present"].includes(lower)) return yes;
+    if (["false", "no", "n", "0", "not required", "absent"].includes(lower)) return no;
+  }
+  return "—";
+};
+
+const normaliseFraActions = (fra) => {
+  const actions = asArray(fra?.recommendations ?? fra?.actions ?? fra?.action_items);
+
+  return {
+    total: fra?.total_actions ?? fra?.total_action_count ?? (actions.length || "—"),
+    overdue: fra?.overdue_actions ?? fra?.overdue_action_count ?? "—",
+    outstanding:
+      fra?.outstanding_actions ?? fra?.outstanding_action_count ?? "—",
+    items: actions,
+  };
+};
+
+const getFraewHeight = (fraew) =>
+  toNumberOrNull(fraew?.building_height_m) ??
+  toNumberOrNull(fraew?.building_height) ??
+  toNumberOrNull(fraew?.height_m);
+
+/* ========================= UI COMPONENTS ========================= */
+
+function DetailRow({ label, value }) {
   return (
-    <div className="table-scroll">
-      <table className="raw-table">
-        <thead>
-          <tr>
-            <th style={{ width: "44%" }}>Field</th>
-            <th>Value</th>
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((r) => (
-            <tr key={r.key}>
-              <td style={{ fontWeight: 700 }}>{r.key}</td>
-              <td className="mono" style={{ whiteSpace: "pre-wrap" }}>{r.value}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+    <div className="details-sub" style={{ marginTop: 6 }}>
+      <b>{label}:</b> {isPresent(value) ? value : "—"}
     </div>
   );
 }
 
-export default function PropertyDetails({ property, uprnResult, uprnLoading, uprnError }) {
-  const readiness = useMemo(() => (property ? readinessFromProperty(property) : null), [property]);
+function KeyValueCard({ label, value }) {
+  return (
+    <div className="kv">
+      <div className="kv-k">{label}</div>
+      <div className="kv-v">{isPresent(value) ? value : "—"}</div>
+    </div>
+  );
+}
 
-  const lat = property?.lat ?? property?.latitude;
-  const lon = property?.lon ?? property?.longitude;
+function BulletList({ items, max = 5 }) {
+  const safeItems = asArray(items);
+  if (!safeItems.length) return null;
 
-  const postcode = property?.postcode ?? property?.post_code ?? "—";
-  const city = property?.city ?? "—";
-  const address1 = property?.address1 ?? property?.address_line_1 ?? "—";
-  const address2 = property?.address2 ?? property?.address_line_2 ?? "";
+  return (
+    <ul style={{ margin: "8px 0 0 18px", padding: 0 }}>
+      {safeItems.slice(0, max).map((item, index) => (
+        <li key={`${String(item).slice(0, 20)}-${index}`} style={{ marginBottom: 4 }}>
+          {truncate(item, 180)}
+        </li>
+      ))}
+    </ul>
+  );
+}
 
-  const sumInsured =
-    property?.sumInsured ??
-    property?.sum_insured ??
-    property?.total_sum_insured ??
-    property?.value ??
-    null;
+function FireRiskSection({
+  fra,
+  fraew,
+  emptyLabel = "No FRA / FRAEW data linked.",
+}) {
+  const fraMeta = bandMeta(
+    fra?.risk_level ?? fra?.rag_status ?? fra?.raw_rating
+  );
+  const fraewMeta = bandMeta(
+    fraew?.risk_level ?? fraew?.rag_status ?? fraew?.raw_rating
+  );
+  const fraActions = normaliseFraActions(fra);
+  const fraewRecommendations = asArray(
+    fraew?.recommendations ?? fraew?.actions ?? fraew?.remedial_actions
+  );
+  const fraewHeight = getFraewHeight(fraew);
 
-  const propertyType = property?.propertyType ?? property?.property_type ?? "—";
-  const occupancy =
-    property?.occupancyType ??
-    property?.occupancy_type ??
-    property?.occupancy ??
-    "—";
+  return (
+    <div className="details-block">
+      <div className="details-h">Fire Risk Assessment (FRA / FRAEW)</div>
 
-  const flats = property?.numberOfFlats ?? property?.number_of_flats ?? property?.flats ?? "—";
+      {!fra && !fraew && <div className="muted">{emptyLabel}</div>}
 
-  const uprnBest = uprnResult?.best_match || null;
-  const uprnCandidates = uprnResult?.candidates || [];
-  const uprnWarnings = uprnResult?.warnings || [];
-  const uprnBand = useMemo(() => bandMeta(uprnBest?.confidence_band), [uprnBest]);
+      {(fra || fraew) && (
+        <div
+          style={{
+            display: "grid",
+            gap: 12,
+          }}
+        >
+          {fra && (
+            <div
+              style={{
+                border: "1px solid rgba(148,163,184,0.18)",
+                borderRadius: 12,
+                padding: 12,
+                background: "#fff",
+              }}
+            >
+              <div
+                style={{
+                  display: "flex",
+                  gap: 8,
+                  alignItems: "center",
+                  flexWrap: "wrap",
+                  marginBottom: 8,
+                }}
+              >
+                <span className={`pill ${fraMeta.cls}`}>{fraMeta.label}</span>
+                <span className="pill pill-muted">FRA</span>
+                {fra.extraction_confidence ? (
+                  <span className="pill pill-muted">
+                    confidence {fmt(fra.extraction_confidence, 2)}
+                  </span>
+                ) : null}
+              </div>
+
+              <DetailRow
+                label="Risk"
+                value={fra?.risk_level ?? fra?.rag_status ?? fra?.raw_rating}
+              />
+              <DetailRow label="Assessment date" value={fra?.assessment_date} />
+              <DetailRow label="Valid until" value={fra?.assessment_valid_until} />
+              <DetailRow label="Next review" value={fra?.next_review_date} />
+              <DetailRow
+                label="In date"
+                value={normaliseBooleanLabel(fra?.is_in_date)}
+              />
+              <DetailRow label="Assessor" value={fra?.assessor_name} />
+              <DetailRow label="Company" value={fra?.assessor_company} />
+              <DetailRow label="Responsible person" value={fra?.responsible_person} />
+              <DetailRow label="Evacuation" value={fra?.evacuation_strategy} />
+              <DetailRow label="Fire doors" value={normaliseBooleanLabel(fra?.has_fire_doors ?? fra?.fire_doors)} />
+              <DetailRow
+                label="Compartmentation"
+                value={normaliseBooleanLabel(fra?.has_compartmentation ?? fra?.compartmentation)}
+              />
+              <DetailRow
+                label="Fire alarm"
+                value={normaliseBooleanLabel(fra?.has_fire_alarm_system ?? fra?.fire_alarm_system)}
+              />
+              <DetailRow
+                label="Smoke detection"
+                value={normaliseBooleanLabel(fra?.has_smoke_detection ?? fra?.smoke_detection)}
+              />
+              <DetailRow
+                label="Sprinklers"
+                value={normaliseBooleanLabel(fra?.has_sprinkler_system ?? fra?.sprinkler_system)}
+              />
+              <DetailRow label="Total actions" value={fraActions.total} />
+              <DetailRow label="Overdue actions" value={fraActions.overdue} />
+              <DetailRow label="Outstanding actions" value={fraActions.outstanding} />
+
+              {fra.summary ? (
+                <div className="details-sub" style={{ marginTop: 10 }}>
+                  <b>Summary:</b> {truncate(fra.summary, 240)}
+                </div>
+              ) : null}
+
+              <BulletList items={fraActions.items} />
+            </div>
+          )}
+
+          {fraew && (
+            <div
+              style={{
+                border: "1px solid rgba(148,163,184,0.18)",
+                borderRadius: 12,
+                padding: 12,
+                background: "#fff",
+              }}
+            >
+              <div
+                style={{
+                  display: "flex",
+                  gap: 8,
+                  alignItems: "center",
+                  flexWrap: "wrap",
+                  marginBottom: 8,
+                }}
+              >
+                <span className={`pill ${fraewMeta.cls}`}>{fraewMeta.label}</span>
+                <span className="pill pill-muted">FRAEW</span>
+                {fraew.extraction_confidence ? (
+                  <span className="pill pill-muted">
+                    confidence {fmt(fraew.extraction_confidence, 2)}
+                  </span>
+                ) : null}
+              </div>
+
+              <DetailRow
+                label="Risk"
+                value={fraew?.risk_level ?? fraew?.rag_status ?? fraew?.raw_rating}
+              />
+              <DetailRow
+                label="External wall risk"
+                value={fraew?.external_wall_risk ?? fraew?.building_risk_rating}
+              />
+              <DetailRow label="Assessment date" value={fraew?.assessment_date} />
+              <DetailRow label="Valid until" value={fraew?.assessment_valid_until} />
+              <DetailRow
+                label="In date"
+                value={normaliseBooleanLabel(fraew?.is_in_date)}
+              />
+              <DetailRow
+                label="Height"
+                value={Number.isFinite(fraewHeight) ? `${fmt(fraewHeight, 1)} m` : "—"}
+              />
+              <DetailRow label="Height category" value={fraew?.building_height_category} />
+              <DetailRow label="Storeys" value={fraew?.num_storeys} />
+              <DetailRow label="Units" value={fraew?.num_units} />
+              <DetailRow label="Cladding type" value={fraew?.cladding_type} />
+              <DetailRow
+                label="Wall types"
+                value={(() => {
+                  let wt = fraew?.wall_types;
+                  if (typeof wt === "string") { try { wt = JSON.parse(wt); } catch { return wt; } }
+                  if (!Array.isArray(wt) || wt.length === 0) return "—";
+                  return wt.map((w) => w?.type_ref ?? w).filter(Boolean).join(", ");
+                })()}
+              />
+              <DetailRow
+                label="Combustible cladding"
+                value={normaliseBooleanLabel(
+                  fraew?.combustible_cladding ?? fraew?.has_combustible_cladding
+                )}
+              />
+              <DetailRow
+                label="Cavity barriers"
+                value={normaliseBooleanLabel(fraew?.cavity_barriers_present)}
+              />
+              <DetailRow
+                label="PAS 9980 compliant"
+                value={normaliseBooleanLabel(fraew?.pas_9980_compliant)}
+              />
+              <DetailRow label="PAS 9980 version" value={fraew?.pas_9980_version} />
+              <DetailRow
+                label="Interim measures"
+                value={normaliseBooleanLabel(
+                  fraew?.interim_measures_required,
+                  "Required",
+                  "Not required"
+                )}
+              />
+              <DetailRow label="Interim detail" value={fraew?.interim_measures_detail} />
+              <DetailRow
+                label="Remediation required"
+                value={normaliseBooleanLabel(
+                  fraew?.remediation_required ?? fraew?.has_remedial_actions
+                )}
+              />
+              <DetailRow
+                label="Evacuation"
+                value={fraew?.evacuation_strategy
+                  ? fraew.evacuation_strategy.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())
+                  : "—"}
+              />
+              <DetailRow label="Dry riser" value={normaliseBooleanLabel(fraew?.dry_riser_present)} />
+              <DetailRow label="Wet riser" value={normaliseBooleanLabel(fraew?.wet_riser_present)} />
+              <DetailRow
+                label="ADB compliant"
+                value={fraew?.adb_compliant
+                  ? fraew.adb_compliant.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())
+                  : "—"}
+              />
+
+              {fraew.summary ? (
+                <div className="details-sub" style={{ marginTop: 10 }}>
+                  <b>Summary:</b> {truncate(fraew.summary, 240)}
+                </div>
+              ) : null}
+
+              <BulletList items={fraewRecommendations} />
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function BlockPropertiesTable({ properties = [] }) {
+  if (!properties.length) {
+    return <div className="muted">No linked properties found for this block.</div>;
+  }
+
+  return (
+    <div className="details-block">
+      <div className="details-h">Contained properties</div>
+
+      <div
+        className="table-wrap"
+        style={{
+          maxHeight: 320,
+          overflowY: "auto",
+          overflowX: "hidden",
+          border: "1px solid rgba(148,163,184,0.16)",
+          borderRadius: 12,
+        }}
+      >
+        <table className="table">
+          <thead>
+            <tr>
+              <th>Property</th>
+              <th>UPRN</th>
+              <th>Value</th>
+              <th>FRA</th>
+              <th>FRAEW</th>
+            </tr>
+          </thead>
+          <tbody>
+            {properties.map((item, index) => {
+              const fire = getFireAssessment(item);
+              const fraMeta = bandMeta(fire.fra?.risk_level);
+              const fraewMeta = bandMeta(fire.fraew?.risk_level);
+
+              return (
+                <tr key={item.id || item.property_id || item.uprn || index}>
+                  <td>
+                    {item.address_line_1 ||
+                      item.property_reference ||
+                      item.id ||
+                      `Property ${index + 1}`}
+                  </td>
+                  <td>{item.uprn || "—"}</td>
+                  <td>{fmtMoney(item.sum_insured)}</td>
+                  <td>{fire.fra ? <span className={`pill ${fraMeta.cls}`}>{fraMeta.label}</span> : "—"}</td>
+                  <td>{fire.fraew ? <span className={`pill ${fraewMeta.cls}`}>{fraewMeta.label}</span> : "—"}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+/* ========================= MAIN ========================= */
+
+export default function PropertyDetails({
+  property,
+  selectedBlock = null,
+  blockMode = false,
+}) {
+  const activeSource = property || selectedBlock || {};
+
+  const { line1, line2, city, postcode } = useMemo(
+    () => getDisplayAddress(property || {}),
+    [property]
+  );
+
+  const { lat, lon } = useMemo(() => getLatLon(activeSource), [activeSource]);
+
+  const sov = useMemo(() => getSovValues(property || {}), [property]);
+
+  const propertyFire = useMemo(() => getFireAssessment(property), [property]);
+  const blockFire = useMemo(() => getFireAssessment(selectedBlock), [selectedBlock]);
+
+  if (!property && !blockMode) {
+    return (
+      <div className="details-body">
+        <div className="muted">Select a property to view details.</div>
+      </div>
+    );
+  }
+
+  if (blockMode && selectedBlock && !property) {
+    return (
+      <div className="details-body">
+        <div className="details-block">
+          <div className="details-h">
+            BLOCK
+          </div>
+
+          <DetailRow label="Block reference" value={selectedBlock.block_reference} />
+          <DetailRow label="Parent UPRN" value={selectedBlock.parent_uprn} />
+          <DetailRow
+            label="Properties"
+            value={selectedBlock.count ?? selectedBlock.unit_count}
+          />
+          <DetailRow
+            label="Total insured value"
+            value={
+              isPresent(selectedBlock.totalValue)
+                ? fmtMoney(selectedBlock.totalValue)
+                : isPresent(selectedBlock.total_sum_insured)
+                ? fmtMoney(selectedBlock.total_sum_insured)
+                : "—"
+            }
+          />
+          <DetailRow
+            label="Average readiness"
+            value={
+              Number.isFinite(Number(selectedBlock.avgReadiness))
+                ? `${Math.round(selectedBlock.avgReadiness)} / 100`
+                : "—"
+            }
+          />
+          <DetailRow
+            label="Max height"
+            value={
+              Number.isFinite(Number(selectedBlock.maxHeight))
+                ? `${fmt(selectedBlock.maxHeight, 1)} m`
+                : Number.isFinite(Number(selectedBlock.max_storeys))
+                ? selectedBlock.max_storeys
+                : "—"
+            }
+          />
+          <DetailRow
+            label="Coordinates"
+            value={
+              Number.isFinite(lat) && Number.isFinite(lon)
+                ? `${fmt(lat, 5)}, ${fmt(lon, 5)}`
+                : "—"
+            }
+          />
+        </div>
+
+        <FireRiskSection
+          fra={blockFire.fra}
+          fraew={blockFire.fraew}
+          emptyLabel="No FRA / FRAEW data linked to this block."
+        />
+
+        <BlockPropertiesTable properties={selectedBlock.properties || []} />
+      </div>
+    );
+  }
 
   if (!property) {
     return (
-      <div className="details-empty">
-        Click a property circle on the map to view SOV + property details here.
+      <div className="details-body">
+        <div className="muted">No details available.</div>
       </div>
     );
   }
 
   return (
-    <div className="details">
-      <div className="details-section">
-        <div className="details-h">
-          <div>
-            <div className="details-title">Property</div>
-            <div className="details-sub">
-              {city} · {postcode} · lat {fmt(lat, 5)}, lon {fmt(lon, 5)}
-            </div>
-            <div className="details-addr">
-              {address1} {address2 ? <span className="muted">· {address2}</span> : null}
-            </div>
-          </div>
+    <div className="details-body">
+      <div className="details-block">
+        <div className="details-h">Property</div>
 
-          {readiness?.score != null && (
-            <div className={`pill ${bandMeta(readiness.band).cls}`}>
-              {Math.round(readiness.score)} / 100 ({readiness.band})
-            </div>
-          )}
+        <div className="details-sub">
+          {city || "—"} {postcode ? `· ${postcode}` : ""}
+          {Number.isFinite(lat) && Number.isFinite(lon)
+            ? ` · lat ${fmt(lat, 5)}, lon ${fmt(lon, 5)}`
+            : " · no valid lat/lon"}
         </div>
+
+        <div className="details-title">
+          {line1 || "—"} {line2 || ""}
+        </div>
+
+        <DetailRow
+          label="Property ref"
+          value={property?.property_reference ?? property?.propertyReference ?? property?.id}
+        />
+        <DetailRow label="Property ID" value={property?.property_id ?? property?.propertyId} />
+        <DetailRow label="UPRN" value={property?.uprn ?? property?.UPRN} />
+        <DetailRow label="Parent UPRN" value={property?.parent_uprn} />
+        <DetailRow
+          label="Block"
+          value={
+            property?.block_reference ??
+            selectedBlock?.label ??
+            selectedBlock?.name ??
+            selectedBlock?.block_reference
+          }
+        />
       </div>
 
-      <div className="details-section">
-        <div className="details-title">SOV</div>
+      <div className="details-block">
+        <div className="details-h">SOV</div>
+
         <div className="kv-grid">
-          <div className="kv">
-            <div className="kv-k">Sum insured</div>
-            <div className="kv-v">£{fmtMoney(sumInsured, 0)}</div>
-          </div>
-          <div className="kv">
-            <div className="kv-k">Property type</div>
-            <div className="kv-v">{propertyType}</div>
-          </div>
-          <div className="kv">
-            <div className="kv-k">Occupancy</div>
-            <div className="kv-v">{occupancy}</div>
-          </div>
-          <div className="kv">
-            <div className="kv-k">Number of flats</div>
-            <div className="kv-v">{flats}</div>
-          </div>
+          <KeyValueCard
+            label="Sum insured"
+            value={Number.isFinite(sov.sumInsured) ? fmtMoney(sov.sumInsured) : "—"}
+          />
+          <KeyValueCard label="Property type" value={sov.propertyType} />
+          <KeyValueCard label="Occupancy" value={sov.occupancy} />
+          <KeyValueCard
+            label="Height"
+            value={Number.isFinite(sov.height) ? `${fmt(sov.height, 1)} m` : "—"}
+          />
+          <KeyValueCard
+            label="Storeys"
+            value={Number.isFinite(sov.storeys) ? sov.storeys : "—"}
+          />
+          <KeyValueCard
+            label="Units / flats"
+            value={Number.isFinite(sov.units) ? sov.units : "—"}
+          />
+          <KeyValueCard
+            label="Year built"
+            value={Number.isFinite(sov.yearBuilt) ? sov.yearBuilt : "—"}
+          />
         </div>
       </div>
 
-      <div className="details-section">
-        <div className="details-title">UPRN match (backend)</div>
-
-        {uprnLoading && <div className="pill">Matching UPRN…</div>}
-        {uprnError && <div className="pill band-red" style={{ marginTop: 8 }}>{uprnError}</div>}
-
-        {!uprnLoading && !uprnError && uprnResult && (
-          <>
-            {uprnBest ? (
-              <div className="uprn-best">
-                <div className="uprn-best-top">
-                  <div>
-                    <div className="uprn-uprn">
-                      Best match: <span className="mono">{uprnBest.uprn}</span>
-                    </div>
-                    <div className="uprn-notes">{uprnBest.notes}</div>
-                  </div>
-                  <div className="uprn-score">
-                    <div className={`pill ${uprnBand.cls}`}>
-                      {uprnBand.label} · {uprnBest.confidence_score}
-                    </div>
-                    <div className="muted" style={{ marginTop: 6, fontSize: 12 }}>
-                      dist {uprnBest.distance_m}m · neighbors {uprnBest.neighbor_count}
-                    </div>
-                  </div>
-                </div>
-
-                {uprnWarnings.length > 0 && (
-                  <div className="uprn-warn">
-                    <div className="uprn-warn-title">Warnings</div>
-                    <ul>
-                      {uprnWarnings.map((w, i) => <li key={i}>{w}</li>)}
-                    </ul>
-                  </div>
-                )}
-              </div>
-            ) : (
-              <div className="pill band-yellow" style={{ marginTop: 8 }}>
-                No best match returned (postcode missing from DB or no candidates).
-              </div>
-            )}
-
-            {uprnCandidates.length > 0 && (
-              <div className="uprn-table-wrap">
-                <div className="uprn-table-title">Candidates</div>
-                <div className="table-scroll">
-                  <table className="uprn-table">
-                    <thead>
-                      <tr>
-                        <th>UPRN</th>
-                        <th>Band</th>
-                        <th>Score</th>
-                        <th>Dist (m)</th>
-                        <th>Neighbors</th>
-                        <th>Signals</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {uprnCandidates.map((c) => {
-                        const meta = bandMeta(c.confidence_band);
-                        return (
-                          <tr key={c.uprn}>
-                            <td className="mono">{c.uprn}</td>
-                            <td><span className={`pill ${meta.cls}`}>{meta.label}</span></td>
-                            <td>{c.confidence_score}</td>
-                            <td>{c.distance_m}</td>
-                            <td>{c.neighbor_count}</td>
-                            <td className="muted">
-                              pc {c.signals?.postcode ?? 0} · sp {c.signals?.spatial ?? 0} · den{" "}
-                              {c.signals?.density ?? 0} · pen {c.signals?.penalties ?? 0}
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            )}
-          </>
-        )}
-      </div>
-
-      <div className="details-section">
-        <div className="details-title">Raw fields (from upload)</div>
-        <RawFieldsTableInline raw={property} />
-      </div>
+      <FireRiskSection
+        fra={propertyFire.fra}
+        fraew={propertyFire.fraew}
+        emptyLabel="No FRA / FRAEW data linked to this property."
+      />
     </div>
   );
 }
