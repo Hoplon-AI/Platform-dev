@@ -5,8 +5,10 @@ import Landingpage from "./landingpage.jsx";
 import LoginPage from "./pages/LoginPage.jsx";
 import IngestionPage from "./pages/IngestionLandingPage.tsx";
 import PortfolioDashboard from "./pages/PortfolioDashboard.jsx";
+import BlockAnalysisPage from "./pages/BlockAnalysisPage.jsx";
 
 import { getIngestionSummary } from "./utils/ingestion";
+import { collectFireDocuments } from "./utils/blockModel";
 import { apiFetch } from "./services/apiClient";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "";
@@ -529,6 +531,10 @@ export default function App() {
   const [showLanding, setShowLanding] = useState(true);
   const [authUser, setAuthUser] = useState(null);
   const [activeNav, setActiveNav] = useState("uploads");
+  // Track which tabs have been opened. Once a tab is visited we keep it mounted
+  // (just hidden) so its state — map position, selections, scroll — survives
+  // switching tabs instead of resetting on every remount.
+  const [visitedNav, setVisitedNav] = useState({ uploads: true });
 
   const [isUploading, setIsUploading] = useState(false);
   const [uploadError, setUploadError] = useState(null);
@@ -536,6 +542,8 @@ export default function App() {
 
   const [uploadMode, setUploadMode] = useState("sov");
   const [pdfDocumentType, setPdfDocumentType] = useState("fra");
+  // Which upload stage the Upload Documents page should show (SOV / FRA / FRAEW).
+  const [uploadStage, setUploadStage] = useState("SOV");
   const [selectedBlockReference, setSelectedBlockReference] = useState("");
   const [selectedPropertyId, setSelectedPropertyId] = useState("");
 
@@ -556,6 +564,19 @@ export default function App() {
   useEffect(() => {
     console.log("API_BASE_URL =", API_BASE_URL);
   }, []);
+
+  // Remember each tab once opened so kept-alive views stay mounted.
+  useEffect(() => {
+    setVisitedNav((v) => (v[activeNav] ? v : { ...v, [activeNav]: true }));
+  }, [activeNav]);
+
+  // The overview map is hidden via display:none when inactive; nudge Leaflet to
+  // recompute its size when it's reshown so tiles render at the right dimensions.
+  useEffect(() => {
+    if (activeNav !== "overview") return;
+    const t = setTimeout(() => window.dispatchEvent(new Event("resize")), 60);
+    return () => clearTimeout(t);
+  }, [activeNav]);
 
   const loadPropertiesFromApi = async () => {
     try {
@@ -855,10 +876,22 @@ export default function App() {
     }
   };
 
-  const handleUploadNew = () => {
+  const handleUploadNew = (stage = "SOV") => {
+    const next = String(stage || "SOV").toUpperCase();
+    setUploadStage(["SOV", "FRA", "FRAEW"].includes(next) ? next : "SOV");
     setActiveNav("uploads");
     setUploadError(null);
     setPipelineStep(null);
+  };
+
+  // "Upload Documents" routes to the next document still needed: SoV -> FRA -> FRAEW.
+  // Once a full set exists it falls back to the FRA evidence stage.
+  const goToNextUpload = () => {
+    if (!ingestionResult) return handleUploadNew("SOV");
+    const docs = collectFireDocuments(ingestionResult, latestFireRiskPayload);
+    const hasFra = docs.some((d) => d.document_type === "FRA");
+    const hasFraew = docs.some((d) => d.document_type === "FRAEW");
+    handleUploadNew(!hasFra ? "FRA" : !hasFraew ? "FRAEW" : "FRA");
   };
 
   if (showLanding) {
@@ -918,16 +951,26 @@ export default function App() {
 
             <button
               className={`side-link ${activeNav === "uploads" ? "active" : ""}`}
-              onClick={() => setActiveNav("uploads")}
+              onClick={goToNextUpload}
             >
               Upload Documents
             </button>
           </div>
 
-          <div className="side-section dim">
+          <div className="side-section">
             <div className="side-head">Analysis</div>
+            <button
+              className={`side-link ${activeNav === "block-analysis" ? "active" : ""}`}
+              onClick={() => setActiveNav("block-analysis")}
+              disabled={!ingestionResult}
+            >
+              Block Analysis
+            </button>
+          </div>
+
+          <div className="side-section dim">
+            <div className="side-head">Coming soon</div>
             <div className="side-item">Evidence Summary</div>
-            <div className="side-item">Block Analysis</div>
             <div className="side-item">Documents</div>
           </div>
 
@@ -973,6 +1016,8 @@ export default function App() {
               </div>
 
               <IngestionPage
+                stage={uploadStage}
+                onStageChange={setUploadStage}
                 hasSovData={Boolean(ingestionResult)}
                 isUploading={isUploading}
                 uploadError={uploadError}
@@ -1087,17 +1132,29 @@ export default function App() {
             </>
           )}
 
-          {activeNav === "overview" && (
-            <PortfolioDashboard
-              ingestionResult={ingestionResult}
-              ingestionSummary={ingestionSummary}
-              onUploadNew={handleUploadNew}
-              latestFireRiskPayload={latestFireRiskPayload}
-              fireDocumentsLoading={fireDocumentsLoading}
-              refetchFireDocuments={refetchFireDocuments}
-              portfolioId={getPortfolioIdFromResult(ingestionResult)}
-              onLoadMapData={loadPropertiesFromApi}
-            />
+          {(visitedNav.overview || activeNav === "overview") && (
+            <div style={{ display: activeNav === "overview" ? "block" : "none" }}>
+              <PortfolioDashboard
+                ingestionResult={ingestionResult}
+                ingestionSummary={ingestionSummary}
+                onUploadNew={handleUploadNew}
+                latestFireRiskPayload={latestFireRiskPayload}
+                fireDocumentsLoading={fireDocumentsLoading}
+                refetchFireDocuments={refetchFireDocuments}
+                portfolioId={getPortfolioIdFromResult(ingestionResult)}
+                onLoadMapData={loadPropertiesFromApi}
+              />
+            </div>
+          )}
+
+          {(visitedNav["block-analysis"] || activeNav === "block-analysis") && (
+            <div style={{ display: activeNav === "block-analysis" ? "block" : "none" }}>
+              <BlockAnalysisPage
+                ingestionResult={ingestionResult}
+                latestFireRiskPayload={latestFireRiskPayload}
+                onUploadNew={handleUploadNew}
+              />
+            </div>
           )}
         </main>
       </div>
