@@ -11,8 +11,8 @@ const CLUSTER_ZOOM = 13;
 const BLOCK_ZOOM = 18;
 const FOCUSED_ZOOM = 19;
 const CONTEXT_BLOCK_ZOOM = 16.5;
-const CONTEXT_BLOCK_FADE_START_ZOOM = 18;
-const CONTEXT_BLOCK_HIDE_ZOOM = 18.25;
+const CONTEXT_BLOCK_FADE_START_ZOOM = 18.5;
+const CONTEXT_BLOCK_HIDE_ZOOM = 19;
 const BUILDINGS_URL = "/buildings_cathcart.geojson";
 
 const UK_LAT_BOUNDS = { min: 49.0, max: 61.5 };
@@ -400,16 +400,55 @@ const getPropertyPopupHtml = (point) => {
   `;
 };
 
-const getBlockPopupHtml = (point) => `
-  <div style="min-width:240px;">
-    <div style="font-weight:700; margin-bottom:6px;">${point.name}</div>
-    <div>Properties: ${getBlockPropertyCount(point.raw) || 0}</div>
-    <div>Total insured value: ${fmtMoney(point.totalValue)}</div>
-    <div>Height: ${Number.isFinite(point.storeys) && point.storeys > 0 ? `${point.storeys.toFixed(1)} m` : "—"}</div>
-    <div>Readiness: ${point.readinessScore ?? "—"}${point.readinessBand ? ` (${point.readinessBand})` : ""}</div>
-    <div>Fire risk: ${getRiskBand(point.raw) || "—"}</div>
-  </div>
-`;
+const buildFlatListPopupHtml = (point) => {
+  const flats = point.raw?.properties || [];
+  const rep = point.raw?.representativeProperty;
+  const rawAddr = rep?.address || rep?.address_line_1 || "";
+  const addr = rawAddr.replace(/^(flat|apartment|unit|apt)[^,]*,\s*/i, "").trim();
+  const postcode = rep?.post_code || rep?.postcode || "";
+  const addrLine = [addr, postcode].filter(Boolean).join(" ");
+  const items = flats.map((p, i) => {
+    const label = getPropertyLabel(p, i);
+    return `<div class="flat-row" data-idx="${i}" style="padding:7px 8px;cursor:pointer;border-radius:6px;font-size:13px;color:#0f172a;line-height:1.4">${label}</div>`;
+  }).join("");
+  return `
+    <div style="min-width:230px;max-width:300px">
+      <div style="margin-bottom:8px;padding-bottom:7px;border-bottom:1px solid #e2e8f0">
+        <div style="font-weight:700;font-size:13px;color:#0f172a">${addrLine || point.name}</div>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-top:4px">
+          <span style="font-size:12px;color:#64748b">${flats.length} properties · Block ${point.name}</span>
+          <span class="block-view-btn" style="font-size:12px;color:#2563eb;cursor:pointer;font-weight:600">Block view</span>
+        </div>
+      </div>
+      <div style="max-height:220px;overflow-y:auto">${items}</div>
+    </div>`;
+};
+
+const attachFlatListPopupHandlers = (marker, point, onSelectProperty) => {
+  marker.on("popupopen", (e) => {
+    const container = e.popup.getElement();
+    if (!container) return;
+    container.querySelectorAll(".flat-row").forEach((el) => {
+      el.addEventListener("mouseenter", () => { el.style.background = "#f1f5f9"; });
+      el.addEventListener("mouseleave", () => { el.style.background = ""; });
+      el.addEventListener("click", () => {
+        const idx = parseInt(el.dataset.idx, 10);
+        const flats = point.raw?.properties || [];
+        if (flats[idx]) {
+          onSelectProperty?.(flats[idx]);
+          marker.closePopup();
+        }
+      });
+    });
+    const blockBtn = container.querySelector(".block-view-btn");
+    if (blockBtn) {
+      blockBtn.addEventListener("click", () => {
+        onSelectProperty?.(null);
+        marker.closePopup();
+      });
+    }
+  });
+};
 
 const flattenCoords = (coords, out = []) => {
   if (!Array.isArray(coords)) return out;
@@ -589,6 +628,7 @@ export default function PortfolioMap({
   onSelectProperty,
   onSelectBlock,
   viewMode = "blocks",
+  suppressFit = false,
 }) {
   const mapDivRef = useRef(null);
   const mapRef = useRef(null);
@@ -597,6 +637,8 @@ export default function PortfolioMap({
   const overviewBlockLayerRef = useRef(null);
   const selectedMarkerRef = useRef(null);
   const lastFitSignatureRef = useRef("");
+  const suppressFitRef = useRef(suppressFit);
+  suppressFitRef.current = suppressFit;
   const lastSelectionSignatureRef = useRef("");
   const buildingsGeojsonCacheRef = useRef(null);
   const buildingsFetchPromiseRef = useRef(null);
@@ -662,7 +704,7 @@ export default function PortfolioMap({
     if (!mapDivRef.current || mapRef.current) return;
 
     const map = L.map(mapDivRef.current, {
-      scrollWheelZoom: false,
+      scrollWheelZoom: true,
       zoomControl: true,
       attributionControl: false,
     }).setView(DEFAULT_CENTER, DEFAULT_ZOOM);
@@ -728,7 +770,6 @@ export default function PortfolioMap({
     if (!visiblePoints.length) {
       lastFitSignatureRef.current = "";
       buildingsLayer.clearLayers();
-      map.setView(DEFAULT_CENTER, DEFAULT_ZOOM);
       setTimeout(() => map.invalidateSize(), 80);
       return;
     }
@@ -776,14 +817,28 @@ export default function PortfolioMap({
         marker.on("mouseover", () => marker.setZIndexOffset(10000));
         marker.on("mouseout", () => marker.setZIndexOffset(baseZ));
         marker.on("click", () => {
-          onSelectBlock?.(point.raw);
-          onSelectProperty?.(null);
+          if (!isSelected) {
+            onSelectBlock?.(point.raw);
+            onSelectProperty?.(null);
+          }
         });
         marker.bindTooltip(
-          `${point.name} · ${getBlockPropertyCount(point.raw) || 0} properties · ${fmtMoney(point.totalValue)}`,
-          { direction: "top", sticky: true, opacity: 0.95 }
+          (() => {
+            const rep = point.raw?.representativeProperty;
+            const rawAddr = rep?.address || rep?.address_line_1 || "";
+            const addr = rawAddr.replace(/^(flat|apartment|unit|apt)[^,]*,\s*/i, "").trim() || point.name;
+            const postcode = rep?.postcode ? ` ${rep.postcode}` : "";
+            const count = getBlockPropertyCount(point.raw) || 0;
+            const h = Number.isFinite(point.storeys) && point.storeys > 0 ? point.storeys : null;
+            const heightStr = h ? `${h.toFixed(1)} m` : "—";
+            const risk = h > 18 ? "High-risk" : h > 11 ? "Mid-risk" : "Low-risk";
+            const riskColor = h > 18 ? "rgba(225,29,72,0.75)" : h > 11 ? "rgba(245,158,11,0.85)" : "rgba(100,116,139,0.75)";
+            return `<div style="min-width:160px;line-height:1.6"><div style="font-weight:700;margin-bottom:2px">${addr}${postcode}</div><div style="color:#64748b">${count} properties · ${fmtMoney(point.totalValue)}</div><div style="color:#64748b">${heightStr} · <span style="color:${riskColor};font-weight:600">${h ? risk : "—"}</span></div><div style="margin-top:6px;padding-top:5px;border-top:1px solid #e2e8f0;display:flex;flex-direction:column;gap:1px"><span style="font-size:11px;color:#94a3b8">1× click → block summary</span><span style="font-size:11px;color:#94a3b8">2× click → flat list</span></div></div>`;
+          })(),
+          { direction: "top", sticky: true, opacity: 0.97 }
         );
-        marker.bindPopup(getBlockPopupHtml(point));
+        marker.bindPopup(buildFlatListPopupHtml(point), { maxWidth: 320 });
+        attachFlatListPopupHandlers(marker, point, onSelectProperty);
         clusterGroup.addLayer(marker);
         if (isSelected) selectedMarkerRef.current = marker;
       });
@@ -792,12 +847,15 @@ export default function PortfolioMap({
     } else {
       propertyPoints.forEach((point) => {
         const isSelected = sameProperty(selectedProperty, point.raw);
+        const baseZ = isSelected ? 1000 : 0;
         const marker = L.marker([point.lat, point.lon], {
           icon: createPropertyDotIcon(point, isSelected),
           keyboard: false,
-          zIndexOffset: isSelected ? 1000 : 500,
+          zIndexOffset: baseZ,
         });
 
+        marker.on("mouseover", () => marker.setZIndexOffset(10000));
+        marker.on("mouseout", () => marker.setZIndexOffset(baseZ));
         marker.on("click", () => onSelectProperty?.(point.raw));
         marker.bindTooltip(`${point.label} · ${point.propertyCategoryLabel}`, {
           direction: "top",
@@ -827,25 +885,28 @@ export default function PortfolioMap({
       ]);
 
       if (lastFitSignatureRef.current !== signature) {
-        const leafletBounds = L.latLngBounds(fitBounds);
-        if (leafletBounds.isValid()) {
-          if (activeMode === "properties") {
-            map.flyToBounds(leafletBounds.pad(selectedProperty ? 0.08 : 0.16), {
-              duration: 0.55,
-              maxZoom: selectedProperty ? FOCUSED_ZOOM : BLOCK_ZOOM,
-            });
-          } else if (selectedBlock) {
-            map.flyToBounds(leafletBounds.pad(0.02), {
-              duration: 0.45,
-              maxZoom: BLOCK_ZOOM,
-            });
-          } else {
-            map.fitBounds(leafletBounds.pad(0.24), {
-              animate: false,
-              maxZoom: CLUSTER_ZOOM,
-            });
+        lastFitSignatureRef.current = signature;
+
+        if (!suppressFitRef.current) {
+          const leafletBounds = L.latLngBounds(fitBounds);
+          if (leafletBounds.isValid()) {
+            if (activeMode === "properties") {
+              map.flyToBounds(leafletBounds.pad(selectedProperty ? 0.08 : 0.16), {
+                duration: 0.55,
+                maxZoom: selectedProperty ? FOCUSED_ZOOM : BLOCK_ZOOM,
+              });
+            } else if (selectedBlock) {
+              map.flyToBounds(leafletBounds.pad(0.02), {
+                duration: 0.45,
+                maxZoom: BLOCK_ZOOM,
+              });
+            } else {
+              map.fitBounds(leafletBounds.pad(0.24), {
+                animate: false,
+                maxZoom: CLUSTER_ZOOM,
+              });
+            }
           }
-          lastFitSignatureRef.current = signature;
         }
       }
     }
@@ -880,6 +941,7 @@ export default function PortfolioMap({
 
       blockPoints.forEach((point) => {
         const isSelected = sameBlock(selectedBlock, point.raw);
+        const baseZ = isSelected ? 760 : 260;
         const marker = L.marker([point.lat, point.lon], {
           icon: createBlockCountIcon(
             point,
@@ -889,20 +951,37 @@ export default function PortfolioMap({
             isSelected ? Math.min(1.08, visibility.scale + 0.04) : visibility.scale
           ),
           keyboard: false,
-          zIndexOffset: isSelected ? 760 : 260,
+          zIndexOffset: baseZ,
         });
 
+        marker.on("mouseover", () => marker.setZIndexOffset(10000));
+        marker.on("mouseout", () => marker.setZIndexOffset(baseZ));
         marker.on("click", () => {
-          onSelectBlock?.(point.raw);
-          onSelectProperty?.(null);
-          lastFitSignatureRef.current = "";
+          if (!isSelected) {
+            onSelectBlock?.(point.raw);
+            onSelectProperty?.(null);
+            lastFitSignatureRef.current = "";
+          }
         });
 
         marker.bindTooltip(
-          `${point.name} · ${getBlockPropertyCount(point.raw) || 0} properties · ${fmtMoney(point.totalValue)}`,
-          { direction: "top", sticky: true, opacity: 0.95 }
+          (() => {
+            const rep = point.raw?.representativeProperty;
+            const rawAddr = rep?.address || rep?.address_line_1 || "";
+            const addr = rawAddr.replace(/^(flat|apartment|unit|apt)[^,]*,\s*/i, "").trim() || point.name;
+            const postcode = rep?.postcode ? ` ${rep.postcode}` : "";
+            const count = getBlockPropertyCount(point.raw) || 0;
+            const h = Number.isFinite(point.storeys) && point.storeys > 0 ? point.storeys : null;
+            const heightStr = h ? `${h.toFixed(1)} m` : "—";
+            const risk = h > 18 ? "High-risk" : h > 11 ? "Mid-risk" : "Low-risk";
+            const riskColor = h > 18 ? "rgba(225,29,72,0.75)" : h > 11 ? "rgba(245,158,11,0.85)" : "rgba(100,116,139,0.75)";
+            return `<div style="min-width:160px;line-height:1.6"><div style="font-weight:700;margin-bottom:2px">${addr}${postcode}</div><div style="color:#64748b">${count} properties · ${fmtMoney(point.totalValue)}</div><div style="color:#64748b">${heightStr} · <span style="color:${riskColor};font-weight:600">${h ? risk : "—"}</span></div><div style="margin-top:6px;padding-top:5px;border-top:1px solid #e2e8f0;display:flex;flex-direction:column;gap:1px"><span style="font-size:11px;color:#94a3b8">1× click → block summary</span><span style="font-size:11px;color:#94a3b8">2× click → flat list</span></div></div>`;
+          })(),
+          { direction: "top", sticky: true, opacity: 0.97 }
         );
 
+        marker.bindPopup(buildFlatListPopupHtml(point), { maxWidth: 320 });
+        attachFlatListPopupHandlers(marker, point, onSelectProperty);
         marker.addTo(overviewBlockLayer);
       });
     };

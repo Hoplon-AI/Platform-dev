@@ -543,14 +543,21 @@ function FireRiskSection({
   );
 }
 
-function BlockPropertiesTable({ properties = [] }) {
+function BlockPropertiesTable({ properties = [], onSelectProperty }) {
+  const [hoveredIndex, setHoveredIndex] = React.useState(null);
+
   if (!properties.length) {
     return <div className="muted">No linked properties found for this block.</div>;
   }
 
   return (
     <div className="details-block">
-      <div className="details-h">Contained properties</div>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
+        <div className="details-h" style={{ marginBottom: 0 }}>Contained properties</div>
+        {onSelectProperty && (
+          <span style={{ fontSize: 11, color: "var(--text-light, #94a3b8)" }}>Click row to view flat</span>
+        )}
+      </div>
 
       <div
         className="table-wrap"
@@ -577,14 +584,37 @@ function BlockPropertiesTable({ properties = [] }) {
               const fire = getFireAssessment(item);
               const fraMeta = bandMeta(fire.fra?.risk_level);
               const fraewMeta = bandMeta(fire.fraew?.risk_level);
+              const isHovered = hoveredIndex === index;
 
               return (
-                <tr key={item.id || item.property_id || item.uprn || index}>
+                <tr
+                  key={item.id || item.property_id || item.uprn || index}
+                  onClick={() => onSelectProperty?.(item)}
+                  onMouseEnter={() => setHoveredIndex(index)}
+                  onMouseLeave={() => setHoveredIndex(null)}
+                  style={{
+                    cursor: onSelectProperty ? "pointer" : undefined,
+                    background: isHovered ? "rgba(59,130,246,0.06)" : undefined,
+                    transition: "background 0.12s ease",
+                  }}
+                >
                   <td>
-                    {item.address_line_1 ||
-                      item.property_reference ||
-                      item.id ||
-                      `Property ${index + 1}`}
+                    <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                      <span>
+                        {item.address_line_1 ||
+                          item.property_reference ||
+                          item.id ||
+                          `Property ${index + 1}`}
+                      </span>
+                      <span style={{
+                        opacity: isHovered ? 1 : 0,
+                        transition: "opacity 0.12s ease",
+                        color: "#3b82f6",
+                        fontWeight: 600,
+                        fontSize: 14,
+                        lineHeight: 1,
+                      }}>›</span>
+                    </span>
                   </td>
                   <td>{item.uprn || "—"}</td>
                   <td>{fmtMoney(item.sum_insured)}</td>
@@ -606,6 +636,7 @@ export default function PropertyDetails({
   property,
   selectedBlock = null,
   blockMode = false,
+  onSelectProperty,
 }) {
   const activeSource = property || selectedBlock || {};
 
@@ -623,26 +654,43 @@ export default function PropertyDetails({
 
   if (!property && !blockMode) {
     return (
-      <div className="details-body">
-        <div className="muted">Select a property to view details.</div>
+      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+        <div style={{ display: "flex", alignItems: "flex-start", gap: 10, backgroundColor: "rgba(59,130,246,0.06)", border: "1px solid rgba(59,130,246,0.15)", borderRadius: 8, padding: "10px 12px" }}>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginTop: 2, flexShrink: 0 }}>
+            <path d="M4 4l7 18 3-7 7-3z" />
+          </svg>
+          <p style={{ fontSize: 13, color: "#3b6fc4", margin: 0, lineHeight: 1.5 }}>
+            Click any circle on the map to inspect a block's properties, value, height, and fire risk status.
+          </p>
+        </div>
+        <div style={{ display: "flex", alignItems: "flex-start", gap: 10, backgroundColor: "rgba(148,163,184,0.07)", border: "1px solid rgba(148,163,184,0.18)", borderRadius: 8, padding: "10px 12px" }}>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginTop: 2, flexShrink: 0 }}>
+            <line x1="8" y1="6" x2="21" y2="6" /><line x1="8" y1="12" x2="21" y2="12" /><line x1="8" y1="18" x2="21" y2="18" />
+            <circle cx="3" cy="6" r="1" /><circle cx="3" cy="12" r="1" /><circle cx="3" cy="18" r="1" />
+          </svg>
+          <p style={{ fontSize: 13, color: "var(--text-light, #64748b)", margin: 0, lineHeight: 1.5 }}>
+            Or search and click a block from the list in the summary above.
+          </p>
+        </div>
       </div>
     );
   }
 
   if (blockMode && selectedBlock && !property) {
+    const rep = selectedBlock.representativeProperty;
+    const rawAddr = rep?.address_line_1 || rep?.address || "";
+    const blockAddr = rawAddr.replace(/^(flat|apartment|unit|apt)[^,]*,\s*/i, "").trim();
+    const blockPostcode = rep?.post_code || rep?.postcode || "";
+    const blockAddrDisplay = [blockAddr, blockPostcode].filter(Boolean).join(", ") || selectedBlock.name || selectedBlock.label;
+
     return (
       <div className="details-body">
         <div className="details-block">
           <div className="details-h">
-            BLOCK
+            {blockAddrDisplay}
           </div>
 
-          <DetailRow label="Block reference" value={selectedBlock.block_reference} />
-          <DetailRow label="Parent UPRN" value={selectedBlock.parent_uprn} />
-          <DetailRow
-            label="Properties"
-            value={selectedBlock.count ?? selectedBlock.unit_count}
-          />
+
           <DetailRow
             label="Total insured value"
             value={
@@ -654,12 +702,8 @@ export default function PropertyDetails({
             }
           />
           <DetailRow
-            label="Average readiness"
-            value={
-              Number.isFinite(Number(selectedBlock.avgReadiness))
-                ? `${Math.round(selectedBlock.avgReadiness)} / 100`
-                : "—"
-            }
+            label="Properties"
+            value={selectedBlock.count ?? selectedBlock.unit_count}
           />
           <DetailRow
             label="Max height"
@@ -671,6 +715,8 @@ export default function PropertyDetails({
                 : "—"
             }
           />
+          <DetailRow label="Parent UPRN" value={selectedBlock.parent_uprn} />
+          <DetailRow label="Block reference" value={selectedBlock.block_reference} />
           <DetailRow
             label="Coordinates"
             value={
@@ -687,15 +733,31 @@ export default function PropertyDetails({
           emptyLabel="No FRA / FRAEW data linked to this block."
         />
 
-        <BlockPropertiesTable properties={selectedBlock.properties || []} />
+        <BlockPropertiesTable properties={selectedBlock.properties || []} onSelectProperty={onSelectProperty} />
       </div>
     );
   }
 
   if (!property) {
     return (
-      <div className="details-body">
-        <div className="muted">No details available.</div>
+      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+        <div style={{ display: "flex", alignItems: "flex-start", gap: 10, backgroundColor: "rgba(59,130,246,0.06)", border: "1px solid rgba(59,130,246,0.15)", borderRadius: 8, padding: "10px 12px" }}>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginTop: 2, flexShrink: 0 }}>
+            <path d="M4 4l7 18 3-7 7-3z" />
+          </svg>
+          <p style={{ fontSize: 13, color: "#3b6fc4", margin: 0, lineHeight: 1.5 }}>
+            Click any circle on the map to inspect a block's properties, value, height, and fire risk status.
+          </p>
+        </div>
+        <div style={{ display: "flex", alignItems: "flex-start", gap: 10, backgroundColor: "rgba(148,163,184,0.07)", border: "1px solid rgba(148,163,184,0.18)", borderRadius: 8, padding: "10px 12px" }}>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginTop: 2, flexShrink: 0 }}>
+            <line x1="8" y1="6" x2="21" y2="6" /><line x1="8" y1="12" x2="21" y2="12" /><line x1="8" y1="18" x2="21" y2="18" />
+            <circle cx="3" cy="6" r="1" /><circle cx="3" cy="12" r="1" /><circle cx="3" cy="18" r="1" />
+          </svg>
+          <p style={{ fontSize: 13, color: "var(--text-light, #64748b)", margin: 0, lineHeight: 1.5 }}>
+            Or search and click a block from the list in the summary above.
+          </p>
+        </div>
       </div>
     );
   }
@@ -703,17 +765,28 @@ export default function PropertyDetails({
   return (
     <div className="details-body">
       <div className="details-block">
-        <div className="details-h">Property</div>
-
-        <div className="details-sub">
-          {city || "—"} {postcode ? `· ${postcode}` : ""}
-          {Number.isFinite(lat) && Number.isFinite(lon)
-            ? ` · lat ${fmt(lat, 5)}, lon ${fmt(lon, 5)}`
-            : " · no valid lat/lon"}
-        </div>
-
-        <div className="details-title">
-          {line1 || "—"} {line2 || ""}
+        <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 8, marginBottom: 4 }}>
+          <div className="details-h" style={{ marginBottom: 0 }}>
+            {[line1, line2].filter(Boolean).join(" ") || "—"}
+          </div>
+          {selectedBlock && (
+            <button
+              onClick={() => onSelectProperty?.(null)}
+              style={{
+                flexShrink: 0,
+                fontSize: 12,
+                padding: "3px 10px",
+                borderRadius: 6,
+                border: "1px solid var(--border, #e2e8f0)",
+                background: "var(--panel, #fff)",
+                color: "var(--text-light, #64748b)",
+                cursor: "pointer",
+                fontWeight: 500,
+              }}
+            >
+              ← Block view
+            </button>
+          )}
         </div>
 
         <DetailRow
