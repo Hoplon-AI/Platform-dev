@@ -354,6 +354,55 @@ export const buildBlocks = (properties = [], fireDocuments = []) => {
     });
 };
 
+// ---------- assessment validity ----------
+
+const toDate = (v) => {
+  if (!isPresent(v)) return null;
+  const d = new Date(v);
+  return Number.isNaN(d.getTime()) ? null : d;
+};
+
+// Is an assessment still valid today? Best-effort from the dates available:
+// explicit valid-until -> recommended next-review -> assessment date + 5 years
+// -> the source document's own in-date flag. Returns { inDate, basis, date }.
+export const assessmentStatus = (doc) => {
+  if (!doc) return { inDate: null, basis: null, date: null };
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const at = (raw, basis) => {
+    const d = toDate(raw);
+    return d ? { inDate: d.getTime() >= today.getTime(), basis, date: raw } : null;
+  };
+  const byValidUntil = at(doc.assessment_valid_until, "valid-until");
+  if (byValidUntil) return byValidUntil;
+  const byReview = at(doc.next_review_date, "next-review");
+  if (byReview) return byReview;
+  const a = toDate(doc.assessment_date);
+  if (a) {
+    const exp = new Date(a);
+    exp.setFullYear(exp.getFullYear() + 5);
+    return { inDate: exp.getTime() >= today.getTime(), basis: "assessment+5y", date: doc.assessment_date };
+  }
+  if (doc.is_in_date === true || doc.is_in_date === false) return { inDate: doc.is_in_date, basis: "flag", date: null };
+  return { inDate: null, basis: null, date: null };
+};
+
+// Plain-language explanation of how the in-date verdict was reached (for a tooltip).
+export const inDateTip = (s) => {
+  if (!s || s.inDate === null) return "No validity date recorded for this assessment.";
+  if (s.basis === "valid-until")
+    return s.inDate ? `Within validity — valid until ${s.date}.` : `Out of date — expired ${s.date}.`;
+  if (s.basis === "next-review")
+    return s.inDate
+      ? `Within the assessor's recommended review date (${s.date}).`
+      : `Overdue — recommended review date ${s.date} has passed.`;
+  if (s.basis === "assessment+5y")
+    return s.inDate
+      ? `Estimated — no valid-until or review date was recorded, so this assumes the assessment (${s.date}) stays valid for 5 years. Verify against the source document.`
+      : `Estimated — no valid-until or review date was recorded; assumed out of date (assessment ${s.date} + 5 years).`;
+  return "Based on the source document's in-date flag.";
+};
+
 // ---------- derived risk ----------
 
 export const blockOverallBand = (block) =>
@@ -374,8 +423,8 @@ export const summariseBlockRisk = (block) => {
 
   const stats = fraActionStats(fra);
   if (stats.overdue > 0) reasons.push(`${stats.overdue} overdue action${stats.overdue > 1 ? "s" : ""}`);
-  if (fra && fra.is_in_date === false) reasons.push("FRA out of date");
-  if (fraew && fraew.is_in_date === false) reasons.push("FRAEW out of date");
+  if (fra && assessmentStatus(fra).inDate === false) reasons.push("FRA out of date");
+  if (fraew && assessmentStatus(fraew).inDate === false) reasons.push("FRAEW out of date");
 
   if (!reasons.length) {
     if (getFireRiskBand(fraew) === "Amber") reasons.push("external wall (FRAEW) rated medium");
@@ -418,9 +467,9 @@ export const computeBlockAlerts = (block) => {
   if (getFireRiskBand(fraew) === "Red")
     alerts.push({ tone: "red", text: "FRAEW rated High / Red — external wall risk." });
 
-  if (fra && fra.is_in_date === false)
+  if (fra && assessmentStatus(fra).inDate === false)
     alerts.push({ tone: "red", text: "FRA is out of date — reassessment required." });
-  if (fraew && fraew.is_in_date === false)
+  if (fraew && assessmentStatus(fraew).inDate === false)
     alerts.push({ tone: "amber", text: "FRAEW is out of date." });
 
   const stats = fraActionStats(fra);

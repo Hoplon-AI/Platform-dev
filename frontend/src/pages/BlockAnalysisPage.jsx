@@ -5,6 +5,8 @@ import {
   collectFireDocuments,
   blockOverallBand,
   summariseBlockRisk,
+  assessmentStatus,
+  inDateTip,
   bandVerdict,
   bandClass,
   blockStreetText,
@@ -132,6 +134,18 @@ function InfoTip({ text, children, align }) {
 
 function Pill({ children, cls = "pill-muted" }) {
   return <span className={`pill ${cls}`}>{children}</span>;
+}
+
+// Colored Yes/No for the computed in-date status.
+function InDateBadge({ status }) {
+  if (!status || status.inDate === null) return <span style={{ color: "var(--muted)" }}>—</span>;
+  const estimated = status.basis === "assessment+5y";
+  return (
+    <span style={{ color: status.inDate ? "#166534" : "#991b1b", fontWeight: 700 }}>
+      {status.inDate ? "Yes" : "No"}
+      {estimated ? <span style={{ color: "var(--muted)", fontWeight: 600 }}> (est.)</span> : null}
+    </span>
+  );
 }
 
 function RiskDot({ band }) {
@@ -300,6 +314,8 @@ function Dossier({ block }) {
   const alerts = useMemo(() => computeBlockAlerts(block), [block]);
   const stats = useMemo(() => fraActionStats(fra), [fra]);
   const wallTypes = useMemo(() => getWallTypes(fraew), [fraew]);
+  const fraStatus = useMemo(() => assessmentStatus(fra), [fra]);
+  const fraewStatus = useMemo(() => assessmentStatus(fraew), [fraew]);
 
   const hCat = heightCategory(block.maxHeight) || (fraew?.building_height_category && titleCase(fraew.building_height_category));
   const fraBand = getFireRiskBand(fra);
@@ -403,7 +419,7 @@ function Dossier({ block }) {
                 <KV label="Assessment type" value={fra.fra_assessment_type} tip={G.assessmentType} />
                 <KV label="Assessment date" value={fra.assessment_date} />
                 <KV label="Valid until" value={fra.assessment_valid_until} />
-                <KV label="In date" value={boolLabel(fra.is_in_date)} tip={G.inDate} />
+                <KV label="In date" value={<InDateBadge status={fraStatus} />} tip={inDateTip(fraStatus)} />
               </div>
               <div>
                 <KV label="Assessor" value={fra.assessor_name} />
@@ -452,7 +468,7 @@ function Dossier({ block }) {
                 <KV label="Clause 14 applied" value={boolLabel(fraew.clause_14_applied)} tip={G.clause14} />
                 <KV label="Assessment date" value={fraew.assessment_date} />
                 <KV label="Valid until" value={fraew.assessment_valid_until} />
-                <KV label="In date" value={boolLabel(fraew.is_in_date)} tip={G.inDate} />
+                <KV label="In date" value={<InDateBadge status={fraewStatus} />} tip={inDateTip(fraewStatus)} />
               </div>
               <div>
                 <KV label="Building height" value={fraew.building_height_m ? `${fmt(fraew.building_height_m, 1)} m` : null} />
