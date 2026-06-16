@@ -48,6 +48,7 @@ html,
 body,
 #root {
   min-height: 100%;
+  overflow-anchor: none;
 }
 
 body {
@@ -185,7 +186,7 @@ select {
 
 .main {
   min-width: 0;
-  padding: 28px;
+  padding: 28px 72px;
 }
 
 .main-head {
@@ -226,7 +227,6 @@ select {
   display: flex;
   flex-direction: column;
   gap: 20px;
-  max-width: 1600px;
   width: 100%;
 }
 
@@ -1068,6 +1068,16 @@ select {
   font-family: inherit;
 }
 
+.portfolio-map-canvas .marker-cluster-small,
+.portfolio-map-canvas .marker-cluster-medium,
+.portfolio-map-canvas .marker-cluster-large,
+.portfolio-map-canvas .marker-cluster-small div,
+.portfolio-map-canvas .marker-cluster-medium div,
+.portfolio-map-canvas .marker-cluster-large div {
+  background: none !important;
+  box-shadow: none !important;
+}
+
 .portfolio-map-canvas .leaflet-control-zoom {
   border: 1px solid rgba(226, 232, 240, 0.95);
   box-shadow: 0 12px 24px rgba(15, 23, 42, 0.1);
@@ -1127,6 +1137,11 @@ select {
 .portfolio-map-canvas .leaflet-marker-icon,
 .portfolio-map-canvas .leaflet-marker-shadow {
   transition: transform 0.18s ease;
+}
+
+.portfolio-map-canvas .leaflet-div-icon {
+  background: none;
+  border: none;
 }
 
 .portfolio-map-canvas .leaflet-interactive:focus {
