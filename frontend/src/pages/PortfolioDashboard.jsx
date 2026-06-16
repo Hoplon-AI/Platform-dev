@@ -1264,7 +1264,8 @@ export default function PortfolioDashboard({
             </button>
           ) : null}
           <button className="btn" onClick={() => onUploadNew?.("SOV")}>Upload SoV</button>
-          <button className="btn btn-primary" onClick={() => onUploadNew?.("FRA")}>Upload FRA / FRAEW</button>
+          <button className="btn btn-primary" onClick={() => onUploadNew?.("FRA")}>Upload FRA</button>
+          <button className="btn btn-primary" onClick={() => onUploadNew?.("FRAEW")}>Upload FRAEW</button>
         </div>
       </div>
 

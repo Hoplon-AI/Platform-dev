@@ -14,6 +14,8 @@ type IngestionLandingPageProps = {
   onSelectedBlockReferenceChange?: (value: string) => void;
   onSelectedPropertyIdChange?: (value: string) => void;
   onFilesSelected?: (files: File[], stage: UploadStage) => void;
+  stage?: UploadStage;
+  onStageChange?: (stage: UploadStage) => void;
 };
 
 const stageCopy: Record<
@@ -124,9 +126,10 @@ export default function IngestionLandingPage({
   onSelectedBlockReferenceChange,
   onSelectedPropertyIdChange,
   onFilesSelected,
+  stage = "SOV",
+  onStageChange,
 }: IngestionLandingPageProps) {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
-  const [stage, setStage] = useState<UploadStage>("SOV");
   const [isDragOver, setIsDragOver] = useState(false);
 
   const activeCopy = stageCopy[stage];
@@ -206,7 +209,7 @@ export default function IngestionLandingPage({
               key={item}
               type="button"
               className={`journey-card ${active ? "active" : ""} ${complete ? "complete" : ""} ${locked ? "locked" : ""}`}
-              onClick={() => !locked && setStage(item)}
+              onClick={() => !locked && onStageChange?.(item)}
               disabled={locked}
             >
               <div className="journey-number">
