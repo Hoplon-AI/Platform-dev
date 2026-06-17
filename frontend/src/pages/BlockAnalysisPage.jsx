@@ -153,6 +153,17 @@ function RiskDot({ band }) {
   return <span style={{ width: 9, height: 9, borderRadius: 999, background: color, flexShrink: 0, display: "inline-block" }} title={band} />;
 }
 
+// Summary + filter chip in the toolbar (count of blocks in a band; click to filter).
+function StatChip({ label, band, count, active, onClick }) {
+  return (
+    <button type="button" className={`ba-stat${active ? " is-active" : ""}`} onClick={onClick}>
+      {band ? <RiskDot band={band} /> : null}
+      {label}
+      <span className="ba-stat-n">{count}</span>
+    </button>
+  );
+}
+
 // Presence/hazard chip with optional hover explanation. hazard=true => "present" is bad (red).
 function Chip({ label, value, hazard = false, tip }) {
   const present = value === true || value === "true" || value === 1 || value === "yes";
@@ -267,40 +278,6 @@ function ActionList({ items, max = 8 }) {
       })}
       {items.length > max ? <div style={{ fontSize: 12, color: "var(--muted)" }}>+{items.length - max} more…</div> : null}
     </div>
-  );
-}
-
-// ---------------------------------------------------------------- result card
-
-function ResultCard({ block, active, onClick }) {
-  const band = blockOverallBand(block);
-  const barColor = { Red: "#ef4444", Amber: "#f59e0b", Green: "#10b981" }[band] || "#cbd5e1";
-  const { street, postcode } = blockDisplayAddress(block);
-  return (
-    <button
-      onClick={onClick}
-      style={{
-        display: "block", width: "100%", textAlign: "left", cursor: "pointer",
-        border: active ? "1px solid var(--primary, #2563eb)" : "1px solid var(--border, #e2e8f0)",
-        background: active ? "rgba(37,99,235,0.06)" : "var(--panel, #fff)",
-        borderLeft: `4px solid ${barColor}`, borderRadius: 10, padding: "10px 12px", marginBottom: 8,
-      }}
-    >
-      <div className="row-between" style={{ alignItems: "flex-start", gap: 8 }}>
-        <div style={{ fontWeight: 700, fontSize: 13, color: "var(--text)", lineHeight: 1.3 }}>
-          {street}{postcode ? <span style={{ color: "var(--muted)", fontWeight: 500 }}> · {postcode}</span> : null}
-        </div>
-        <span className={`pill ${bandClass(band)}`} style={{ fontSize: 10, padding: "2px 8px" }}>{band}</span>
-      </div>
-      <div style={{ fontSize: 11.5, color: "var(--muted)", marginTop: 2 }}>
-        Block {block.name} · {block.count} {block.count === 1 ? "unit" : "units"}
-        {block.maxHeight > 0 ? ` · ${fmt(block.maxHeight, 1)} m` : ""} · £{fmtMoney(block.totalValue)}
-      </div>
-      <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 7 }}>
-        <span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 11, color: "var(--muted)" }}><RiskDot band={getFireRiskBand(block.latest_fra)} /> FRA</span>
-        <span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 11, color: "var(--muted)" }}><RiskDot band={getFireRiskBand(block.latest_fraew)} /> FRAEW</span>
-      </div>
-    </button>
   );
 }
 
@@ -578,27 +555,157 @@ function Dossier({ block }) {
   );
 }
 
+// ---------------------------------------------------------------- block list
+
+// Risk-band ordering for sorting (Red worst → none).
+const BAND_WEIGHT = { Red: 3, Amber: 2, Green: 1 };
+const bandWeight = (band) => BAND_WEIGHT[band] || 0;
+const accentClass = (band) => ({ Red: "r-red", Amber: "r-amber", Green: "r-green" }[band] || "");
+
+// One band column cell: a colour pill with a status dot, or an em-dash when the
+// block has no such document.
+function BandCell({ doc, band }) {
+  if (!doc || !band) return <span className="ba-dash">—</span>;
+  return (
+    <span className={`pill ${bandClass(band)}`}>
+      <RiskDot band={band} />
+      {band}
+    </span>
+  );
+}
+
+function SortHead({ label, col, sort, onSort, align = "left", width }) {
+  const active = sort.key === col;
+  return (
+    <th
+      className={`is-sortable${active ? " is-sorted" : ""}`}
+      style={{ textAlign: align, width }}
+      onClick={() => onSort(col)}
+    >
+      {label}
+      <span className="ba-arrow">{active ? (sort.dir === "asc" ? "▲" : "▼") : "↕"}</span>
+    </th>
+  );
+}
+
+// Flat list of every block: Address · Flats · UPRN · FRA band · FRAEW band.
+// A left accent bar encodes the block's overall (worst) band; rows drill into the dossier.
+function BlockTable({ blocks, selectedId, onSelect, sort, onSort }) {
+  return (
+    <div className="table-wrap" style={{ maxHeight: "calc(100vh - 300px)", overflowY: "auto" }}>
+      <table className="ba-table">
+        <thead>
+          <tr>
+            <SortHead label="Address" col="address" sort={sort} onSort={onSort} />
+            <SortHead label="Flats" col="flats" sort={sort} onSort={onSort} align="center" width={90} />
+            <th>UPRN</th>
+            <SortHead label="FRA" col="fra" sort={sort} onSort={onSort} align="center" width={120} />
+            <SortHead label="FRAEW" col="fraew" sort={sort} onSort={onSort} align="center" width={120} />
+            <th style={{ width: 44 }} aria-label="open" />
+          </tr>
+        </thead>
+        <tbody>
+          {blocks.map((b) => {
+            const { street, postcode } = blockDisplayAddress(b);
+            const fraBand = getFireRiskBand(b.latest_fra);
+            const fraewBand = getFireRiskBand(b.latest_fraew);
+            const overall = blockOverallBand(b);
+            const active = b.id === selectedId;
+            return (
+              <tr key={b.id} className={active ? "is-active" : undefined} onClick={() => onSelect(b.id)}>
+                <td className={`ba-accent ${accentClass(overall)}`}>
+                  <div className="ba-addr">{street}</div>
+                  <div className="ba-addr-sub">
+                    Block {b.name}{postcode ? ` · ${postcode}` : ""}
+                  </div>
+                </td>
+                <td style={{ textAlign: "center" }}>
+                  <span className="ba-flats">{b.count}</span>
+                </td>
+                <td><span className="ba-uprn">{b.parent_uprn ?? <span className="ba-dash">—</span>}</span></td>
+                <td style={{ textAlign: "center" }}><BandCell doc={b.latest_fra} band={fraBand} /></td>
+                <td style={{ textAlign: "center" }}><BandCell doc={b.latest_fraew} band={fraewBand} /></td>
+                <td style={{ textAlign: "center" }}>
+                  <span className="ba-chev" aria-hidden>›</span>
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+// Comparator for the sortable columns.
+function compareBlocks(a, b, key) {
+  switch (key) {
+    case "address":
+      return blockDisplayAddress(a).street.localeCompare(blockDisplayAddress(b).street);
+    case "flats":
+      return (a.count || 0) - (b.count || 0);
+    case "fra":
+      return bandWeight(getFireRiskBand(a.latest_fra)) - bandWeight(getFireRiskBand(b.latest_fra));
+    case "fraew":
+      return bandWeight(getFireRiskBand(a.latest_fraew)) - bandWeight(getFireRiskBand(b.latest_fraew));
+    default:
+      return 0;
+  }
+}
+
 // ---------------------------------------------------------------- page
 
 export default function BlockAnalysisPage({ ingestionResult, latestFireRiskPayload = null, onUploadNew }) {
   const [query, setQuery] = useState("");
+  const [bandFilter, setBandFilter] = useState("all");
+  const [sort, setSort] = useState({ key: null, dir: "desc" });
   const [selectedId, setSelectedId] = useState(null);
 
   const fireDocuments = useMemo(() => collectFireDocuments(ingestionResult, latestFireRiskPayload), [ingestionResult, latestFireRiskPayload]);
   const blocks = useMemo(() => buildBlocks(ingestionResult?.properties || [], fireDocuments), [ingestionResult, fireDocuments]);
 
+  // Overall-band tallies for the summary / filter chips (whole portfolio).
+  const counts = useMemo(() => {
+    const c = { all: blocks.length, Red: 0, Amber: 0, Green: 0, none: 0 };
+    for (const b of blocks) {
+      const ob = blockOverallBand(b);
+      if (ob === "Red") c.Red++;
+      else if (ob === "Amber") c.Amber++;
+      else if (ob === "Green") c.Green++;
+      else c.none++;
+    }
+    return c;
+  }, [blocks]);
+
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    if (!q) return blocks;
-    return blocks.filter((b) => blockStreetText(b).includes(q));
-  }, [blocks, query]);
+    return blocks.filter((b) => {
+      if (q && !blockStreetText(b).includes(q)) return false;
+      if (bandFilter !== "all" && (blockOverallBand(b) || "none") !== bandFilter) return false;
+      return true;
+    });
+  }, [blocks, query, bandFilter]);
 
-  // Derived selection: honour an explicit pick if it's in the current results,
-  // otherwise fall back to the top (highest-risk) result. No effect needed.
-  const selected = useMemo(() => {
-    if (!filtered.length) return null;
-    return filtered.find((b) => b.id === selectedId) || filtered[0];
-  }, [filtered, selectedId]);
+  // Sorted view — defaults to the risk-first order from buildBlocks until a column is picked.
+  const visible = useMemo(() => {
+    if (!sort.key) return filtered;
+    const dir = sort.dir === "asc" ? 1 : -1;
+    return [...filtered].sort((a, b) => dir * compareBlocks(a, b, sort.key));
+  }, [filtered, sort]);
+
+  const toggleSort = (key) =>
+    setSort((s) =>
+      s.key === key
+        ? { key, dir: s.dir === "asc" ? "desc" : "asc" }
+        : { key, dir: key === "address" ? "asc" : "desc" }
+    );
+
+  // The detail dossier only opens when a row is explicitly clicked — the list
+  // is the primary view, so nothing is auto-selected.
+  const selected = useMemo(
+    () => (selectedId ? blocks.find((b) => b.id === selectedId) || null : null),
+    [blocks, selectedId]
+  );
 
   if (!ingestionResult || !blocks.length) {
     return (
@@ -623,44 +730,80 @@ export default function BlockAnalysisPage({ ingestionResult, latestFireRiskPaylo
     );
   }
 
+  const pickBand = (id) => setBandFilter((f) => (f === id ? "all" : id));
+
+  // ---- Dedicated full-page block detail (shown when a row is clicked) ----
+  if (selected) {
+    const overall = blockOverallBand(selected);
+    const { street, postcode } = blockDisplayAddress(selected);
+    return (
+      <>
+        <div className="main-head">
+          <div>
+            <button type="button" className="ba-back" onClick={() => setSelectedId(null)}>
+              ← Back to blocks
+            </button>
+            <div className="page-title" style={{ marginTop: 6 }}>{street}</div>
+            <div className="page-sub">
+              Block {selected.name}
+              {postcode ? ` · ${postcode}` : ""}
+              {selected.parent_uprn ? ` · UPRN ${selected.parent_uprn}` : ""}
+            </div>
+          </div>
+          <span className={`pill ${bandClass(overall)}`} style={{ fontSize: 13, padding: "8px 14px" }}>
+            {bandVerdict(overall)}
+          </span>
+        </div>
+        <div className="content-wrap">
+          <Dossier block={selected} />
+        </div>
+      </>
+    );
+  }
+
   return (
     <>
       <div className="main-head">
         <div>
           <div className="page-title">Block Analysis</div>
-          <div className="page-sub">Search a block by street and review its full risk profile. Hover any ⓘ for a plain-language explanation.</div>
+          <div className="page-sub">Every block with address, size, UPRN and FRA / FRAEW fire-risk banding. Click a row for the full risk profile.</div>
         </div>
         <span className="pill pill-muted">{blocks.length} blocks</span>
       </div>
 
       <div className="content-wrap">
-        <div style={{ display: "grid", gridTemplateColumns: "minmax(300px, 360px) minmax(0, 1fr)", gap: 16, alignItems: "start" }}>
-          {/* Left rail */}
-          <aside className="card" style={{ position: "sticky", top: 16 }}>
-            <div className="card-body" style={{ paddingBottom: 12 }}>
-              <div style={{ position: "relative" }}>
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" strokeWidth="2" strokeLinecap="round" style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)" }}>
+        {/* Block list */}
+        <div className="card">
+          <div className="card-body">
+            <div className="ba-toolbar">
+              <div className="ba-search">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" strokeWidth="2" strokeLinecap="round">
                   <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
                 </svg>
-                <input className="input" type="text" placeholder="Search by street, postcode or block…" value={query} onChange={(e) => setQuery(e.target.value)} style={{ paddingLeft: 36 }} />
+                <input className="input" type="text" placeholder="Search by street, postcode or block…" value={query} onChange={(e) => setQuery(e.target.value)} />
               </div>
-              <div style={{ fontSize: 12, color: "var(--muted)", margin: "10px 2px 0" }}>
-                {filtered.length} {filtered.length === 1 ? "match" : "matches"} · sorted by risk
+              <div className="ba-stats">
+                <StatChip label="All" active={bandFilter === "all"} count={counts.all} onClick={() => pickBand("all")} />
+                <StatChip label="Red" band="Red" active={bandFilter === "Red"} count={counts.Red} onClick={() => pickBand("Red")} />
+                <StatChip label="Amber" band="Amber" active={bandFilter === "Amber"} count={counts.Amber} onClick={() => pickBand("Amber")} />
+                <StatChip label="Green" band="Green" active={bandFilter === "Green"} count={counts.Green} onClick={() => pickBand("Green")} />
+                <StatChip label="Unrated" active={bandFilter === "none"} count={counts.none} onClick={() => pickBand("none")} />
               </div>
             </div>
-            <div style={{ padding: "0 14px 14px", maxHeight: "calc(100vh - 220px)", overflowY: "auto" }}>
-              {filtered.length === 0 ? (
-                <div className="muted" style={{ padding: "8px 2px" }}>No blocks match “{query}”.</div>
-              ) : (
-                filtered.map((b) => <ResultCard key={b.id} block={b} active={b.id === selected?.id} onClick={() => setSelectedId(b.id)} />)
-              )}
-            </div>
-          </aside>
+          </div>
 
-          {/* Detail */}
-          <section style={{ minWidth: 0 }}>
-            {selected ? <Dossier block={selected} /> : <div className="card"><div className="empty-state">Select a block from the list to view its risk profile.</div></div>}
-          </section>
+          <div className="ba-meta">
+            {visible.length} {visible.length === 1 ? "block" : "blocks"}
+            {query ? ` matching “${query}”` : ""}
+            {bandFilter !== "all" ? ` · ${bandFilter === "none" ? "unrated" : bandFilter} only` : ""}
+            {sort.key ? ` · sorted by ${sort.key} (${sort.dir})` : " · sorted by risk"}
+          </div>
+
+          {visible.length === 0 ? (
+            <div className="card-body"><div className="muted">No blocks match your search or filters.</div></div>
+          ) : (
+            <BlockTable blocks={visible} selectedId={null} onSelect={setSelectedId} sort={sort} onSort={toggleSort} />
+          )}
         </div>
       </div>
     </>
