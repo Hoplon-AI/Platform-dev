@@ -461,6 +461,47 @@ def _strip_postcode_from_address(address: str | None, postcode: str | None) -> s
     return ", ".join(seen) if seen else None
 
 
+def _standardise_address(address: str | None) -> str | None:
+    """Reorder address to standard UK format for OS Places.
+
+    Handles Scottish X/Y flat notation appended to the street segment:
+      "40 Balmore Road 0/1, Glasgow"      ->  "0/1, 40 Balmore Road, Glasgow"
+      "675, Hawthorn Street 0/2, Glasgow" ->  "0/2, 675, Hawthorn Street, Glasgow"
+
+    Also handles flat/unit keyword not at front:
+      "45 High Street, Flat 3, Oxford"    ->  "Flat 3, 45 High Street, Oxford"
+    """
+    if not address:
+        return address
+
+    parts = [p.strip() for p in address.split(",") if p.strip()]
+    if not parts:
+        return address
+
+    # Step 1: scan all segments for trailing X/Y (e.g. "40 Balmore Road 0/1")
+    # Skip segments that already start with a flat keyword (e.g. "Flat 1/1" is already correct)
+    for i, part in enumerate(parts):
+        if re.match(r"^(flat|unit|apt|apartment|room|suite)\b", part, re.IGNORECASE):
+            continue
+        m = re.match(r"^(.+?)\s+(\d+/\d+)\s*$", part)
+        if m:
+            flat_notation = m.group(2).strip()
+            parts[i] = m.group(1).strip()
+            if not re.match(r"^\d+/\d+", parts[0]):
+                parts.insert(0, flat_notation)
+            return ", ".join(parts)
+
+    # Step 2: flat/unit keyword or standalone X/Y segment not at front
+    for i in range(1, len(parts)):
+        part = parts[i]
+        if (re.match(r"^(flat|unit|apt|apartment|room|suite)\s+\S+", part, re.IGNORECASE)
+                or re.match(r"^\d+/\d+$", part)):
+            parts.insert(0, parts.pop(i))
+            return ", ".join(parts)
+
+    return address
+
+
 def _parse_storeys(val: Any) -> int | None:
     if val is None:
         return None
@@ -1178,6 +1219,8 @@ def _stage_c_extract(ws, sheet_info: dict, join_data: dict | None,
 
             if address and postcode:
                 address = _strip_postcode_from_address(address, postcode)
+            if address:
+                address = _standardise_address(address)
 
             # Property reference — Issue #4
             prop_ref = _clean_str(_get_val(row, col_map, "property_reference"))
