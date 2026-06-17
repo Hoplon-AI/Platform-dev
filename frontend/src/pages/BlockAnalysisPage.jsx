@@ -784,9 +784,9 @@ export default function BlockAnalysisPage({ ingestionResult, latestFireRiskPaylo
               </div>
               <div className="ba-stats">
                 <StatChip label="All" active={bandFilter === "all"} count={counts.all} onClick={() => pickBand("all")} />
-                <StatChip label="Red" band="Red" active={bandFilter === "Red"} count={counts.Red} onClick={() => pickBand("Red")} />
-                <StatChip label="Amber" band="Amber" active={bandFilter === "Amber"} count={counts.Amber} onClick={() => pickBand("Amber")} />
-                <StatChip label="Green" band="Green" active={bandFilter === "Green"} count={counts.Green} onClick={() => pickBand("Green")} />
+                <StatChip label="High risk" band="Red" active={bandFilter === "Red"} count={counts.Red} onClick={() => pickBand("Red")} />
+                <StatChip label="Medium risk" band="Amber" active={bandFilter === "Amber"} count={counts.Amber} onClick={() => pickBand("Amber")} />
+                <StatChip label="Low risk" band="Green" active={bandFilter === "Green"} count={counts.Green} onClick={() => pickBand("Green")} />
                 <StatChip label="Unrated" active={bandFilter === "none"} count={counts.none} onClick={() => pickBand("none")} />
               </div>
             </div>

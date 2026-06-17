@@ -310,6 +310,40 @@ function KpiCard({ title, value, subtitle, tone = "default" }) {
   );
 }
 
+// Renders high-risk / medium-risk badges for a fire-evidence card.
+// Returns null when there are no red/amber blocks so the card shows no zeroes.
+function fireRiskSubtitle(counts) {
+  if (!counts || (counts.red <= 0 && counts.amber <= 0 && counts.green <= 0)) return null;
+  return (
+    <span style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+      {counts.red > 0 ? (
+        <HoverTooltip
+          tip="Block rated Red — high fire risk"
+          badgeStyle={{ padding: "2px 8px", borderRadius: 6, background: "rgba(225,29,72,0.09)", border: "1px solid rgba(225,29,72,0.28)", fontWeight: 600, fontSize: 13, color: "var(--muted)", cursor: "default" }}
+        >
+          {counts.red} high-risk
+        </HoverTooltip>
+      ) : null}
+      {counts.amber > 0 ? (
+        <HoverTooltip
+          tip="Block rated Amber — medium fire risk"
+          badgeStyle={{ padding: "2px 8px", borderRadius: 6, background: "rgba(245,158,11,0.10)", border: "1px solid rgba(245,158,11,0.30)", fontWeight: 600, fontSize: 13, color: "var(--muted)", cursor: "default" }}
+        >
+          {counts.amber} mid-risk
+        </HoverTooltip>
+      ) : null}
+      {counts.green > 0 ? (
+        <HoverTooltip
+          tip="Block rated Green — low fire risk"
+          badgeStyle={{ padding: "2px 8px", borderRadius: 6, background: "rgba(34,197,94,0.10)", border: "1px solid rgba(34,197,94,0.30)", fontWeight: 600, fontSize: 13, color: "var(--muted)", cursor: "default" }}
+        >
+          {counts.green} low-risk
+        </HoverTooltip>
+      ) : null}
+    </span>
+  );
+}
+
 function PortfolioCompositionCard({ properties, blocks, onSelectBlock, selectedBlock }) {
   const [flatsOpen, setFlatsOpen] = useState(false);
   const [blocksOpen, setBlocksOpen] = useState(false);
@@ -1136,23 +1170,42 @@ export default function PortfolioDashboard({
   const highRiseBlocks = blocks.filter((b) => Number(b.maxHeight) >= 18 || Number(b.max_storeys) >= 7).length;
   const amberBlocks = blocks.filter((b) => (Number(b.maxHeight) >= 11 && Number(b.maxHeight) < 18) || (Number(b.max_storeys) >= 4 && Number(b.max_storeys) < 7)).length;
   const mappedBlocksCount = blocks.filter((b) => b.hasValidCoords).length;
+  const enrichedPropertiesCount = properties.filter((p) => p.uprn || p.enrichment_status === "enriched").length;
+  const enrichedPropertiesPct = properties.length > 0 ? Math.round((enrichedPropertiesCount / properties.length) * 100) : 0;
 
+  // Block-level RAG counts, split by evidence type (FRA vs FRAEW).
   const fireRiskCounts = useMemo(() => {
-    return blocks.reduce(
-      (acc, block) => {
-        const docs = [block.latest_fra, block.latest_fraew].filter(Boolean);
-        const hasRed = docs.some((doc) => getFireRiskBand(doc) === "Red");
-        const hasAmber = docs.some((doc) => getFireRiskBand(doc) === "Amber");
-        const hasGreen = docs.some((doc) => getFireRiskBand(doc) === "Green");
-        if (hasRed) acc.red += 1;
-        else if (hasAmber) acc.amber += 1;
-        else if (hasGreen) acc.green += 1;
-        else acc.unlinked += 1;
+    const tally = (getDoc) =>
+      blocks.reduce(
+        (acc, block) => {
+          const doc = getDoc(block);
+          if (!doc) return acc;
+          const band = getFireRiskBand(doc);
+          if (band === "Red") acc.red += 1;
+          else if (band === "Amber") acc.amber += 1;
+          else if (band === "Green") acc.green += 1;
+          return acc;
+        },
+        { red: 0, amber: 0, green: 0 }
+      );
+    return {
+      fra: tally((b) => b.latest_fra),
+      fraew: tally((b) => b.latest_fraew),
+    };
+  }, [blocks]);
+
+  // Document counts per evidence type for the card headline values.
+  const fireDocCounts = useMemo(() => {
+    return fireDocuments.reduce(
+      (acc, doc) => {
+        const type = String(doc.document_type || "").toUpperCase();
+        if (type === "FRA") acc.fra += 1;
+        else if (type === "FRAEW") acc.fraew += 1;
         return acc;
       },
-      { red: 0, amber: 0, green: 0, unlinked: 0 }
+      { fra: 0, fraew: 0 }
     );
-  }, [blocks]);
+  }, [fireDocuments]);
 
   // Called by list panels and the map — selects the block for the details panel / flat-list popup (map stays in blocks view)
   const handleSelectBlock = (block) => {
@@ -1297,15 +1350,31 @@ export default function PortfolioDashboard({
           tone="blue"
         />
         <KpiCard
-          title="Fire evidence"
-          value={fireDocuments.length}
-          subtitle={`${fireRiskCounts.red} red · ${fireRiskCounts.amber} amber blocks`}
+          title="FRA evidence"
+          value={fireDocCounts.fra}
+          subtitle={fireDocCounts.fra > 0 ? fireRiskSubtitle(fireRiskCounts.fra) : "No evidence uploaded"}
           tone="amber"
         />
         <KpiCard
-          title="Mappable coverage"
-          value={`${geoCompletenessPct}%`}
-          subtitle={`${mappedBlocksCount} mapped blocks`}
+          title="FRAEW evidence"
+          value={fireDocCounts.fraew}
+          subtitle={fireDocCounts.fraew > 0 ? fireRiskSubtitle(fireRiskCounts.fraew) : "No evidence uploaded"}
+          tone="amber"
+        />
+        <KpiCard
+          title={
+            <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+              Properties enhanced
+              <HoverTooltip
+                tip="We cross-reference trusted external sources (Ordnance Survey, EPC) to verify and enrich your portfolio data."
+                badgeStyle={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 15, height: 15, borderRadius: 999, background: "rgba(100,116,139,0.18)", color: "var(--muted)", fontSize: 10, fontWeight: 700, fontStyle: "italic", cursor: "help" }}
+              >
+                i
+              </HoverTooltip>
+            </span>
+          }
+          value={`${enrichedPropertiesPct}%`}
+          subtitle={`${enrichedPropertiesCount} of ${properties.length} properties`}
           tone="green"
         />
       </div>
