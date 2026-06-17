@@ -14,8 +14,8 @@ English (Flat 3, 1 Street) flat notation.
 import re
 from difflib import SequenceMatcher
 
-from address_confidence import _normalize, compare_addresses
-from os_datahub_functions import get_coordinates_from_uprn
+from backend.geo.uprn_maps.address_confidence import _normalize, compare_addresses
+from backend.geo.uprn_maps.os_datahub_functions import get_coordinates_from_uprn
 
 
 # ── Postcode extraction ───────────────────────────────────
@@ -642,7 +642,7 @@ if __name__ == "__main__":
     # Feed addresses through address_to_final pipeline, then compare
     # OS confidence against our traffic-light scoring.
 
-    from os_datahub_functions import get_uprns_from_addresses
+    from backend.geo.uprn_maps.os_datahub_functions import get_uprns_from_addresses
 
     test_addresses = [
         "Flat 3/2, 22 Cartside Quadrant, Battlefield, Glasgow, G42 9RL",

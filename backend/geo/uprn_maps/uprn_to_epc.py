@@ -13,7 +13,7 @@ import requests
 import base64
 import csv
 import io
-from address_confidence import compare_addresses
+from backend.geo.uprn_maps.address_confidence import compare_addresses
 from backend.geo.uprn_maps.os_datahub_functions import get_coordinates_from_uprn
 
 

@@ -171,8 +171,11 @@ def get_uprns_from_addresses(addresses: list[str], api_key: str) -> list[dict | 
 
 # Usage example
 if __name__ == "__main__":
-    MY_API_KEY = "1cNGEE0jL0R5pXlDpPd55wyEXnIBCF2J"
-    search_address = "Flat 2/1, 60 Grange Road, Battlefield, Glasgow, G42 9LF"
+    MY_API_KEY = "7VakhnbibvboaY9eE0385zORrBJAc2sw"
+    search_address = "78 Rowntree Lodge, Haxby Road, New Earswick, York, YO32 4AA"
+
+    #    "78 Rowntree Lodge, Haxby Road, New Earswick, York, YO32 4AA",
+      #  "4 Rowntree Lodge, Haxby Road, New Earswick, York, YO32 4AA"
 
     #parent_uprn: 906421443
 

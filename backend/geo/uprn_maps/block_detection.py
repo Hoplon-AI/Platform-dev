@@ -14,10 +14,7 @@ Edge cases handled:
   address matching catches these.
 """
 import re
-from backend.geo.uprn_maps.os_datahub_functions import (
-    get_coordinates_from_uprn,
-    get_coordinates_from_uprns,
-)
+from backend.geo.uprn_maps.os_datahub_functions import *
 
 MAX_DEPTH = 5  # max levels to traverse upward for nested hierarchies
 
@@ -240,29 +237,21 @@ def detect_block_properties(props: list[dict], api_key: str = None) -> dict:
 
 
 if __name__ == "__main__":
-    API_KEY = "1cNGEE0jL0R5pXlDpPd55wyEXnIBCF2J"
+    API_KEY = "7VakhnbibvboaY9eE0385zORrBJAc2sw"
 
-    test_addresses = ["Flat 1/1, 351 Holmlea Road, Cathcart, Glasgow, G44 4BP",
-                      "Flat 1/1, 351 Holmlea Road, Cathcart, Glasgow, G44 4BP",
-                      "Flat 1/2, 351 Holmlea Road, Cathcart, Glasgow, G44 4BP",
-                      "Flat 1/3, 351 Holmlea Road, Cathcart, Glasgow, G44 4BP",
-                      "Flat 2/1, 351 Holmlea Road, Cathcart, Glasgow, G44 4BP",
-                      "Flat 2/2, 351 Holmlea Road, Cathcart, Glasgow, G44 4BP",
-                      "Flat 0/1, 60 Grange Road, Battlefield, Glasgow, G42 9LF",
-                      "Flat 0/2, 60 Grange Road, Battlefield, Glasgow, G42 9LF",
-                      "Flat 1/1, 60 Grange Road, Battlefield, Glasgow, G42 9LF",
-                      "Flat 1/2, 60 Grange Road, Battlefield, Glasgow, G42 9LF",
-                      "Flat 2/1, 60 Grange Road, Battlefield, Glasgow, G42 9LF",
-                      "Flat 2/2, 60 Grange Road, Battlefield, Glasgow, G42 9LF",]
+    test_addresses = ["99 Spean Street, Cathcart, Glasgow, G44 4FA",
+                      "91 Spean Street , Cathcart, Glasgow, G44 4FA"
+                      ]
 
-    test = ["flat 1/1 99 Spean Street, Cathcart, Glasgow, G44 4FA",
-                "99 Spean Street, Cathcart, Glasgow, G44 4FA",
-                "flat 1/2 99 Spean Street, Cathcart, Glasgow, G44 4FA",
-                "flat 2/1 99 Spean Street, Cathcart, Glasgow, G44 4FA",
-                "flat 2/2 99 Spean Street, Cathcart, Glasgow, G44 4FA",]
+    test_addresses = ["75 Rowntree Lodge, Haxby Road, New Earswick, York, YO32 4AA",
+        "78 Rowntree Lodge, Haxby Road, New Earswick, York, YO32 4AA",
+        "4 Rowntree Lodge, Haxby Road, New Earswick, York, YO32 4AA",]
 
-    props = get_uprns_from_addresses(test, API_KEY)
+    props = get_uprns_from_addresses(test_addresses, API_KEY)
+
+    #print(get_uprns_from_addresses(["351 Holmlea Road, Cathcart, Glasgow, G44 4BP"], API_KEY))
 
     result = detect_block_properties(props, api_key=API_KEY)
+
     print("Blocks:", result["blocks"])
     print("Standalone:", result["standalone"])

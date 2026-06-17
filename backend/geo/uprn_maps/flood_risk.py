@@ -366,7 +366,7 @@ def get_flood_risks_from_coords_batch(
 # ── Usage example ─────────────────────────────────────────────────────────
 
 if __name__ == "__main__":
-    from os_datahub_functions import get_uprns_from_addresses
+    from backend.geo.uprn_maps.os_datahub_functions import get_uprns_from_addresses
 
     PLACES_KEY = "7VakhnbibvboaY9eE0385zORrBJAc2sw"
 

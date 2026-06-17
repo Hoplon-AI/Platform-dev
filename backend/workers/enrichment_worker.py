@@ -32,17 +32,6 @@ import psycopg2
 import psycopg2.extras
 logger = logging.getLogger(__name__)
 
-# Path to 'uprn maps' folder (space in name — Igor's dev folder)
-_UPRN_MAPS_SPACE = os.path.normpath(
-    os.path.join(os.path.dirname(__file__), "..", "geo", "uprn maps")
-)
-
-
-def _ensure_uprn_maps_space_on_path() -> None:
-    """Add the 'uprn maps' (space) directory to sys.path if not already present."""
-    if _UPRN_MAPS_SPACE not in sys.path:
-        sys.path.insert(0, _UPRN_MAPS_SPACE)
-
 # API keys from environment (set in .env or system)
 DEFAULT_PLACES_KEY = os.getenv("OS_PLACES_API_KEY", "")
 DEFAULT_NGD_KEY = os.getenv("OS_NGD_API_KEY", "")
@@ -228,8 +217,7 @@ def _building_only_address(address: str) -> str | None:
 def _run_cross_reference(query: str, os_data: dict, api_key: str) -> dict:
     """Run Igor's cross_reference scoring on an OS Places result."""
     try:
-        _ensure_uprn_maps_space_on_path()
-        from cross_reference import cross_reference  # noqa: E402
+        from backend.geo.uprn_maps.cross_reference import cross_reference
         matched_addr = os_data.get("ADDRESS", "")
         os_score = float(os_data.get("MATCH") or 0.0)
         return cross_reference(query, matched_addr, os_score, os_data, api_key)
@@ -241,8 +229,7 @@ def _run_cross_reference(query: str, os_data: dict, api_key: str) -> dict:
 def _call_flood_risk(x: float, y: float, country_code: str, postcode: str | None) -> dict | None:
     """Get flood risk band for a BNG point via the relevant national agency."""
     try:
-        _ensure_uprn_maps_space_on_path()
-        from flood_risk import get_flood_risk_from_coords  # noqa: E402
+        from backend.geo.uprn_maps.flood_risk import get_flood_risk_from_coords
         result = get_flood_risk_from_coords(x, y, country_code, postcode=postcode)
         return result if isinstance(result, dict) else None
     except Exception as exc:
