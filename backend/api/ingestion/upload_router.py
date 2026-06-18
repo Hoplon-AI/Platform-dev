@@ -780,9 +780,14 @@ async def ingest_document(
             db_pool=pool,
         )
 
-        # Auto-trigger enrichment in background (limit 20 blocks for demo)
-        from backend.workers.enrichment_worker import enrich_portfolio
-        background_tasks.add_task(enrich_portfolio, ha_id, limit=50)
+        # Auto-trigger enrichment in the background and register the job so the
+        # frontend can poll GET /api/v1/enrich/{ha_id}/status and only reveal the
+        # dashboard once enrichment finishes. We mark the job "running"
+        # synchronously (before returning) so a re-upload never sees a previous
+        # run's stale "complete" during the gap before the task starts.
+        from backend.api.enrichment.enrichment_router import _run_background, _active_jobs
+        _active_jobs[ha_id] = {"status": "running", "result": None, "target": 20}
+        background_tasks.add_task(_run_background, ha_id, 20)
         logger.info("[INGEST] SoV done — enrichment queued for ha_id=%s limit=20", ha_id)
 
         # Fetch property rows back so the frontend can render them immediately
@@ -842,6 +847,7 @@ async def ingest_document(
             "status": "success",
             "success": True,
             "document_type": "sov",
+            "ha_id": ha_id,
             "upload_id": upload_id,
             "filename": filename,
             "file_size": len(file_content),

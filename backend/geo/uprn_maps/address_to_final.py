@@ -9,6 +9,16 @@ resolve coordinates once and share them across downstream lookups, cutting
 OS Places API calls from ~4N to ~N for N properties.
 """
 
+# Allow running this file directly (e.g. `py address_to_final.py`) in addition
+# to `py -m backend.geo.uprn_maps.address_to_final`. When run as a loose script
+# `__package__` is empty and the project root is not on sys.path, so the
+# absolute `backend.` imports below fail. Put the project root on the path.
+if not __package__:
+    import os, sys
+    _ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
+    if _ROOT not in sys.path:
+        sys.path.insert(0, _ROOT)
+
 from backend.geo.uprn_maps.os_datahub_functions import (
     get_uprn_from_address,
     get_coordinates_from_uprn,
@@ -258,6 +268,9 @@ def _merge_property_result(
     if isinstance(ngd_building, dict):
         ngd = ngd_building.get("properties", {})
 
+    # Flood lookup may return an error string for some UPRNs — guard like EPC/NGD.
+    flood = flood_data if isinstance(flood_data, dict) else {}
+
     result = {
         # Identity
         "uprn": str(uprn),
@@ -316,9 +329,9 @@ def _merge_property_result(
         "listed_reference": listed_data.get("reference"),
 
         # Flood risk
-        "flood_risk_band": flood_data.get("flood_risk_band") if flood_data else None,
-        "flood_risk_source": flood_data.get("flood_risk_source") if flood_data else None,
-        "flood_risk_note": flood_data.get("flood_risk_note") if flood_data else None,
+        "flood_risk_band": flood.get("flood_risk_band"),
+        "flood_risk_source": flood.get("flood_risk_source"),
+        "flood_risk_note": flood.get("flood_risk_note"),
 
         # NGD identifiers
         "osid": ngd.get("osid"),
@@ -511,8 +524,8 @@ def get_final_info_from_uprns(
 if __name__ == "__main__":
     from backend.geo.uprn_maps.block_detection import detect_block_properties
 
-    PLACES_KEY = "7VakhnbibvboaY9eE0385zORrBJAc2sw"
-    NGD_KEY = "7VakhnbibvboaY9eE0385zORrBJAc2sw"
+    PLACES_KEY = "Y37a6atCtenY2mutDAtFzZenu5x45nVw"
+    NGD_KEY = "Y37a6atCtenY2mutDAtFzZenu5x45nVw"
     EPC_EMAIL = "igorshuvalov23@gmail.com"
     EPC_KEY = "9213b51f9af85ba4700865191700778f0cc7f3fc"
 

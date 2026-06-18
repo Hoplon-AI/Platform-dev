@@ -46,7 +46,7 @@ def get_building_from_coords(x: float, y: float, api_key: str) -> dict | str:
     }
 
     try:
-        response = requests.get(NGD_BUILDINGS_URL, params=params)
+        response = requests.get(NGD_BUILDINGS_URL, params=params, timeout=15)
         response.raise_for_status()
         data = response.json()
     except requests.exceptions.RequestException as e:

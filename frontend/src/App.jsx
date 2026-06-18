@@ -584,7 +584,9 @@ export default function App() {
       const properties = await res.json();
       if (Array.isArray(properties) && properties.length > 0) {
         const normalised = normaliseBackendIngestionResult(
-          { properties, status: "success" },
+          // Demo portfolio id so currentPortfolioId resolves and the
+          // FRA/FRAEW fire-documents reload effect fires after a refresh.
+          { properties, status: "success", portfolio_id: "11111111-1111-1111-1111-111111111111" },
           "Portfolio"
         );
         setIngestionResult(normalised);
@@ -609,8 +611,11 @@ export default function App() {
         const user = JSON.parse(raw);
         setAuthUser(user);
         setShowLanding(false);
-        // Demo mode: do NOT pre-load portfolio from DB on session restore.
-        // Data lives in React state for this session only.
+        // Re-hydrate the portfolio from the DB so previous uploads survive a
+        // page refresh / server restart. Does NOT redirect — navigation stays
+        // wherever the user was; this just repopulates state and re-enables
+        // the Overview nav.
+        loadPropertiesFromApi();
       } catch {
         // corrupted storage — ignore
       }
@@ -668,10 +673,65 @@ export default function App() {
     const steps = STAGE_PIPELINE_STEPS[docType] ?? STAGE_PIPELINE_STEPS.sov;
     setPipelineStep(steps[0]);
 
-    steps.slice(1).forEach((step, i) => {
+    // For SoV, real enrichment progress drives the later steps (3→6). Cap the
+    // canned timers at step 2 so they can't overshoot to the end and then jump
+    // BACKWARDS when enrichment progress (starting near 0) takes over.
+    const maxFakeSteps = docType === "sov" ? 2 : steps.length;
+
+    steps.slice(1, maxFakeSteps).forEach((step, i) => {
       const id = setTimeout(() => setPipelineStep(step), 3500 * (i + 1));
       pipelineTimersRef.current.push(id);
     });
+  };
+
+  // After an SoV upload, the backend enriches a capped batch of properties in
+  // the background. We keep the loading screen up and poll the enrichment job
+  // status until it reports complete/failed (not every row gets enriched — we
+  // just wait for the process to finish), with a safety timeout so the UI can
+  // never hang if the job never reports.
+  const waitForEnrichment = async (haId) => {
+    const POLL_MS = 3000;
+    // No wall-clock cap: we WAIT until the job reports complete/failed (i.e. all
+    // target properties processed). The only escape hatch is a true stall — no
+    // new property finishing for STALL_MS — so a dead backend can't hang the UI
+    // forever, but a slow-but-progressing run always finishes all of them first.
+    const STALL_MS = 180000; // 3 min with zero progress = give up
+    setPipelineStep("Enriching properties");
+    let lastProcessed = -1;
+    let lastProgressAt = Date.now();
+
+    while (true) {
+      await new Promise((resolve) => setTimeout(resolve, POLL_MS));
+      try {
+        const res = await apiFetch(`/api/v1/enrich/${haId}/status`);
+        const data = await res.json();
+        const counts = data?.counts || {};
+        const processed = (counts.enriched || 0) + (counts.failed || 0);
+        const target = data?.target || 0;
+        // Encode processed/target so the step indicator can advance smoothly.
+        setPipelineStep(
+          target > 0
+            ? `Enriching properties — ${processed}/${target}`
+            : processed > 0
+            ? `Enriching properties — ${processed} processed`
+            : "Enriching properties"
+        );
+        // Terminal: the job finished everything it was going to process.
+        if (data?.job_status === "complete" || data?.job_status === "failed") {
+          return data;
+        }
+        // Progress watchdog — reset the clock whenever a property completes.
+        if (processed > lastProcessed) {
+          lastProcessed = processed;
+          lastProgressAt = Date.now();
+        } else if (Date.now() - lastProgressAt > STALL_MS) {
+          console.warn("[waitForEnrichment] no progress for 3 min — opening dashboard");
+          return data;
+        }
+      } catch (err) {
+        console.warn("[waitForEnrichment] status poll failed:", err);
+      }
+    }
   };
 
   const fetchFireDocuments = async (portfolioId) => {
@@ -820,8 +880,22 @@ export default function App() {
           }))
         );
 
+        // Show the un-enriched data immediately as a fallback, then wait for the
+        // background enrichment job to finish before revealing the dashboard.
         setIngestionResult(normalised);
         setLatestFireRiskPayload(normalised.fire_risk_payload ?? null);
+
+        // Stop the fake timed pipeline steps; from here we track REAL enrichment.
+        pipelineTimersRef.current.forEach((id) => clearTimeout(id));
+        pipelineTimersRef.current = [];
+
+        // Keep the loading screen up until enrichment completes.
+        const haId = payload?.ha_id || "ha_demo";
+        await waitForEnrichment(haId);
+
+        // Re-pull rows so the dashboard opens with enriched coords + blocks.
+        await loadPropertiesFromApi();
+
         setActiveNav("overview");
       } else {
         const normalisedFirePayload = {

@@ -37,7 +37,7 @@ def get_coordinates_from_uprn(uprn, api_key):
     }
 
     try:
-        response = requests.get(url, params=params)
+        response = requests.get(url, params=params, timeout=15)
 
         response.raise_for_status()
 
@@ -79,7 +79,7 @@ def get_uprn_from_address(address, api_key):
     }
 
     try:
-        response = requests.get(url, params=params)
+        response = requests.get(url, params=params, timeout=15)
 
         response.raise_for_status()
 

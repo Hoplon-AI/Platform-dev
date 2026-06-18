@@ -52,7 +52,7 @@ def get_epc_from_uprn(uprn, email, api_key):
     params = {"uprn": str(uprn), "size": 100}
 
     try:
-        response = requests.get(url, headers=headers, params=params)
+        response = requests.get(url, headers=headers, params=params, timeout=15)
         response.raise_for_status()
 
         reader = csv.DictReader(io.StringIO(response.text))

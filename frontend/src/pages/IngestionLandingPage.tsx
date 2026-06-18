@@ -160,6 +160,18 @@ export default function IngestionLandingPage({
     // First try exact match in display steps
     const exact = pipelineSteps.findIndex(s => s.toLowerCase() === lower);
     if (exact !== -1) return exact;
+    // Enrichment runs after the canned steps and carries a dynamic suffix
+    // ("Enriching properties — N/M"). Map its real progress across the back
+    // portion of the steps so the bar climbs smoothly instead of snapping to
+    // the last step (and never shows "Complete" until the job truly finishes).
+    if (lower.startsWith("enriching")) {
+      const m = lower.match(/(\d+)\s*\/\s*(\d+)/);
+      const frac = m && Number(m[2]) > 0 ? Number(m[1]) / Number(m[2]) : 0;
+      const startStep = Math.max(pipelineSteps.length - 5, 0); // e.g. "3 of 7"
+      const lastBeforeComplete = pipelineSteps.length - 2;      // e.g. "6 of 7"
+      const span = Math.max(lastBeforeComplete - startStep, 0);
+      return Math.min(startStep + Math.round(frac * span), lastBeforeComplete);
+    }
     // Fall back: find app step index and map proportionally
     const appIndex = appStepNames.indexOf(lower);
     if (appIndex === -1) return 0;

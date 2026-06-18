@@ -8,6 +8,7 @@ POST /api/v1/enrich/{ha_id}/blocks  — Re-run block detection only
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import os
 from typing import Optional
@@ -30,14 +31,29 @@ class EnrichRequest(BaseModel):
     limit: int = Field(0, description="Max properties to enrich (0 = all)")
 
 
+def _enrich_sync(ha_id: str, limit: int) -> dict:
+    """Drive the (synchronous) enrich_portfolio coroutine in a worker thread.
+
+    enrich_portfolio is declared async but does only blocking I/O (psycopg2 +
+    requests) and never awaits the main event loop, so running it in its own
+    loop on a separate thread is safe and keeps the server responsive — without
+    this, enrichment freezes the entire event loop (even /health and /status
+    time out) for the whole batch.
+    """
+    return asyncio.run(enrich_portfolio(ha_id=ha_id, limit=limit))
+
+
 async def _run_background(ha_id: str, limit: int):
-    _active_jobs[ha_id] = {"status": "running", "result": None}
+    # target = how many rows this job will process (0 = all). Surfaced via
+    # /status so the frontend can show smooth progress against the real cap.
+    _active_jobs[ha_id] = {"status": "running", "result": None, "target": limit}
     try:
-        result = await enrich_portfolio(ha_id=ha_id, limit=limit)
-        _active_jobs[ha_id] = {"status": "complete", "result": result}
+        # Offload to a thread so the blocking enrichment doesn't freeze the loop.
+        result = await asyncio.to_thread(_enrich_sync, ha_id, limit)
+        _active_jobs[ha_id] = {"status": "complete", "result": result, "target": limit}
     except Exception as exc:
         logger.error(f"Enrichment failed for {ha_id}: {exc}", exc_info=True)
-        _active_jobs[ha_id] = {"status": "failed", "result": {"error": str(exc)}}
+        _active_jobs[ha_id] = {"status": "failed", "result": {"error": str(exc)}, "target": limit}
 
 
 @router.post("/{ha_id}")
@@ -118,6 +134,7 @@ async def enrichment_status(ha_id: str):
         "ha_id": ha_id,
         "job_status": job["status"] if job else "no_job",
         "job_result": job.get("result") if job else None,
+        "target": job.get("target") if job else None,
         "counts": counts,
         "total_properties": total,
         "total_sum_insured": raw.get("total_si", 0),

@@ -40,7 +40,7 @@ DEFAULT_EPC_KEY = os.getenv("EPC_API_KEY", "")
 
 RATE_LIMIT_DELAY_S = 0.25  # ~400 calls/min, within 600/min limit
 EPC_DAILY_LIMIT = 5000
-BATCH_COMMIT_SIZE = 50
+BATCH_COMMIT_SIZE = 5  # commit every 5 rows so /status shows live progress and partial results persist
 
 
 def _get_db_conn():
@@ -48,7 +48,7 @@ def _get_db_conn():
         os.getenv("DATABASE_URL", "postgresql://postgres:postgres@localhost:5432/platform_dev")
     )
 
-def _api_call_with_retry(func, *args, max_retries=3):
+def _api_call_with_retry(func, *args, max_retries=2):
     for attempt in range(max_retries):
         try:
             result = func(*args)
@@ -76,7 +76,7 @@ def _batch_os_places_by_postcode(postcode: str, api_key: str) -> list[dict]:
         import requests
         url = "https://api.os.uk/search/places/v1/postcode"
         params = {"postcode": postcode, "key": api_key, "maxresults": 100}
-        response = requests.get(url, params=params)
+        response = requests.get(url, params=params, timeout=15)
         response.raise_for_status()
         data = response.json()
         results = []

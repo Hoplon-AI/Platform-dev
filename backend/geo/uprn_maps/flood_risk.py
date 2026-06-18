@@ -132,7 +132,7 @@ SEPA_LAYERS = {
     "Low": [2, 8],     # River Low (layer 2), Coastal Low (layer 8)
 }
 
-REQUEST_TIMEOUT = 30  # seconds
+REQUEST_TIMEOUT = 10  # seconds (kept low so slow flood WFS endpoints can't stall enrichment)
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────
