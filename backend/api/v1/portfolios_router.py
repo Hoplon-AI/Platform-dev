@@ -236,6 +236,7 @@ async def get_properties(
                 epc_rating, epc_potential_rating, epc_lodgement_date, height_max_m,
                 height_roofbase_m, height_confidence, building_footprint_m2,
                 is_listed, listed_grade, listed_name, listed_reference,
+                flood_risk_band, flood_risk_source,
                 enrichment_status, enrichment_source, enriched_at, metadata
             FROM silver.properties
             WHERE ha_id = $1

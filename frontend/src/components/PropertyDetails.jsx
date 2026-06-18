@@ -661,6 +661,165 @@ function BlockPropertiesTable({ properties = [], onSelectProperty }) {
   );
 }
 
+/* ===================== EMPTY STATE ====================== */
+
+function EmptyDetailsState() {
+  const numStep = (n, text) => (
+    <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
+      <span
+        style={{
+          flexShrink: 0,
+          width: 22,
+          height: 22,
+          borderRadius: 999,
+          background: "rgba(184,86,75,0.12)",
+          color: "var(--terracotta-2, #9A463D)",
+          fontSize: 11,
+          fontWeight: 700,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+        }}
+      >
+        {n}
+      </span>
+      <span style={{ fontSize: 13, color: "var(--text, #1E3246)", lineHeight: 1.5 }}>{text}</span>
+    </div>
+  );
+
+  const legendRow = (color, label) => (
+    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+      <span
+        style={{
+          width: 13,
+          height: 13,
+          borderRadius: 999,
+          background: "#fff",
+          border: `2.5px solid ${color}`,
+          boxSizing: "border-box",
+          flexShrink: 0,
+        }}
+      />
+      <span style={{ fontSize: 11, color: "var(--muted, #6B6560)", whiteSpace: "nowrap" }}>{label}</span>
+    </div>
+  );
+
+  const infoItem = (icon, label) => (
+    <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
+      <span
+        style={{
+          flexShrink: 0,
+          width: 26,
+          height: 26,
+          borderRadius: 8,
+          background: "rgba(184,86,75,0.10)",
+          color: "var(--terracotta-2, #9A463D)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+        }}
+      >
+        {icon}
+      </span>
+      <span style={{ fontSize: 12.5, color: "var(--text, #1E3246)" }}>{label}</span>
+    </div>
+  );
+
+  const ic = (children) => (
+    <svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
+      {children}
+    </svg>
+  );
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 22 }}>
+      <p style={{ margin: "0 0 -13px", fontSize: 13.5, color: "var(--muted, #6B6560)", lineHeight: 1.6 }}>
+        Select a block — on the map or from the list above — to inspect its insured value, building height, property mix and fire-risk status.
+      </p>
+
+      <div style={{ marginBottom: -10 }}>
+        <div className="tag" style={{ marginBottom: 12 }}>How to explore</div>
+        <div style={{ display: "flex", flexDirection: "column", gap: 11 }}>
+          {numStep("1", "Click a block on the map for its summary.")}
+          {numStep("2", "Click the same block again to list every flat inside it.")}
+          <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
+            <span
+              style={{
+                flexShrink: 0,
+                width: 22,
+                height: 22,
+                borderRadius: 999,
+                background: "rgba(184,86,75,0.12)",
+                color: "var(--terracotta-2, #9A463D)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              <svg aria-hidden="true" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="11" cy="11" r="7" />
+                <line x1="21" y1="21" x2="16.65" y2="16.65" />
+              </svg>
+            </span>
+            <span style={{ fontSize: 13, color: "var(--text, #1E3246)", lineHeight: 1.5 }}>
+              Or expand the block list in <strong style={{ fontWeight: 600 }}>Portfolio Composition</strong> above and click the block you want.
+            </span>
+          </div>
+        </div>
+      </div>
+
+      <div>
+        <div className="tag" style={{ marginBottom: 12 }}>What each summary shows</div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "12px 10px" }}>
+          {infoItem(ic(<><path d="M18 7c0-5.333-8-5.333-8 0" /><path d="M10 7v14" /><path d="M6 21h12" /><path d="M6 13h10" /></>), "Insured value")}
+          {infoItem(ic(<><path d="M12 3v18" /><path d="m8 7 4-4 4 4" /><path d="m8 17 4 4 4-4" /></>), "Height & storeys")}
+          {infoItem(ic(<><path d="M3 9.5 12 3l9 6.5" /><path d="M5 10v10h14V10" /></>), "Flats in the block")}
+          {infoItem(ic(<path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z" />), "FRA fire risk")}
+          {infoItem(ic(<><rect x="3" y="4" width="18" height="16" rx="1" /><path d="M3 9h18M3 14h18M8 4v5m8-5v5m-4 5v6m-4-6h8" /></>), "FRAEW wall risk")}
+          {infoItem(ic(<><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0z" /><circle cx="12" cy="10" r="3" /></>), "Location & UPRN")}
+        </div>
+      </div>
+
+      <div style={{ background: "var(--warm-bg-2, #F3EFE8)", border: "1px solid var(--border-line, #DED7CC)", borderRadius: 12, padding: "14px 16px" }}>
+        <div className="tag" style={{ marginBottom: 12 }}>Map legend</div>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "6px 8px" }}>
+          {legendRow("#ef4444", "High risk")}
+          {legendRow("#f59e0b", "Medium risk")}
+          {legendRow("#22c55e", "Low risk")}
+          {legendRow("#64748b", "No evidence")}
+        </div>
+        <p style={{ margin: "10px 0 0", fontSize: 12, color: "var(--muted, #6B6560)", lineHeight: 1.5 }}>
+          Marker colour reflects the worst FRA / FRAEW rating linked to the block.
+        </p>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 14, paddingTop: 14, borderTop: "1px solid var(--border-line, #DED7CC)" }}>
+          <span
+            style={{
+              flexShrink: 0,
+              width: 26,
+              height: 26,
+              borderRadius: 999,
+              background: "#fff",
+              color: "var(--navy, #1E3246)",
+              fontSize: 11,
+              fontWeight: 700,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              border: "2.5px solid #64748b",
+              boxSizing: "border-box",
+            }}
+          >
+            12
+          </span>
+          <span style={{ fontSize: 12, color: "var(--muted, #6B6560)", lineHeight: 1.5 }}>
+            Each circle is a block; the number shows how many flats it contains.
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /* ========================= MAIN ========================= */
 
 export default function PropertyDetails({
@@ -684,27 +843,7 @@ export default function PropertyDetails({
   const blockFire = useMemo(() => getFireAssessment(selectedBlock), [selectedBlock]);
 
   if (!property && !blockMode) {
-    return (
-      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-        <div style={{ display: "flex", alignItems: "flex-start", gap: 10, backgroundColor: "rgba(59,130,246,0.06)", border: "1px solid rgba(59,130,246,0.15)", borderRadius: 8, padding: "10px 12px" }}>
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginTop: 2, flexShrink: 0 }}>
-            <path d="M4 4l7 18 3-7 7-3z" />
-          </svg>
-          <p style={{ fontSize: 13, color: "#3b6fc4", margin: 0, lineHeight: 1.5 }}>
-            Click any circle on the map to inspect a block's properties, value, height, and fire risk status.
-          </p>
-        </div>
-        <div style={{ display: "flex", alignItems: "flex-start", gap: 10, backgroundColor: "rgba(148,163,184,0.07)", border: "1px solid rgba(148,163,184,0.18)", borderRadius: 8, padding: "10px 12px" }}>
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginTop: 2, flexShrink: 0 }}>
-            <line x1="8" y1="6" x2="21" y2="6" /><line x1="8" y1="12" x2="21" y2="12" /><line x1="8" y1="18" x2="21" y2="18" />
-            <circle cx="3" cy="6" r="1" /><circle cx="3" cy="12" r="1" /><circle cx="3" cy="18" r="1" />
-          </svg>
-          <p style={{ fontSize: 13, color: "var(--text-light, #64748b)", margin: 0, lineHeight: 1.5 }}>
-            Or search and click a block from the list in the summary above.
-          </p>
-        </div>
-      </div>
-    );
+    return <EmptyDetailsState />;
   }
 
   if (blockMode && selectedBlock && !property) {
@@ -724,7 +863,6 @@ export default function PropertyDetails({
           </div>
           <div className="details-sub" style={{ marginTop: 3 }}>
             Block {selectedBlock.block_reference || selectedBlock.name}
-            {isPresent(selectedBlock.parent_uprn) ? ` · UPRN ${selectedBlock.parent_uprn}` : ""}
           </div>
 
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginTop: 12 }}>
@@ -749,6 +887,7 @@ export default function PropertyDetails({
                   : "—"
               }
             />
+            <MiniStat label="UPRN" value={isPresent(selectedBlock.parent_uprn) ? selectedBlock.parent_uprn : "—"} />
           </div>
 
           {Number.isFinite(lat) && Number.isFinite(lon) ? (
@@ -768,27 +907,7 @@ export default function PropertyDetails({
   }
 
   if (!property) {
-    return (
-      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-        <div style={{ display: "flex", alignItems: "flex-start", gap: 10, backgroundColor: "rgba(59,130,246,0.06)", border: "1px solid rgba(59,130,246,0.15)", borderRadius: 8, padding: "10px 12px" }}>
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginTop: 2, flexShrink: 0 }}>
-            <path d="M4 4l7 18 3-7 7-3z" />
-          </svg>
-          <p style={{ fontSize: 13, color: "#3b6fc4", margin: 0, lineHeight: 1.5 }}>
-            Click any circle on the map to inspect a block's properties, value, height, and fire risk status.
-          </p>
-        </div>
-        <div style={{ display: "flex", alignItems: "flex-start", gap: 10, backgroundColor: "rgba(148,163,184,0.07)", border: "1px solid rgba(148,163,184,0.18)", borderRadius: 8, padding: "10px 12px" }}>
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginTop: 2, flexShrink: 0 }}>
-            <line x1="8" y1="6" x2="21" y2="6" /><line x1="8" y1="12" x2="21" y2="12" /><line x1="8" y1="18" x2="21" y2="18" />
-            <circle cx="3" cy="6" r="1" /><circle cx="3" cy="12" r="1" /><circle cx="3" cy="18" r="1" />
-          </svg>
-          <p style={{ fontSize: 13, color: "var(--text-light, #64748b)", margin: 0, lineHeight: 1.5 }}>
-            Or search and click a block from the list in the summary above.
-          </p>
-        </div>
-      </div>
-    );
+    return <EmptyDetailsState />;
   }
 
   return (
@@ -823,8 +942,6 @@ export default function PropertyDetails({
           value={property?.property_reference ?? property?.propertyReference ?? property?.id}
         />
         <DetailRow label="Property ID" value={property?.property_id ?? property?.propertyId} />
-        <DetailRow label="UPRN" value={property?.uprn ?? property?.UPRN} />
-        <DetailRow label="Parent UPRN" value={property?.parent_uprn} />
         <DetailRow
           label="Block"
           value={
@@ -855,13 +972,14 @@ export default function PropertyDetails({
             value={Number.isFinite(sov.storeys) ? sov.storeys : "—"}
           />
           <KeyValueCard
-            label="Units / flats"
-            value={Number.isFinite(sov.units) ? sov.units : "—"}
-          />
-          <KeyValueCard
             label="Year built"
             value={Number.isFinite(sov.yearBuilt) ? sov.yearBuilt : "—"}
           />
+          <KeyValueCard label="UPRN" value={property?.uprn ?? property?.UPRN} />
+          <KeyValueCard label="Parent UPRN" value={property?.parent_uprn} />
+          {isPresent(property?.flood_risk_band) ? (
+            <KeyValueCard label="Flood risk" value={property.flood_risk_band} />
+          ) : null}
         </div>
       </div>
 

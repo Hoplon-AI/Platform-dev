@@ -1,41 +1,69 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Playfair+Display:ital,wght@0,500;0,600;0,700;1,600&display=swap');
+
 @keyframes spin {
   to { transform: rotate(360deg); }
 }
 
+/* ─────────────────────────────────────────────────────────────────────────
+   EquiRisk design system — warm editorial palette (navy + terracotta),
+   ported from the marketing/holding page. Existing app token NAMES are kept
+   and simply remapped onto the warm system so every var(--x) consumer updates
+   via the cascade.
+   ───────────────────────────────────────────────────────────────────────── */
 :root {
-  --bg: #f5f7fb;
+  /* Brand palette */
+  --navy: #1E3246;
+  --navy-deep: #16273A;
+  --navy-card: #1A2C40;
+  --terracotta: #B8564B;
+  --terracotta-2: #9A463D;
+  --terracotta-3: #C76A5F;
+  --warm-bg: #F9F7F3;
+  --warm-bg-2: #F3EFE8;
+  --blush: #F7E4D5;
+  --slate-warm: #6B6560;
+  --slate-light: #8A847D;
+  --border-line: #DED7CC;
+
+  --font-serif: 'Playfair Display', Georgia, 'Times New Roman', serif;
+  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --ease: cubic-bezier(0.22, 1, 0.36, 1);
+
+  /* App tokens remapped onto the warm system */
+  --bg: #F9F7F3;
   --panel: #ffffff;
-  --panel-soft: #f8fafc;
-  --muted: #64748b;
-  --text: #0f172a;
-  --text-light: #475569;
+  --panel-soft: #F3EFE8;
+  --muted: #6B6560;
+  --text: #1E3246;
+  --text-light: #5E5852;
 
-  --primary: #2563eb;
-  --primary-soft: #dbeafe;
+  --primary: #B8564B;
+  --primary-soft: #F7E4D5;
 
-  --accent: #10b981;
-  --accent-soft: #d1fae5;
+  --accent: #4F8A6B;
+  --accent-soft: #E4EFE8;
 
-  --warning: #f59e0b;
-  --warning-soft: #fef3c7;
+  --warning: #C8923E;
+  --warning-soft: #F7ECD6;
 
-  --danger: #ef4444;
-  --danger-soft: #fee2e2;
+  --danger: #B8564B;
+  --danger-soft: #F7E0DB;
 
-  --border: #e2e8f0;
-  --border-soft: #eef2f7;
-  --shadow: 0 10px 30px rgba(15, 23, 42, 0.06);
-  --shadow-soft: 0 6px 18px rgba(15, 23, 42, 0.04);
+  --border: #EAE5DE;
+  --border-soft: #F1ECE4;
+  --shadow: 0 18px 48px -24px rgba(30, 50, 70, 0.18);
+  --shadow-soft: 0 2px 4px rgba(30, 50, 70, 0.03), 0 12px 30px -18px rgba(30, 50, 70, 0.10);
+  --shadow-hover: 0 28px 60px -28px rgba(30, 50, 70, 0.28);
 
   --radius-sm: 10px;
   --radius: 16px;
-  --radius-lg: 22px;
+  --radius-lg: 20px;
 
-  --map-ocean: #dbeafe;
-  --map-land: #f8fbff;
+  --map-ocean: #E4EAF0;
+  --map-land: #F9F7F3;
   --map-road: #ffffff;
-  --map-park: #e8f7ea;
-  --map-building: #eef2f7;
+  --map-park: #E8EFE7;
+  --map-building: #EAE5DE;
 }
 
 * {
@@ -52,10 +80,24 @@ body,
 }
 
 body {
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  font-family: var(--font-sans);
   background: var(--bg);
   color: var(--text);
-  line-height: 1.5;
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+h1, h2, h3, h4 {
+  font-family: var(--font-serif);
+  color: var(--text);
+  line-height: 1.15;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+::selection {
+  background: rgba(184, 86, 75, 0.18);
 }
 
 a {
@@ -73,7 +115,7 @@ select {
 /* app shell */
 .app {
   min-height: 100vh;
-  background: linear-gradient(180deg, #f8fbff 0%, #f5f7fb 100%);
+  background: linear-gradient(180deg, #FBFAF6 0%, var(--warm-bg) 100%);
 }
 
 .topbar {
@@ -198,24 +240,77 @@ select {
 }
 
 .page-title {
-  font-size: 30px;
-  line-height: 1.1;
-  letter-spacing: -0.03em;
-  font-weight: 800;
-  color: var(--text);
+  font-family: var(--font-serif);
+  font-size: 34px;
+  line-height: 1.12;
+  letter-spacing: -0.015em;
+  font-weight: 600;
+  color: var(--navy);
+}
+
+.page-title em {
+  font-style: italic;
+  color: var(--terracotta);
 }
 
 .page-sub {
-  color: var(--muted);
+  color: var(--slate-warm);
   margin-top: 8px;
   font-size: 15px;
-  max-width: 760px;
+  line-height: 1.6;
+  white-space: nowrap;
+}
+
+/* Let the subtitle wrap once the viewport is too narrow for one line */
+@media (max-width: 1100px) {
+  .page-sub {
+    white-space: normal;
+  }
 }
 
 .actions {
   display: flex;
   gap: 10px;
   flex-wrap: wrap;
+}
+
+/* Editorial eyebrow — uppercase terracotta label with a leading rule.
+   Uses terracotta-2 (#9A463D) so the 11.5px text clears WCAG AA. */
+.tag {
+  color: var(--terracotta-2);
+  font-family: var(--font-sans);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
+  font-size: 11.5px;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin-bottom: 0.55rem;
+}
+
+.tag::before {
+  content: '';
+  width: 24px;
+  height: 1px;
+  background: var(--terracotta);
+  display: inline-block;
+}
+
+/* Accessibility — visible keyboard focus + reduced-motion */
+:focus-visible {
+  outline: 3px solid var(--terracotta);
+  outline-offset: 2px;
+  border-radius: 5px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+  }
 }
 
 /* common */
@@ -236,14 +331,22 @@ select {
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-soft);
   overflow: hidden;
+  transition: box-shadow 0.4s var(--ease), border-color 0.4s var(--ease);
+}
+
+/* Container cards get a restrained focus nudge (no transform — they hold maps
+   and scroll areas, so a lift would cause reflow jitter). */
+.card:hover {
+  box-shadow: var(--shadow);
+  border-color: var(--border-line);
 }
 
 .card-lg {
-  border-radius: 24px;
+  border-radius: var(--radius-lg);
 }
 
 .card-soft {
-  background: linear-gradient(180deg, #ffffff 0%, #fafcff 100%);
+  background: linear-gradient(180deg, #ffffff 0%, var(--warm-bg) 100%);
 }
 
 .card-header {
@@ -255,9 +358,11 @@ select {
 }
 
 .card-title {
-  font-size: 18px;
-  font-weight: 700;
-  color: var(--text);
+  font-family: var(--font-serif);
+  font-size: 20px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--navy);
 }
 
 .card-subtitle,
@@ -303,81 +408,143 @@ select {
 
 .pill-soft,
 .pill-muted {
-  background: #f8fafc;
-  color: var(--muted);
-  border-color: var(--border);
+  background: var(--warm-bg-2);
+  color: #5A554F;
+  border-color: var(--border-line);
 }
 
 .pill-good {
   background: var(--accent-soft);
-  color: #047857;
-  border-color: #a7f3d0;
+  color: #2f6b4f;
+  border-color: #bcd9c8;
 }
 
 .pill-warn {
   background: var(--warning-soft);
-  color: #b45309;
-  border-color: #fde68a;
+  color: #8a6420;
+  border-color: #e7cd9c;
 }
 
 .pill-amber,
 .band-yellow,
 .band-amber {
   background: var(--warning-soft);
-  color: #b45309;
-  border-color: #fde68a;
+  color: #8a6420;
+  border-color: #e7cd9c;
 }
 
 .band-green {
   background: var(--accent-soft);
-  color: #047857;
-  border-color: #a7f3d0;
+  color: #2f6b4f;
+  border-color: #bcd9c8;
 }
 
 .band-red {
   background: var(--danger-soft);
-  color: #b91c1c;
-  border-color: #fecaca;
+  color: var(--terracotta-2);
+  border-color: #e8b9b1;
 }
 
 .band-muted {
-  background: #f8fafc;
-  color: #64748b;
-  border-color: var(--border);
+  background: var(--warm-bg-2);
+  color: var(--slate-warm);
+  border-color: var(--border-line);
 }
 
-/* buttons */
+/* buttons — pill-shaped, warm */
 .btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 8px;
-  border: 1px solid var(--border);
+  border: 1px solid var(--border-line);
   background: #fff;
-  color: var(--text);
+  color: var(--navy);
   min-height: 42px;
-  padding: 0 16px;
-  border-radius: 12px;
+  padding: 0 20px;
+  border-radius: 50px;
+  font-family: var(--font-sans);
   font-size: 14px;
-  font-weight: 700;
+  font-weight: 500;
   cursor: pointer;
-  transition: 0.18s ease;
+  transition: all 0.32s var(--ease);
 }
 
 .btn:hover {
-  background: #f8fafc;
-  border-color: #cfd8e3;
+  background: #fff;
+  border-color: var(--terracotta);
+  color: var(--terracotta);
+  transform: translateY(-2px);
+  box-shadow: 0 12px 26px -16px rgba(30, 50, 70, 0.28);
 }
 
 .btn-primary {
-  background: linear-gradient(180deg, #2f6cf3 0%, #2563eb 100%);
-  border-color: #2563eb;
+  background: var(--terracotta);
+  border-color: var(--terracotta);
   color: #fff;
+  box-shadow: 0 6px 18px rgba(184, 86, 75, 0.28);
 }
 
 .btn-primary:hover {
-  background: linear-gradient(180deg, #2a63e0 0%, #1d4ed8 100%);
-  border-color: #1d4ed8;
+  background: var(--terracotta-2);
+  border-color: var(--terracotta-2);
+  color: #fff;
+  transform: translateY(-2px);
+  box-shadow: 0 12px 28px rgba(184, 86, 75, 0.34);
+}
+
+.btn:disabled,
+.btn[disabled] {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+.btn:disabled:hover,
+.btn[disabled]:hover {
+  transform: none;
+  box-shadow: none;
+  border-color: var(--border-line);
+  color: var(--navy);
+}
+
+/* Single chevron that rotates with the collapse, instead of swapping glyphs */
+.panel-chev {
+  display: inline-block;
+  color: var(--slate-warm);
+  transition: transform 0.35s var(--ease);
+}
+
+.panel-chev.is-collapsed {
+  transform: rotate(-90deg);
+}
+
+/* Block list rows — hover feedback + selected state */
+.block-row {
+  transition: background 0.18s var(--ease), box-shadow 0.18s var(--ease);
+}
+
+.block-row:hover {
+  background: var(--warm-bg-2);
+  box-shadow: inset 3px 0 0 var(--terracotta);
+}
+
+.block-row.is-selected {
+  background: var(--primary-soft);
+  box-shadow: inset 3px 0 0 var(--terracotta);
+}
+
+/* Document export tiles — same hover language as the KPI cards */
+.doc-card {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  transition: box-shadow 0.35s var(--ease), border-color 0.35s var(--ease);
+}
+
+.doc-card:hover {
+  border-color: var(--border-line);
+  box-shadow: var(--shadow-soft);
 }
 
 .btn-ghost {
@@ -398,8 +565,8 @@ select {
 }
 
 .input:focus {
-  border-color: #93c5fd;
-  box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.08);
+  border-color: var(--terracotta);
+  box-shadow: 0 0 0 3px rgba(184, 86, 75, 0.30);
 }
 
 /* ingestion page */
@@ -518,8 +685,8 @@ select {
 }
 
 .dropzone:hover {
-  border-color: #93c5fd;
-  background: linear-gradient(180deg, #fafdff 0%, #f3f9ff 100%);
+  border-color: var(--terracotta-3);
+  background: linear-gradient(180deg, #ffffff 0%, var(--warm-bg) 100%);
 }
 
 .dropzone-active {
@@ -800,44 +967,102 @@ select {
 }
 
 .dashboard-card {
-  background: #fff;
+  position: relative;
+  background: linear-gradient(180deg, #ffffff 0%, #FCFBF8 100%);
   border: 1px solid var(--border);
-  border-radius: 18px;
-  padding: 18px;
+  border-radius: var(--radius-lg);
+  padding: 20px 20px 20px 22px;
   box-shadow: var(--shadow-soft);
+  --card-accent: var(--terracotta);
+  transition: transform 0.4s var(--ease), box-shadow 0.4s var(--ease), border-color 0.4s var(--ease);
 }
 
-.dashboard-card-blue {
-  background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
+/* Inset accent bar (top/bottom inset so it clears the rounded corners — this
+   means the card needs NO overflow:hidden, so badge tooltips aren't clipped). */
+.dashboard-card::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 14px;
+  bottom: 14px;
+  width: 3px;
+  border-radius: 0 3px 3px 0;
+  background: var(--card-accent);
+  opacity: 0.55;
+  transition: width 0.35s var(--ease), opacity 0.35s var(--ease);
 }
 
-.dashboard-card-green {
-  background: linear-gradient(180deg, #ffffff 0%, #f7fef9 100%);
+.dashboard-card:hover {
+  transform: translateY(-4px);
+  box-shadow: var(--shadow-hover);
+  border-color: var(--border-line);
+  z-index: 20;
 }
 
-.dashboard-card-amber {
-  background: linear-gradient(180deg, #ffffff 0%, #fffaf1 100%);
+.dashboard-card:hover::before {
+  width: 6px;
+  opacity: 1;
 }
+
+.dashboard-card-blue  { --card-accent: var(--navy); }
+.dashboard-card-green { --card-accent: var(--accent); }
+.dashboard-card-amber { --card-accent: var(--terracotta); }
 
 .dashboard-card-title {
-  font-size: 13px;
-  color: var(--muted);
-  font-weight: 700;
+  font-family: var(--font-sans);
+  font-size: 11.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  color: var(--slate-warm);
+  font-weight: 600;
 }
 
 .dashboard-card-value {
-  margin-top: 10px;
-  font-size: 30px;
-  line-height: 1.05;
-  letter-spacing: -0.03em;
-  font-weight: 800;
-  color: var(--text);
+  margin-top: 12px;
+  font-family: var(--font-serif);
+  font-size: 33px;
+  line-height: 1.0;
+  letter-spacing: -0.01em;
+  font-weight: 600;
+  color: var(--navy);
+  font-variant-numeric: tabular-nums;
 }
 
 .dashboard-card-sub {
-  margin-top: 8px;
+  margin-top: 10px;
   font-size: 13px;
-  color: var(--muted);
+  color: var(--slate-warm);
+}
+
+.dashboard-card-icon {
+  position: absolute;
+  top: 18px;
+  right: 18px;
+  width: 38px;
+  height: 38px;
+  border-radius: 11px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: color-mix(in srgb, var(--card-accent) 12%, transparent);
+  color: var(--card-accent);
+  transition: background 0.35s var(--ease), color 0.35s var(--ease), transform 0.4s var(--ease);
+}
+
+.dashboard-card-icon svg {
+  width: 19px;
+  height: 19px;
+}
+
+.dashboard-card:hover .dashboard-card-icon {
+  background: var(--card-accent);
+  color: #fff;
+  transform: scale(1.06);
+}
+
+/* keep the eyebrow label clear of the corner icon */
+.dashboard-card .dashboard-card-title {
+  padding-right: 46px;
 }
 
 .confidence-card {
@@ -883,7 +1108,7 @@ select {
 
 .bar-fill {
   height: 100%;
-  background: linear-gradient(90deg, #2563eb 0%, #22c55e 100%);
+  background: linear-gradient(90deg, var(--terracotta) 0%, var(--terracotta-3) 100%);
   border-radius: 999px;
 }
 
@@ -1010,7 +1235,7 @@ select {
   letter-spacing: 0.04em;
   padding: 12px 14px;
   border-bottom: 1px solid var(--border);
-  background: #fbfdff;
+  background: var(--warm-bg-2);
   position: sticky;
   top: 0;
   z-index: 1;
@@ -1302,15 +1527,15 @@ select {
 }
 
 .map-block-item:hover {
-  border-color: #bfdbfe;
-  box-shadow: 0 8px 18px rgba(37, 99, 235, 0.08);
+  border-color: var(--terracotta-3);
+  box-shadow: 0 8px 18px rgba(184, 86, 75, 0.10);
   transform: translateY(-1px);
 }
 
 .map-block-item.active {
-  border-color: #93c5fd;
-  background: #f8fbff;
-  box-shadow: 0 10px 22px rgba(37, 99, 235, 0.1);
+  border-color: var(--terracotta);
+  background: var(--blush);
+  box-shadow: 0 10px 22px rgba(184, 86, 75, 0.12);
 }
 
 .map-block-top {
@@ -1389,12 +1614,6 @@ select {
 .status-badge,
 .spinner {
   /* retained names from older iterations */
-}
-
-@keyframes spin {
-  to {
-    transform: rotate(360deg);
-  }
 }
 
 /* responsive */

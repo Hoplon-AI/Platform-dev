@@ -289,6 +289,8 @@ const normaliseProperty = (row, index = 0) => {
     listed_grade: row.listed_grade ?? "",
     listed_name: row.listed_name ?? "",
     listed_reference: row.listed_reference ?? "",
+    flood_risk_band: row.flood_risk_band ?? "",
+    flood_risk_source: row.flood_risk_source ?? "",
     enrichment_status: row.enrichment_status ?? "",
     enrichment_source: row.enrichment_source ?? "",
     enriched_at: row.enriched_at ?? null,

@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 
 import PortfolioMap from "../components/PortfolioMap.jsx";
 import PropertyDetails from "../components/PropertyDetails.jsx";
+import { blockStreetText, blockDisplayAddress } from "../utils/blockModel.js";
 
 const fmtMoney = (n) => {
   const x = Number(n);
@@ -265,7 +266,7 @@ function RiskBadge({ band }) {
   );
 }
 
-function HoverTooltip({ children, tip, badgeStyle }) {
+function HoverTooltip({ children, tip, badgeStyle, tipWidth = 160 }) {
   const [visible, setVisible] = useState(false);
   return (
     <span
@@ -279,12 +280,14 @@ function HoverTooltip({ children, tip, badgeStyle }) {
         top: "calc(100% + 8px)",
         left: "50%",
         transform: "translateX(-50%)",
-        width: 160,
+        width: tipWidth,
         background: "var(--panel)",
         color: "var(--text-light)",
         fontSize: 12,
         fontWeight: 400,
         lineHeight: 1.5,
+        textTransform: "none",
+        letterSpacing: "normal",
         borderRadius: 8,
         border: "1px solid var(--border, #e2e8f0)",
         padding: "9px 12px",
@@ -300,15 +303,46 @@ function HoverTooltip({ children, tip, badgeStyle }) {
   );
 }
 
-function KpiCard({ title, value, subtitle, tone = "default" }) {
+function KpiCard({ title, value, subtitle, tone = "default", icon = null }) {
   return (
     <div className={`dashboard-card dashboard-card-${tone}`}>
+      {icon ? <div className="dashboard-card-icon">{icon}</div> : null}
       <div className="dashboard-card-title">{title}</div>
       <div className="dashboard-card-value">{value}</div>
       {subtitle ? <div className="dashboard-card-sub">{subtitle}</div> : null}
     </div>
   );
 }
+
+// Lightweight inline stroke icons (lucide-style) for the KPI cards.
+const KPI_ICONS = {
+  value: (
+    <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M18 7V5a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h14a1 1 0 0 1 1 1v8a1 1 0 0 1-1 1H5a2 2 0 0 1-2-2V6" />
+      <circle cx="16" cy="12" r="1.4" />
+    </svg>
+  ),
+  blocks: (
+    <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M3 21h18" /><path d="M5 21V7l7-4 7 4v14" /><path d="M9 9h.01M15 9h.01M9 13h.01M15 13h.01M9 17h.01M15 17h.01" />
+    </svg>
+  ),
+  fra: (
+    <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z" />
+    </svg>
+  ),
+  fraew: (
+    <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="3" y="4" width="18" height="16" rx="1.5" /><path d="M3 9h18M3 14h18M8 4v5m8-5v5m-4 5v6m-4-6h8" />
+    </svg>
+  ),
+  enhanced: (
+    <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M12 3l1.9 4.6L18.5 9l-4.6 1.9L12 15.5l-1.9-4.6L5.5 9l4.6-1.4z" /><path d="M19 14l.8 2 2 .8-2 .8-.8 2-.8-2-2-.8 2-.8z" />
+    </svg>
+  ),
+};
 
 // Renders high-risk / medium-risk badges for a fire-evidence card.
 // Returns null when there are no red/amber blocks so the card shows no zeroes.
@@ -319,7 +353,7 @@ function fireRiskSubtitle(counts) {
       {counts.red > 0 ? (
         <HoverTooltip
           tip="Block rated Red — high fire risk"
-          badgeStyle={{ padding: "2px 8px", borderRadius: 6, background: "rgba(225,29,72,0.09)", border: "1px solid rgba(225,29,72,0.28)", fontWeight: 600, fontSize: 13, color: "var(--muted)", cursor: "default" }}
+          badgeStyle={{ padding: "2px 8px", borderRadius: 6, background: "rgba(225,29,72,0.09)", border: "1px solid rgba(225,29,72,0.28)", fontWeight: 600, fontSize: 13, color: "var(--navy)", cursor: "default" }}
         >
           {counts.red} high-risk
         </HoverTooltip>
@@ -327,7 +361,7 @@ function fireRiskSubtitle(counts) {
       {counts.amber > 0 ? (
         <HoverTooltip
           tip="Block rated Amber — medium fire risk"
-          badgeStyle={{ padding: "2px 8px", borderRadius: 6, background: "rgba(245,158,11,0.10)", border: "1px solid rgba(245,158,11,0.30)", fontWeight: 600, fontSize: 13, color: "var(--muted)", cursor: "default" }}
+          badgeStyle={{ padding: "2px 8px", borderRadius: 6, background: "rgba(245,158,11,0.10)", border: "1px solid rgba(245,158,11,0.30)", fontWeight: 600, fontSize: 13, color: "var(--navy)", cursor: "default" }}
         >
           {counts.amber} mid-risk
         </HoverTooltip>
@@ -335,7 +369,7 @@ function fireRiskSubtitle(counts) {
       {counts.green > 0 ? (
         <HoverTooltip
           tip="Block rated Green — low fire risk"
-          badgeStyle={{ padding: "2px 8px", borderRadius: 6, background: "rgba(34,197,94,0.10)", border: "1px solid rgba(34,197,94,0.30)", fontWeight: 600, fontSize: 13, color: "var(--muted)", cursor: "default" }}
+          badgeStyle={{ padding: "2px 8px", borderRadius: 6, background: "rgba(34,197,94,0.10)", border: "1px solid rgba(34,197,94,0.30)", fontWeight: 600, fontSize: 13, color: "var(--navy)", cursor: "default" }}
         >
           {counts.green} low-risk
         </HoverTooltip>
@@ -379,7 +413,7 @@ function PortfolioCompositionCard({ properties, blocks, onSelectBlock, selectedB
   const flatTypeBreakdown = useMemo(() => typeBreakdown(flats), [flats]);
   const otherTypeBreakdown = useMemo(() => typeBreakdown(other), [other]);
 
-  const renderRow = (label, count, _total, tone = "#64748b", meta = null) => (
+  const renderRow = (label, count, _total, tone = "#6B6560", meta = null) => (
     <div style={{ marginBottom: 14 }}>
       <div style={{ display: "grid", gridTemplateColumns: "16px 1fr auto", gap: 10, alignItems: "center" }}>
         <div style={{ width: 8, height: 8, borderRadius: 999, background: tone, marginLeft: 4 }} />
@@ -427,14 +461,14 @@ function PortfolioCompositionCard({ properties, blocks, onSelectBlock, selectedB
       </div>
 
       <div className="card-body">
-        {renderRow("Houses", houses.length, totalUnits, "#3b82f6")}
-        {renderExpandableRow("Flats", flats, "#6366f1", flatsOpen, setFlatsOpen)}
+        {renderRow("Houses", houses.length, totalUnits, "#1E3246")}
+        {renderExpandableRow("Flats", flats, "#B8564B", flatsOpen, setFlatsOpen)}
         <div style={{ marginBottom: 14 }}>
           <div
             style={{ display: "grid", gridTemplateColumns: "16px 1fr auto auto", gap: 10, alignItems: "center", cursor: "pointer", userSelect: "none" }}
             onClick={() => setBlocksOpen((o) => !o)}
           >
-            <div style={{ width: 8, height: 8, borderRadius: 999, background: "#f59e0b", marginLeft: 4 }} />
+            <div style={{ width: 8, height: 8, borderRadius: 999, background: "#C8923E", marginLeft: 4 }} />
             <div style={{ fontWeight: 600 }}>Blocks</div>
             <div className="muted">{blockCount} blocks</div>
             <div className="muted" style={{ fontSize: 11, paddingRight: 2 }}>{blocksOpen ? "▲" : "▼"}</div>
@@ -443,7 +477,7 @@ function PortfolioCompositionCard({ properties, blocks, onSelectBlock, selectedB
             <div style={{ marginTop: 8, marginLeft: 26 }}>
               <input
                 type="text"
-                placeholder="Search block ID…"
+                placeholder="Search by address, block ID or postcode…"
                 value={blocksSearch}
                 onChange={(e) => setBlocksSearch(e.target.value)}
                 style={{
@@ -459,35 +493,57 @@ function PortfolioCompositionCard({ properties, blocks, onSelectBlock, selectedB
                   outline: "none",
                 }}
               />
-              <div style={{ borderLeft: "2px solid rgba(245,158,11,0.3)", paddingLeft: 12, paddingRight: 18, maxHeight: 288, overflowY: "auto" }}>
+              <div style={{ borderLeft: "2px solid rgba(184,86,75,0.3)", paddingLeft: 12, paddingRight: 18, maxHeight: 288, overflowY: "auto" }}>
                 {blocks
                   .filter((block) => {
-                    const id = block.label || block.name || block.block_reference || block.block_id || block.id || "";
-                    return id.toLowerCase().includes(blocksSearchDebounced.toLowerCase());
+                    const q = blocksSearchDebounced.trim().toLowerCase();
+                    if (!q) return true;
+                    const idText = [block.block_reference, block.block_id, block.id, block.label, block.name]
+                      .filter(Boolean)
+                      .join(" ")
+                      .toLowerCase();
+                    return blockStreetText(block).includes(q) || idText.includes(q);
                   })
                   .map((block) => {
-                    const id = block.label || block.name || block.block_reference || block.block_id || block.id || "—";
+                    const { street, postcode } = blockDisplayAddress(block);
+                    const ref = block.block_reference || block.name || block.label || block.block_id || block.id || "—";
                     const isSelected = selectedBlock && (
                       (selectedBlock.id && selectedBlock.id === block.id) ||
                       (selectedBlock.label && selectedBlock.label === block.label)
                     );
                     return (
                       <div
-                        key={block.id || block.block_id || id}
+                        key={block.id || block.block_id || ref}
+                        className={`block-row${isSelected ? " is-selected" : ""}`}
                         onClick={() => onSelectBlock?.(block)}
                         style={{
                           display: "flex",
                           justifyContent: "space-between",
-                          padding: "5px 6px",
+                          alignItems: "center",
+                          gap: 10,
+                          padding: "6px 8px",
                           fontSize: 13,
-                          borderRadius: 6,
+                          borderRadius: 8,
                           cursor: "pointer",
-                          background: isSelected ? "rgba(245,158,11,0.12)" : "transparent",
-                          fontWeight: isSelected ? 600 : 400,
                         }}
                       >
-                        <span style={{ color: isSelected ? "#b45309" : undefined }}>{id}</span>
-                        <span className="muted">{block.count ?? 0}</span>
+                        <div style={{ minWidth: 0 }}>
+                          <div
+                            style={{
+                              fontWeight: isSelected ? 600 : 500,
+                              color: isSelected ? "var(--terracotta-2)" : "var(--text)",
+                              whiteSpace: "nowrap",
+                              overflow: "hidden",
+                              textOverflow: "ellipsis",
+                            }}
+                          >
+                            {street || ref}
+                          </div>
+                          <div className="muted" style={{ fontSize: 11.5, marginTop: 1 }}>
+                            {ref}{postcode ? ` · ${postcode}` : ""}
+                          </div>
+                        </div>
+                        <span className="muted" style={{ flexShrink: 0 }}>{block.count ?? 0}</span>
                       </div>
                     );
                   })}
@@ -495,7 +551,7 @@ function PortfolioCompositionCard({ properties, blocks, onSelectBlock, selectedB
             </div>
           )}
         </div>
-        {other.length > 0 && renderExpandableRow("Other", other, "#64748b", otherOpen, setOtherOpen)}
+        {other.length > 0 && renderExpandableRow("Other", other, "#6B6560", otherOpen, setOtherOpen)}
 
         {thirdPartyLikeBlocks > 0 && (
           <div
@@ -521,8 +577,8 @@ function MiniSummaryTable({ title, subtitle, rows, columns }) {
   return (
     <div
       style={{
-        background: "rgba(15,23,42,0.02)",
-        border: "1px solid rgba(15,23,42,0.06)",
+        background: "var(--panel-soft)",
+        border: "1px solid var(--border-soft)",
         borderRadius: 16,
         padding: 14,
       }}
@@ -579,9 +635,7 @@ function PortfolioAnalysisWindow({ tenancyRows, blockRows, propertyTypeRows, age
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           <span className="pill pill-muted">Whole SoV summary</span>
-          <span style={{ fontSize: 18, lineHeight: 1, color: "var(--text-muted, #888)" }}>
-            {collapsed ? "▸" : "▾"}
-          </span>
+          <span className={`panel-chev${collapsed ? " is-collapsed" : ""}`} style={{ fontSize: 16, lineHeight: 1 }}>▾</span>
         </div>
       </div>
 
@@ -674,9 +728,7 @@ function FireEvidencePanel({ fireDocuments, loading, onUploadNew }) {
           <span className="pill pill-muted">
             {loading ? "Refreshing…" : `${fireDocuments.length} documents`}
           </span>
-          <span style={{ fontSize: 18, lineHeight: 1, color: "var(--text-muted, #888)" }}>
-            {collapsed ? "▸" : "▾"}
-          </span>
+          <span className={`panel-chev${collapsed ? " is-collapsed" : ""}`} style={{ fontSize: 16, lineHeight: 1 }}>▾</span>
         </div>
       </div>
 
@@ -708,7 +760,7 @@ function FireEvidencePanel({ fireDocuments, loading, onUploadNew }) {
             <div
               key={band}
               style={{
-                border: "1px solid rgba(148,163,184,0.22)",
+                border: "1px solid var(--border)",
                 borderRadius: 16,
                 padding: 14,
                 background: "#fff",
@@ -722,10 +774,10 @@ function FireEvidencePanel({ fireDocuments, loading, onUploadNew }) {
 
         <div
           style={{
-            border: "1px solid rgba(37,99,235,0.22)",
+            border: "1px solid rgba(184,86,75,0.22)",
             borderRadius: 18,
             padding: 16,
-            background: "linear-gradient(135deg, rgba(37,99,235,0.08), rgba(16,185,129,0.08))",
+            background: "linear-gradient(135deg, rgba(184,86,75,0.10), rgba(199,106,95,0.04))",
             display: "flex",
             flexDirection: "column",
             justifyContent: "space-between",
@@ -762,10 +814,10 @@ function FireEvidencePanel({ fireDocuments, loading, onUploadNew }) {
         {fireDocuments.length === 0 ? (
           <div
             style={{
-              border: "1px dashed rgba(148,163,184,0.45)",
+              border: "1px dashed var(--border-line)",
               borderRadius: 16,
               padding: 16,
-              background: "rgba(248,250,252,0.8)",
+              background: "var(--panel-soft)",
             }}
           >
             <div style={{ fontWeight: 700 }}>No FRA / FRAEW documents uploaded yet.</div>
@@ -780,7 +832,7 @@ function FireEvidencePanel({ fireDocuments, loading, onUploadNew }) {
               <article
                 key={doc.id}
                 style={{
-                  border: "1px solid rgba(148,163,184,0.22)",
+                  border: "1px solid var(--border)",
                   borderRadius: 16,
                   padding: 14,
                   background: "#fff",
@@ -843,9 +895,7 @@ function BlockListPanel({ blocks, selectedBlockId, onSelectBlock, selectedProper
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           <span className="pill pill-muted">{blocks.length} blocks</span>
-          <span style={{ fontSize: 18, lineHeight: 1, color: "var(--text-muted, #888)" }}>
-            {collapsed ? "▸" : "▾"}
-          </span>
+          <span className={`panel-chev${collapsed ? " is-collapsed" : ""}`} style={{ fontSize: 16, lineHeight: 1 }}>▾</span>
         </div>
       </div>
 
@@ -899,7 +949,7 @@ function BlockListPanel({ blocks, selectedBlockId, onSelectBlock, selectedProper
                       cursor: "pointer",
                       background:
                         selectedBlockId === block.id && !selectedProperty
-                          ? "rgba(59,130,246,0.08)"
+                          ? "var(--primary-soft)"
                           : "transparent",
                     }}
                   >
@@ -1304,7 +1354,8 @@ export default function PortfolioDashboard({
     <div className="content-wrap">
       <div className="main-head">
         <div>
-          <div className="page-title">Portfolio Overview</div>
+          <div className="tag">Premium Intelligence</div>
+          <div className="page-title">Portfolio <em>Overview</em></div>
           <div className="page-sub">
             Underwriter-focused dashboard using ingested portfolio, enrichment, block grouping, fire risk evidence, and map analysis.
           </div>
@@ -1327,47 +1378,85 @@ export default function PortfolioDashboard({
           title="Total insured value"
           value={`£${fmtMoney(ingestionSummary.totalValue)}`}
           subtitle={`Across ${ingestionSummary.propertyCount} properties`}
+          icon={KPI_ICONS.value}
         />
         <KpiCard
-          title="Blocks detected"
+          title={
+            <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+              Blocks detected
+              <HoverTooltip
+                tip="Our engine groups the properties in your SoV by shared parent UPRN and address to detect the distinct blocks across your portfolio."
+                tipWidth={280}
+                badgeStyle={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 15, height: 15, borderRadius: 999, background: "rgba(184,86,75,0.12)", color: "var(--terracotta-2)", fontSize: 10, fontWeight: 700, fontStyle: "italic", cursor: "help" }}
+              >
+                i
+              </HoverTooltip>
+            </span>
+          }
           value={blocks.length}
           subtitle={
             <span style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
               <HoverTooltip
                 tip="18 m+ or 7+ storeys — defined as higher-risk under the Building Safety Act 2022"
-                badgeStyle={{ padding: "2px 8px", borderRadius: 6, background: "rgba(225,29,72,0.09)", border: "1px solid rgba(225,29,72,0.28)", fontWeight: 600, fontSize: 13, color: "var(--muted)", cursor: "default" }}
+                badgeStyle={{ padding: "2px 8px", borderRadius: 6, background: "rgba(225,29,72,0.09)", border: "1px solid rgba(225,29,72,0.28)", fontWeight: 600, fontSize: 13, color: "var(--navy)", cursor: "default" }}
               >
                 {highRiseBlocks} high-risk
               </HoverTooltip>
               <HoverTooltip
                 tip="11–18 m or 4–6 storeys — medium-rise under Approved Document B (2022)"
-                badgeStyle={{ padding: "2px 8px", borderRadius: 6, background: "rgba(245,158,11,0.10)", border: "1px solid rgba(245,158,11,0.30)", fontWeight: 600, fontSize: 13, color: "var(--muted)", cursor: "default" }}
+                badgeStyle={{ padding: "2px 8px", borderRadius: 6, background: "rgba(245,158,11,0.10)", border: "1px solid rgba(245,158,11,0.30)", fontWeight: 600, fontSize: 13, color: "var(--navy)", cursor: "default" }}
               >
                 {amberBlocks} mid-risk
               </HoverTooltip>
             </span>
           }
           tone="blue"
+          icon={KPI_ICONS.blocks}
         />
         <KpiCard
-          title="FRA evidence"
+          title={
+            <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+              FRA evidence
+              <HoverTooltip
+                tip="Upload Fire Risk Assessment (FRA) reports for your blocks. Our engine reads each report and assigns the block its fire-risk rating based on the findings in the assessment."
+                tipWidth={280}
+                badgeStyle={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 15, height: 15, borderRadius: 999, background: "rgba(184,86,75,0.12)", color: "var(--terracotta-2)", fontSize: 10, fontWeight: 700, fontStyle: "italic", cursor: "help" }}
+              >
+                i
+              </HoverTooltip>
+            </span>
+          }
           value={fireDocCounts.fra}
           subtitle={fireDocCounts.fra > 0 ? fireRiskSubtitle(fireRiskCounts.fra) : "No evidence uploaded"}
           tone="amber"
+          icon={KPI_ICONS.fra}
         />
         <KpiCard
-          title="FRAEW evidence"
+          title={
+            <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+              FRAEW evidence
+              <HoverTooltip
+                tip="Upload Fire Risk Appraisal of External Walls (FRAEW) reports for your blocks. Our engine reads each report and assigns the block its external-wall (cladding) risk rating based on the findings."
+                tipWidth={280}
+                badgeStyle={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 15, height: 15, borderRadius: 999, background: "rgba(184,86,75,0.12)", color: "var(--terracotta-2)", fontSize: 10, fontWeight: 700, fontStyle: "italic", cursor: "help" }}
+              >
+                i
+              </HoverTooltip>
+            </span>
+          }
           value={fireDocCounts.fraew}
           subtitle={fireDocCounts.fraew > 0 ? fireRiskSubtitle(fireRiskCounts.fraew) : "No evidence uploaded"}
           tone="amber"
+          icon={KPI_ICONS.fraew}
         />
         <KpiCard
           title={
             <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
               Properties enhanced
               <HoverTooltip
-                tip="We cross-reference trusted external sources (Ordnance Survey, EPC) to verify and enrich your portfolio data."
-                badgeStyle={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 15, height: 15, borderRadius: 999, background: "rgba(100,116,139,0.18)", color: "var(--muted)", fontSize: 10, fontWeight: 700, fontStyle: "italic", cursor: "help" }}
+                tip="The share of properties we matched to a verified UPRN from their address, then enriched with trusted external data — coordinates, EPC rating, building height, flood risk and listed-building status."
+                tipWidth={280}
+                badgeStyle={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 15, height: 15, borderRadius: 999, background: "rgba(184,86,75,0.12)", color: "var(--terracotta-2)", fontSize: 10, fontWeight: 700, fontStyle: "italic", cursor: "help" }}
               >
                 i
               </HoverTooltip>
@@ -1376,6 +1465,7 @@ export default function PortfolioDashboard({
           value={`${enrichedPropertiesPct}%`}
           subtitle={`${enrichedPropertiesCount} of ${properties.length} properties`}
           tone="green"
+          icon={KPI_ICONS.enhanced}
         />
       </div>
 
@@ -1409,7 +1499,7 @@ export default function PortfolioDashboard({
               </span>
             </div>
 
-            <div ref={detailsScrollRef} className="details-body" style={{ minHeight: 420, maxHeight: 420, overflowY: "auto", paddingRight: 6 }}>
+            <div ref={detailsScrollRef} className="details-body" style={{ minHeight: 505, maxHeight: 505, overflowY: "auto", paddingRight: 6 }}>
               <PropertyDetails
                 property={resolvedSelectedProperty}
                 selectedBlock={resolvedSelectedBlock}
@@ -1424,9 +1514,6 @@ export default function PortfolioDashboard({
           <div className="card-header row-between">
             <div>
               <div className="card-title">Block analysis map</div>
-              <div className="card-subtitle">
-                Interactive block map. Select a block to explore the details.
-              </div>
             </div>
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
               <span className="pill pill-muted">{mappedBlocksCount} mapped blocks</span>
@@ -1456,6 +1543,44 @@ export default function PortfolioDashboard({
               )}
             </div>
           )}
+
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 9,
+              margin: "12px 22px 0",
+              padding: "9px 13px",
+              borderRadius: 10,
+              background: "var(--blush)",
+              border: "1px solid var(--border-line)",
+              color: "var(--navy)",
+              fontSize: 12.5,
+              lineHeight: 1.45,
+            }}
+          >
+            <svg
+              aria-hidden="true"
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="var(--terracotta-2)"
+              strokeWidth="1.8"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              style={{ flexShrink: 0 }}
+            >
+              <path d="M9 9l5 12 1.8-5.2L21 14z" />
+              <path d="M7.2 2.2 8 5.1" />
+              <path d="m5.1 7.2-2.9-.8" />
+              <path d="M14 4.1 12 6" />
+              <path d="m6 12-1.9 2" />
+            </svg>
+            <span>
+              <strong style={{ fontWeight: 700 }}>Tip:</strong> click a block to see its summary, then click it again to list every flat inside it.
+            </span>
+          </div>
 
           <div className="map-wrap">
             <PortfolioMap
@@ -1533,22 +1658,22 @@ function UnderwriterDocumentsPanel({ portfolioId, propertyCount, properties, blo
   const docBCompletion = blocks.length > 0 ? Math.round((blocksWithData.length / blocks.length) * 100) : 0;
 
   const completionColor = (pct) => {
-    if (pct >= 90) return { bg: "#dcfce7", color: "#16a34a" };
-    if (pct >= 70) return { bg: "#fef9c3", color: "#ca8a04" };
-    return { bg: "#fee2e2", color: "#dc2626" };
+    if (pct >= 90) return { bg: "var(--accent-soft)", color: "#2f6b4f" };
+    if (pct >= 70) return { bg: "var(--warning-soft)", color: "#8a6420" };
+    return { bg: "var(--danger-soft)", color: "var(--terracotta-2)" };
   };
 
   return (
-    <div className="card" style={{ marginTop: 24, padding: 28 }}>
+    <div className="card" style={{ marginTop: 20, padding: 24 }}>
       {/* Header */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 24 }}>
         <div>
-          <div style={{ fontSize: 16, fontWeight: 700, color: "#111827", marginBottom: 4 }}>Underwriter Working Documents</div>
-          <div style={{ fontSize: 13, color: "#6b7280" }}>Pre-populated from HA submission data</div>
+          <div style={{ fontFamily: "var(--font-serif)", fontSize: 20, fontWeight: 600, letterSpacing: "-0.01em", color: "var(--navy)", marginBottom: 4 }}>Underwriter Working Documents</div>
+          <div style={{ fontSize: 13, color: "var(--muted)" }}>Pre-populated from HA submission data</div>
         </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: "#6b7280", flexShrink: 0 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: "var(--muted)", flexShrink: 0 }}>
           <span>Export using:</span>
-          <select style={{ border: "1px solid #d1d5db", borderRadius: 7, padding: "5px 10px", fontSize: 13, background: "#fff", cursor: "pointer", color: "#374151" }}>
+          <select style={{ border: "1px solid var(--border)", borderRadius: 10, padding: "5px 10px", fontSize: 13, background: "#fff", cursor: "pointer", color: "var(--text)" }}>
             <option>Aviva Doc A v2.1</option>
           </select>
         </div>
@@ -1557,19 +1682,19 @@ function UnderwriterDocumentsPanel({ portfolioId, propertyCount, properties, blo
       {/* Doc cards */}
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
         {/* Doc A */}
-        <div style={{ border: "1px solid #e5e7eb", borderRadius: 12, padding: "20px 24px", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 20, minWidth: 0 }}>
+        <div className="doc-card" style={{ padding: "20px 24px", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 20, minWidth: 0 }}>
           <div style={{ display: "flex", gap: 14, alignItems: "flex-start", minWidth: 0 }}>
-            <div style={{ width: 42, height: 42, borderRadius: 10, background: "#eff6ff", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <div style={{ width: 42, height: 42, borderRadius: 10, background: "rgba(184,86,75,0.10)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#B8564B" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/>
               </svg>
             </div>
             <div style={{ minWidth: 0 }}>
-              <div style={{ fontWeight: 600, fontSize: 14, color: "#111827", marginBottom: 4 }}>Document A — Stock Listing</div>
-              <div style={{ fontSize: 12, color: "#6b7280", marginBottom: 10 }}>{propertyCount} properties · 35 fields populated</div>
+              <div style={{ fontWeight: 600, fontSize: 15, color: "var(--text)", marginBottom: 4 }}>Document A — Stock Listing</div>
+              <div style={{ fontSize: 12, color: "var(--muted)", marginBottom: 10 }}>{propertyCount} properties · 35 fields populated</div>
               <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-                <span style={{ fontSize: 11, fontWeight: 600, padding: "3px 10px", borderRadius: 20, background: completionColor(docACompletion).bg, color: completionColor(docACompletion).color }}>{docACompletion}% complete</span>
-                <span style={{ fontSize: 11, fontWeight: 500, padding: "3px 10px", borderRadius: 20, background: "#eff6ff", color: "#3b82f6" }}>Aviva format</span>
+                <span style={{ fontSize: 11, fontWeight: 600, padding: "3px 10px", borderRadius: 999, background: completionColor(docACompletion).bg, color: completionColor(docACompletion).color }}>{docACompletion}% complete</span>
+                <span style={{ fontSize: 11, fontWeight: 500, padding: "3px 10px", borderRadius: 999, background: "rgba(184,86,75,0.12)", color: "var(--terracotta-2)" }}>Aviva format</span>
               </div>
             </div>
           </div>
@@ -1585,24 +1710,24 @@ function UnderwriterDocumentsPanel({ portfolioId, propertyCount, properties, blo
         </div>
 
         {/* Doc B */}
-        <div style={{ border: "1px solid #e5e7eb", borderRadius: 12, padding: "20px 24px", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 20, minWidth: 0 }}>
+        <div className="doc-card" style={{ padding: "20px 24px", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 20, minWidth: 0 }}>
           <div style={{ display: "flex", gap: 14, alignItems: "flex-start", minWidth: 0 }}>
-            <div style={{ width: 42, height: 42, borderRadius: 10, background: "#fffbeb", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <div style={{ width: 42, height: 42, borderRadius: 10, background: "#F7ECD6", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#C8923E" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 9h6M9 12h6M9 15h4"/>
               </svg>
             </div>
             <div style={{ minWidth: 0 }}>
-              <div style={{ fontWeight: 600, fontSize: 14, color: "#111827", marginBottom: 4 }}>Document B — High Value</div>
-              <div style={{ fontSize: 12, color: "#6b7280", marginBottom: 10 }}>{highValueBlocks.length} block{highValueBlocks.length !== 1 ? "s" : ""} (18m+) · 65 fields populated</div>
+              <div style={{ fontWeight: 600, fontSize: 15, color: "var(--text)", marginBottom: 4 }}>Document B — High Value</div>
+              <div style={{ fontSize: 12, color: "var(--muted)", marginBottom: 10 }}>{highValueBlocks.length} block{highValueBlocks.length !== 1 ? "s" : ""} (18m+) · 65 fields populated</div>
               <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-                <span style={{ fontSize: 11, fontWeight: 600, padding: "3px 10px", borderRadius: 20, background: completionColor(docBCompletion).bg, color: completionColor(docBCompletion).color }}>{docBCompletion}% complete</span>
-                <span style={{ fontSize: 11, fontWeight: 500, padding: "3px 10px", borderRadius: 20, background: "#eff6ff", color: "#3b82f6" }}>Aviva format</span>
+                <span style={{ fontSize: 11, fontWeight: 600, padding: "3px 10px", borderRadius: 999, background: completionColor(docBCompletion).bg, color: completionColor(docBCompletion).color }}>{docBCompletion}% complete</span>
+                <span style={{ fontSize: 11, fontWeight: 500, padding: "3px 10px", borderRadius: 999, background: "rgba(184,86,75,0.12)", color: "var(--terracotta-2)" }}>Aviva format</span>
               </div>
             </div>
           </div>
           <div style={{ display: "flex", gap: 8, alignItems: "center", flexShrink: 0 }}>
-            <select style={{ border: "1px solid #d1d5db", borderRadius: 7, padding: "7px 10px", fontSize: 13, background: "#fff", cursor: "pointer", color: "#374151" }}>
+            <select style={{ border: "1px solid var(--border)", borderRadius: 10, padding: "7px 10px", fontSize: 13, background: "#fff", cursor: "pointer", color: "var(--text)" }}>
               <option>Aviva v3.0</option>
             </select>
             <button
