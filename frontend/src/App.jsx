@@ -1,7 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import proj4 from "proj4";
 
-import Landingpage from "./landingpage.jsx";
 import LoginPage from "./pages/LoginPage.jsx";
 import IngestionPage from "./pages/IngestionLandingPage.tsx";
 import PortfolioDashboard from "./pages/PortfolioDashboard.jsx";
@@ -624,6 +623,16 @@ export default function App() {
     }
   }, []);
 
+  // The embedded holding page (public/holding.html) posts this when its
+  // "Login / Register" CTA is clicked — leave the landing and enter the app.
+  useEffect(() => {
+    const onMsg = (e) => {
+      if (e?.data === "equirisk-enter-app") setShowLanding(false);
+    };
+    window.addEventListener("message", onMsg);
+    return () => window.removeEventListener("message", onMsg);
+  }, []);
+
   useEffect(() => {
     if (!API_BASE_URL) return;
 
@@ -972,10 +981,10 @@ export default function App() {
 
   if (showLanding) {
     return (
-      <Landingpage
-        onGetStarted={() => {
-          setShowLanding(false);
-        }}
+      <iframe
+        title="EquiRisk — Premium Intelligence"
+        src="/holding.html"
+        style={{ position: "fixed", inset: 0, width: "100%", height: "100%", border: "none" }}
       />
     );
   }
