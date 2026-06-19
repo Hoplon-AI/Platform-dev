@@ -1,0 +1,347 @@
+/* ──────────────────────────────────────────────────────────────────────────
+   Login — EquiRisk Graphic Standard v1.1 (light). Full-bleed two-pane split.
+   Left: rose band — logo top, hero block centred, Premium Intelligence bottom.
+   Right: off-white pane — form centred, footer pinned bottom (no card, no logo).
+   Palette scoped to .login-page so the rest of the app is untouched.
+   ────────────────────────────────────────────────────────────────────────── */
+
+.login-page {
+  --eq-offwhite: #FAF6EF;
+  --eq-rose:     #FDF1E6;
+  --eq-peach:    #F8E7D6;
+  --eq-white:    #FFFFFF;
+  --eq-navy:     #232540;
+  --eq-red:      #AE302B;
+  --eq-red-deep: #972924;
+  --eq-cream:    #FDF1E6;
+  --eq-ink-72:   rgba(35, 37, 64, 0.72);
+  --eq-ink-55:   rgba(35, 37, 64, 0.55);
+  --eq-ink-line: rgba(35, 37, 64, 0.13);
+
+  min-height: 100vh;
+  display: grid;
+  grid-template-columns: 1fr;
+  background: var(--eq-offwhite);
+  color: var(--eq-navy);
+  font-family: var(--font-sans);
+}
+
+@media (min-width: 900px) {
+  .login-page { grid-template-columns: 47% 53%; }
+}
+
+/* ── Left: rose band — top / centre / bottom rows ────────────────────────── */
+.login-panel {
+  position: relative;
+  z-index: 1;
+  overflow: hidden;
+  display: grid;
+  grid-template-rows: 1fr auto;          /* narrative, then the photo band */
+  background: var(--eq-rose);
+  min-height: 100vh;
+  box-shadow: 30px 0 64px -44px rgba(35, 37, 64, 0.24);   /* layers the panel over the form ground */
+}
+.login-panel-content {
+  display: grid;
+  grid-template-rows: auto 1fr auto;     /* logo / centred narrative / Premium Intelligence */
+  gap: 1.5rem;
+  padding: clamp(2.5rem, 4vw, 4rem);
+  /* light bottom padding: the tall photo's rose-transparent top gives the
+     narrative room to breathe without a hard seam */
+  padding-bottom: clamp(1.25rem, 2vh, 2rem);
+}
+/* the terracotta-clad block (Standard v1.1, Rule 6) — a full-bleed bottom section
+   band cropped to the building mass (no floating sky) that dissolves up into the
+   rose over a long fade, so type never sits over the un-faded photo */
+.login-photo {
+  height: clamp(280px, 46vh, 520px);
+  background-image: url("/BlockEquiRisk.jpg");
+  background-size: cover;
+  background-position: center 64%;       /* corten + brick + balconies, sky cropped out */
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0%, rgba(0, 0, 0, 0.5) 34%, #000 66%);
+          mask-image: linear-gradient(to bottom, transparent 0%, rgba(0, 0, 0, 0.5) 34%, #000 66%);
+}
+
+.login-brand-mark { align-self: start; }
+.login-brand-mark img { height: clamp(46px, 4vw, 60px); width: auto; display: block; }
+
+.login-panel-center {
+  align-self: center;
+  display: flex;
+  flex-direction: column;
+  gap: clamp(1.4rem, 2.4vh, 2.1rem);
+  max-width: 36rem;
+}
+
+.login-kicker {
+  font-size: 0.82rem;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--eq-red);
+}
+
+.login-headline {
+  font-family: var(--font-serif);
+  font-weight: 600;
+  font-size: clamp(2.6rem, 4.4vw, 4.1rem);
+  line-height: 1.04;
+  letter-spacing: -0.015em;
+  color: var(--eq-navy);
+  max-width: 15ch;
+  margin: 0;
+}
+.login-headline em { font-style: italic; color: var(--eq-red); }   /* red italic accent, light ground */
+
+.login-sub {
+  font-size: clamp(1.08rem, 1.25vw, 1.28rem);
+  line-height: 1.55;
+  color: var(--eq-ink-72);
+  max-width: 44ch;
+  margin: 0;
+}
+
+/* trust points: an editorial divided list (navy hairlines, red marks) — no boxes */
+.login-trust { list-style: none; margin: 0; padding: 0; }
+.login-trust li {
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+  padding: clamp(1.1rem, 1.9vh, 1.55rem) 0;
+  font-size: clamp(1.02rem, 1.1vw, 1.16rem);
+  line-height: 1.35;
+  color: var(--eq-navy);
+  border-top: 1px solid var(--eq-ink-line);
+}
+.login-trust li:last-child { border-bottom: 1px solid var(--eq-ink-line); }
+.login-trust svg { flex-shrink: 0; color: var(--eq-red); }
+
+/* "Premium Intelligence" — bottom-right of the surface (Rule 5) */
+.login-pi {
+  align-self: end;
+  justify-self: end;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  display: inline-flex;
+  gap: 0.4em;
+}
+.login-pi .pi-p { color: var(--eq-red); }
+.login-pi .pi-i { color: var(--eq-navy); }
+
+/* ── Right: off-white pane — form centred, footer pinned bottom ──────────── */
+.login-form-pane {
+  display: grid;
+  grid-template-rows: 1fr auto;
+  justify-items: center;
+  gap: 1.5rem;
+  padding: clamp(2.5rem, 4vw, 4rem) clamp(1.5rem, 5vw, 4rem);
+  background: var(--eq-offwhite);
+  min-height: 100vh;
+}
+
+.login-mid { align-self: center; width: 100%; max-width: 392px; display: flex; flex-direction: column; }
+
+.login-form-kicker {
+  font-size: 0.74rem;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--eq-red);
+  margin-bottom: 14px;
+}
+
+.login-heading {
+  font-family: var(--font-serif);
+  font-size: clamp(1.85rem, 2.6vw, 2.3rem);
+  font-weight: 600;
+  color: var(--eq-navy);
+  letter-spacing: -0.01em;
+  margin: 0 0 6px;
+}
+.login-subheading {
+  font-size: 0.92rem;
+  line-height: 1.55;
+  color: var(--eq-ink-72);
+  margin: 0 0 28px;
+}
+
+.login-form { display: flex; flex-direction: column; gap: 17px; }
+.login-field { display: flex; flex-direction: column; gap: 7px; }
+.login-label { font-size: 0.8rem; font-weight: 600; color: var(--eq-navy); letter-spacing: 0.01em; }
+
+.login-input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 12px 14px;
+  font-family: var(--font-sans);
+  font-size: 0.92rem;
+  color: var(--eq-navy);
+  background: var(--eq-white);
+  border: 1.5px solid var(--eq-ink-line);
+  border-radius: 12px;
+  transition: border-color 0.18s var(--ease), box-shadow 0.18s var(--ease);
+}
+.login-input::placeholder { color: var(--eq-ink-55); }
+.login-input:hover:not(:focus):not(:disabled) { border-color: rgba(35, 37, 64, 0.28); }
+.login-input:focus,
+.login-input:focus-visible {
+  outline: none;
+  border-color: var(--eq-red);
+  box-shadow: 0 0 0 3px rgba(174, 48, 43, 0.16);
+}
+.login-input:disabled { opacity: 0.6; cursor: not-allowed; }
+/* keep the brand surface on browser autofill (no yellow box) */
+.login-input:-webkit-autofill,
+.login-input:-webkit-autofill:hover,
+.login-input:-webkit-autofill:focus {
+  -webkit-text-fill-color: var(--eq-navy);
+  -webkit-box-shadow: 0 0 0 1000px var(--eq-white) inset;
+  caret-color: var(--eq-navy);
+  transition: background-color 9999s ease-in-out 0s;
+}
+
+.login-pass-wrap { position: relative; display: flex; align-items: center; }
+.login-pass-wrap .login-input { padding-right: 44px; }
+.login-eye {
+  position: absolute;
+  right: 10px;
+  display: flex;
+  align-items: center;
+  padding: 4px;
+  border: none;
+  background: none;
+  color: var(--eq-ink-55);
+  cursor: pointer;
+  border-radius: 6px;
+}
+.login-eye:hover { color: var(--eq-red); }
+.login-eye:focus-visible { outline: 2px solid var(--eq-red); outline-offset: 1px; }
+
+.login-capslock { display: flex; align-items: center; gap: 5px; font-size: 0.75rem; color: var(--eq-red); margin-top: 2px; }
+
+.login-remember { display: flex; align-items: center; }
+.login-check {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 0.83rem; color: var(--eq-ink-72); cursor: pointer; user-select: none;
+}
+.login-check input { width: 15px; height: 15px; accent-color: var(--eq-red); cursor: pointer; }
+
+.login-error {
+  display: flex; align-items: center; gap: 8px;
+  background: rgba(174, 48, 43, 0.07);
+  border: 1px solid rgba(174, 48, 43, 0.28);
+  border-radius: 10px;
+  padding: 10px 13px;
+  font-size: 0.82rem;
+  color: var(--eq-red);
+}
+.login-error svg { flex-shrink: 0; }
+
+.login-submit {
+  width: 100%;
+  margin-top: 6px;
+  padding: 14px 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  font-family: var(--font-sans);
+  font-size: 0.97rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  color: #fff;
+  background: var(--eq-red);
+  border: none;
+  border-radius: 50px;
+  cursor: pointer;
+  box-shadow: 0 6px 18px rgba(174, 48, 43, 0.26);
+  transition: background 0.3s var(--ease), transform 0.3s var(--ease), box-shadow 0.3s var(--ease);
+}
+.login-arrow { transition: transform 0.3s var(--ease); }
+.login-submit:hover:not(:disabled) .login-arrow { transform: translateX(4px); }
+.login-submit:hover:not(:disabled) {
+  background: var(--eq-red-deep);
+  transform: translateY(-2px);
+  box-shadow: 0 12px 28px rgba(174, 48, 43, 0.32);
+}
+.login-submit:focus-visible { outline: 2px solid var(--eq-red); outline-offset: 2px; }
+.login-submit:disabled { background: #D6A8A4; cursor: not-allowed; box-shadow: none; }
+
+.login-spinner-row { display: flex; align-items: center; justify-content: center; }
+.login-spinner {
+  display: inline-block;
+  width: 14px; height: 14px; margin-right: 8px;
+  border: 2px solid rgba(255, 255, 255, 0.4);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;     /* keyframes in global.css */
+}
+
+.login-footer {
+  align-self: end;
+  width: 100%;
+  max-width: 392px;
+  font-size: 0.74rem;
+  line-height: 1.6;
+  color: var(--eq-ink-55);
+  text-align: center;
+}
+.login-footer strong { color: var(--eq-ink-72); }
+
+/* ── Mobile: panel becomes a compact top band; form fills below ──────────── */
+@media (max-width: 899px) {
+  .login-panel { display: flex; flex-direction: column; min-height: 0; }
+  .login-panel-content {
+    display: flex;
+    flex-direction: column;
+    gap: 0.8rem;
+    padding: 1.5rem clamp(1.25rem, 5vw, 2rem) 1.75rem;
+  }
+  .login-photo { display: none; }
+  .login-panel-center { gap: 0.8rem; }
+  .login-sub, .login-trust, .login-pi { display: none; }
+  .login-headline { font-size: 1.65rem; max-width: none; }
+  .login-form-pane {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    gap: 1.75rem;
+    padding-top: 2.25rem;
+  }
+}
+
+/* ── Entrance: a calm, staggered fade-up on load ─────────────────────────── */
+@keyframes loginRise {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes loginFade { from { opacity: 0; } to { opacity: 1; } }
+@media (prefers-reduced-motion: no-preference) {
+  .login-photo { animation: loginFade 0.8s var(--ease) both; animation-delay: 0.3s; }
+  .login-brand-mark,
+  .login-panel-center > *,
+  .login-pi,
+  .login-mid > *,
+  .login-footer { animation: loginRise 0.55s var(--ease) both; }
+
+  .login-brand-mark { animation-delay: 0.02s; }
+  .login-panel-center > *:nth-child(1) { animation-delay: 0.08s; }
+  .login-panel-center > *:nth-child(2) { animation-delay: 0.14s; }
+  .login-panel-center > *:nth-child(3) { animation-delay: 0.20s; }
+  .login-panel-center > *:nth-child(4) { animation-delay: 0.26s; }
+  .login-pi { animation-delay: 0.34s; }
+
+  .login-mid > *:nth-child(1) { animation-delay: 0.16s; }
+  .login-mid > *:nth-child(2) { animation-delay: 0.22s; }
+  .login-mid > *:nth-child(3) { animation-delay: 0.28s; }
+  .login-mid > *:nth-child(4) { animation-delay: 0.34s; }
+  .login-footer { animation-delay: 0.42s; }
+}
+
+/* ── Reduced motion ──────────────────────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  .login-input, .login-submit { transition: none; }
+  .login-spinner { animation-duration: 1.4s; }
+}
