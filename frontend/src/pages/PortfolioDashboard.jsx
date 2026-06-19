@@ -866,115 +866,6 @@ function FireEvidencePanel({ fireDocuments, loading, onUploadNew }) {
   );
 }
 
-function BlockListPanel({ blocks, selectedBlockId, onSelectBlock, selectedProperty }) {
-  const [search, setSearch] = useState("");
-  const [searchDebounced, setSearchDebounced] = useState("");
-  const [collapsed, setCollapsed] = useState(false);
-
-  useEffect(() => {
-    const t = setTimeout(() => setSearchDebounced(search), 150);
-    return () => clearTimeout(t);
-  }, [search]);
-
-  const filteredBlocks = searchDebounced
-    ? blocks.filter((b) => (b.label || b.name || "").toLowerCase().includes(searchDebounced.toLowerCase()))
-    : blocks;
-
-  return (
-    <div className="card">
-      <div
-        className="card-header row-between"
-        style={{ cursor: "pointer", userSelect: "none", paddingBottom: collapsed ? 16 : undefined }}
-        onClick={() => setCollapsed((c) => !c)}
-      >
-        <div>
-          <div className="card-title">Block analysis list</div>
-          <div className="card-subtitle">
-            Drill into grouped blocks without rendering the whole SoV as a long table.
-          </div>
-        </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <span className="pill pill-muted">{blocks.length} blocks</span>
-          <span className={`panel-chev${collapsed ? " is-collapsed" : ""}`} style={{ fontSize: 16, lineHeight: 1 }}>▾</span>
-        </div>
-      </div>
-
-      <div
-        style={{
-          overflow: "hidden",
-          maxHeight: collapsed ? 0 : 700,
-          transition: "max-height 0.35s ease",
-        }}
-      >
-      <div className="card-body">
-        <input
-          type="text"
-          placeholder="Search block…"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          style={{
-            width: "100%",
-            padding: "6px 12px",
-            marginBottom: 12,
-            fontSize: 13,
-            borderRadius: 6,
-            border: "1px solid var(--border)",
-            background: "var(--panel)",
-            color: "var(--text)",
-            boxSizing: "border-box",
-            outline: "none",
-          }}
-        />
-        {!blocks.length ? (
-          <div className="muted">No block-level groups are available yet.</div>
-        ) : (
-          <div className="table-wrap" style={{ maxHeight: 510, minHeight: 510, overflowY: "auto" }}>
-            <table className="table">
-              <thead>
-                <tr>
-                  <th>Block</th>
-                  <th>Properties</th>
-                  <th>Total value</th>
-                  <th>Max height</th>
-                  <th>FRA</th>
-                  <th>FRAEW</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredBlocks.map((block) => (
-                  <tr
-                    key={block.id}
-                    onClick={() => onSelectBlock?.(block)}
-                    style={{
-                      cursor: "pointer",
-                      background:
-                        selectedBlockId === block.id && !selectedProperty
-                          ? "var(--primary-soft)"
-                          : "transparent",
-                    }}
-                  >
-                    <td>{block.label}</td>
-                    <td>{block.count}</td>
-                    <td>£{fmtMoney(block.totalValue)}</td>
-                    <td>
-                      {Number.isFinite(Number(block.maxHeight))
-                        ? `${Number(block.maxHeight).toFixed(1)} m`
-                        : "—"}
-                    </td>
-                    <td>{block.latest_fra ? <RiskBadge band={getFireRiskBand(block.latest_fra)} /> : "—"}</td>
-                    <td>{block.latest_fraew ? <RiskBadge band={getFireRiskBand(block.latest_fraew)} /> : "—"}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
-      </div>
-    </div>
-  );
-}
-
 export default function PortfolioDashboard({
   ingestionResult,
   ingestionSummary,
@@ -1478,7 +1369,7 @@ export default function PortfolioDashboard({
           alignItems: "start",
         }}
       >
-        <div className="card" style={{ alignSelf: "stretch", display: "flex", flexDirection: "column" }}>
+        <div className="card" style={{ alignSelf: "stretch", display: "flex", flexDirection: "column", minHeight: 505, maxHeight: 830, overflow: "hidden" }}>
           <div className="card-header row-between">
             <div className="card-title">
               {hasActivePropertySelection
@@ -1496,7 +1387,7 @@ export default function PortfolioDashboard({
             </span>
           </div>
 
-          <div ref={detailsScrollRef} className="details-body" style={{ flex: 1, minHeight: 505, overflowY: "auto", paddingRight: 6 }}>
+          <div ref={detailsScrollRef} className="details-body" style={{ flex: 1, minHeight: 0, overflowY: "auto", paddingRight: 6 }}>
             <PropertyDetails
               property={resolvedSelectedProperty}
               selectedBlock={resolvedSelectedBlock}
@@ -1627,13 +1518,6 @@ export default function PortfolioDashboard({
         blockRows={blockRows}
         propertyTypeRows={propertyTypeRows}
         ageBandRows={ageBandRows}
-      />
-
-      <BlockListPanel
-        blocks={blocks}
-        selectedBlockId={selectedBlockId}
-        onSelectBlock={handleSelectBlock}
-        selectedProperty={resolvedSelectedProperty}
       />
 
       <UnderwriterDocumentsPanel
