@@ -1478,35 +1478,31 @@ export default function PortfolioDashboard({
           alignItems: "start",
         }}
       >
-        <div style={{ display: "grid", gap: 16 }}>
-          <PortfolioCompositionCard properties={properties} blocks={blocks} onSelectBlock={handleSelectBlock} selectedBlock={resolvedSelectedBlock} />
-
-          <div className="card">
-            <div className="card-header row-between">
-              <div className="card-title">
-                {hasActivePropertySelection
-                  ? "Selected property details"
-                  : hasActiveBlockSelection
-                  ? "Selected block details"
-                  : "Selection details"}
-              </div>
-              <span className="pill pill-muted">
-                {hasActivePropertySelection
-                  ? "Property selected"
-                  : hasActiveBlockSelection
-                  ? `Block : ${resolvedSelectedBlock?.block_id ?? resolvedSelectedBlock?.id ?? resolvedSelectedBlock?.name ?? "?"}`
-                  : "None"}
-              </span>
+        <div className="card" style={{ alignSelf: "stretch", display: "flex", flexDirection: "column" }}>
+          <div className="card-header row-between">
+            <div className="card-title">
+              {hasActivePropertySelection
+                ? "Selected property details"
+                : hasActiveBlockSelection
+                ? "Selected block details"
+                : "Selection details"}
             </div>
+            <span className="pill pill-muted">
+              {hasActivePropertySelection
+                ? "Property selected"
+                : hasActiveBlockSelection
+                ? `Block : ${resolvedSelectedBlock?.block_id ?? resolvedSelectedBlock?.id ?? resolvedSelectedBlock?.name ?? "?"}`
+                : "None"}
+            </span>
+          </div>
 
-            <div ref={detailsScrollRef} className="details-body" style={{ minHeight: 505, maxHeight: 505, overflowY: "auto", paddingRight: 6 }}>
-              <PropertyDetails
-                property={resolvedSelectedProperty}
-                selectedBlock={resolvedSelectedBlock}
-                blockMode={!resolvedSelectedProperty}
-                onSelectProperty={handleSelectProperty}
-              />
-            </div>
+          <div ref={detailsScrollRef} className="details-body" style={{ flex: 1, minHeight: 505, overflowY: "auto", paddingRight: 6 }}>
+            <PropertyDetails
+              property={resolvedSelectedProperty}
+              selectedBlock={resolvedSelectedBlock}
+              blockMode={!resolvedSelectedProperty}
+              onSelectProperty={handleSelectProperty}
+            />
           </div>
         </div>
 
@@ -1623,6 +1619,8 @@ export default function PortfolioDashboard({
         loading={fireDocumentsLoading}
         onUploadNew={onUploadNew}
       />
+
+      <PortfolioCompositionCard properties={properties} blocks={blocks} onSelectBlock={handleSelectBlock} selectedBlock={resolvedSelectedBlock} />
 
       <PortfolioAnalysisWindow
         tenancyRows={tenancyRows}
