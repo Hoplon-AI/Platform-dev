@@ -104,6 +104,8 @@ export default function LoginPage({ onLogin }) {
                 required
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
+                onFocus={(e) => { e.target.style.borderColor = "#B8564B"; e.target.style.boxShadow = "0 0 0 3px rgba(184,86,75,0.18)"; }}
+                onBlur={(e) => { e.target.style.borderColor = "#DED7CC"; e.target.style.boxShadow = "none"; }}
                 style={{ ...styles.input, paddingRight: 44 }}
                 placeholder="••••••••"
                 disabled={loading}
@@ -149,6 +151,18 @@ export default function LoginPage({ onLogin }) {
           <button
             type="submit"
             disabled={loading || !email || !password}
+            onMouseEnter={(e) => {
+              if (loading || !email || !password) return;
+              e.currentTarget.style.background = "#9A463D";
+              e.currentTarget.style.transform = "translateY(-2px)";
+              e.currentTarget.style.boxShadow = "0 12px 28px rgba(184,86,75,0.34)";
+            }}
+            onMouseLeave={(e) => {
+              if (loading || !email || !password) return;
+              e.currentTarget.style.background = "#B8564B";
+              e.currentTarget.style.transform = "translateY(0)";
+              e.currentTarget.style.boxShadow = "0 6px 18px rgba(184,86,75,0.28)";
+            }}
             style={{
               ...styles.submitBtn,
               ...(loading || !email || !password ? styles.submitBtnDisabled : {}),
