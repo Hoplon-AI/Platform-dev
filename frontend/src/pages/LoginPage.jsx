@@ -1,7 +1,22 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import "./LoginPage.css";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "";
+
+// Read the saved preference (shared with the holding page via the same
+// `equirisk-theme` key + origin), falling back to the OS setting.
+function getInitialTheme() {
+  try {
+    const saved = localStorage.getItem("equirisk-theme");
+    if (saved === "dark" || saved === "light") return saved;
+  } catch {
+    /* storage blocked — fall through to the OS preference */
+  }
+  if (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches) {
+    return "dark";
+  }
+  return "light";
+}
 
 export default function LoginPage({ onLogin }) {
   const [email, setEmail] = useState("");
@@ -11,6 +26,36 @@ export default function LoginPage({ onLogin }) {
   const [error, setError] = useState(null);
   const [showPassword, setShowPassword] = useState(false);
   const [capsOn, setCapsOn] = useState(false);
+  const [theme, setTheme] = useState(getInitialTheme);
+
+  // Keep the document attribute + saved preference in lock-step with state.
+  useEffect(() => {
+    document.documentElement.setAttribute("data-theme", theme);
+    try {
+      localStorage.setItem("equirisk-theme", theme);
+    } catch {
+      /* storage blocked — preference just won't persist this session */
+    }
+  }, [theme]);
+
+  // Same cross-fade the holding page uses: snapshot the page, swap the
+  // attribute, cross-fade between snapshots via the View Transitions API.
+  const toggleTheme = () => {
+    const next = theme === "dark" ? "light" : "dark";
+    // Flip the attribute synchronously so the transition snapshots the new
+    // theme; setTheme then keeps React state (and aria-checked) in sync.
+    const commit = () => {
+      document.documentElement.setAttribute("data-theme", next);
+      setTheme(next);
+    };
+    const reduce =
+      window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (reduce || typeof document.startViewTransition !== "function") {
+      commit();
+      return;
+    }
+    document.startViewTransition(commit);
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -63,46 +108,54 @@ export default function LoginPage({ onLogin }) {
 
   return (
     <div className="login-page">
-      {/* ── Brand / narrative panel (rose break-band) ── */}
-      <aside className="login-panel">
-        <div className="login-panel-content">
-          <span className="login-brand-mark">
-            <img src="/logo.png" alt="EquiRisk" />
-          </span>
+      {/* ── Theme switch — same design as the holding page, top-right ── */}
+      <button
+        type="button"
+        className="login-theme-switch"
+        onClick={toggleTheme}
+        role="switch"
+        aria-checked={theme === "dark"}
+        aria-label="Toggle dark mode"
+        title="Toggle dark mode"
+      >
+        <span className="ts-disc" aria-hidden="true" />
+        <SunIcon />
+        <MoonIcon />
+      </button>
 
-          <div className="login-panel-center">
+      {/* ── Brand / narrative panel: rose ground, photo anchored to the floor ── */}
+      <aside className="login-panel">
+        {/* Architectural ground — absolutely positioned so it can never add
+            height to the panel (this is what kept the page from scrolling). */}
+        <div className="login-photo" role="img" aria-label="A corten-clad social-housing block" />
+
+        <span className="login-brand-mark">
+          <img className="lbm-light" src="/logo.png" alt="EquiRisk" />
+          <img className="lbm-dark" src="/equirisk-dark.png" alt="EquiRisk" />
+        </span>
+
+        <div className="login-panel-center">
           <span className="login-kicker">Social-housing risk intelligence</span>
 
           <h1 className="login-headline">
-            Every block accounted for. Every risk <em>in view</em>.
+            Every block accounted for.<br />
+            Every risk <em>in view</em>.
           </h1>
-
-          <p className="login-sub">
-            Sign in to your housing-association risk portfolios.<br />
-            Per-unit and per-block schedules,<br />
-            enriched and evidence-backed.
-          </p>
-
-          <ul className="login-trust">
-            <li><CheckIcon /> SoV, FRA &amp; FRAEW evidence in one schedule</li>
-            <li><CheckIcon /> Per-block and per-unit risk, priced to underwrite</li>
-            <li><CheckIcon /> Built for UK social-housing portfolios</li>
-          </ul>
         </div>
 
-          <span className="login-pi">
-            <span className="pi-p">Premium</span>
-            <span className="pi-i">Intelligence</span>
-          </span>
-        </div>
-
-        <div className="login-photo" role="img" aria-label="A corten-clad social-housing block" />
+        <span className="login-pi">
+          <span className="pi-p">Premium</span>
+          <span className="pi-i">Intelligence</span>
+        </span>
       </aside>
 
       {/* ── Sign-in form ── */}
       <main className="login-form-pane">
         <div className="login-mid">
-          <span className="login-form-kicker">Underwriter portal</span>
+          <span className="login-form-kicker">
+            <i className="login-tick" aria-hidden="true" />
+            Underwriter portal
+          </span>
           <h2 className="login-heading">Sign in</h2>
           <p className="login-subheading">
             Secure access to housing association risk portfolios.
@@ -242,10 +295,19 @@ function ArrowIcon() {
   );
 }
 
-function CheckIcon() {
+function SunIcon() {
   return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <polyline points="20 6 9 17 4 12" />
+    <svg className="ts-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <circle cx="12" cy="12" r="4" />
+      <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41" />
+    </svg>
+  );
+}
+
+function MoonIcon() {
+  return (
+    <svg className="ts-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
     </svg>
   );
 }
