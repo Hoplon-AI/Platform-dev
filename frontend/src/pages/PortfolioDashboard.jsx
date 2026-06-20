@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 
 import PortfolioMap from "../components/PortfolioMap.jsx";
 import PropertyDetails from "../components/PropertyDetails.jsx";
+import { PortfolioInsightsPanel } from "../components/PortfolioInsights.jsx";
 import { blockStreetText, blockDisplayAddress } from "../utils/blockModel.js";
 
 const fmtMoney = (n) => {
@@ -1504,6 +1505,8 @@ export default function PortfolioDashboard({
           </div>
         </div>
       </div>
+
+      <PortfolioInsightsPanel properties={properties} />
 
       <FireEvidencePanel
         fireDocuments={fireDocuments}

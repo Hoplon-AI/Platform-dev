@@ -290,6 +290,7 @@ const normaliseProperty = (row, index = 0) => {
     listed_reference: row.listed_reference ?? "",
     flood_risk_band: row.flood_risk_band ?? "",
     flood_risk_source: row.flood_risk_source ?? "",
+    uprn_confidence: row.uprn_confidence ?? "",
     enrichment_status: row.enrichment_status ?? "",
     enrichment_source: row.enrichment_source ?? "",
     enriched_at: row.enriched_at ?? null,
@@ -995,7 +996,12 @@ export default function App() {
         onLogin={(user) => {
           setAuthUser(user);
           setActiveNav("uploads");
-          // Demo mode: start with empty state, let Ewan upload fresh.
+          // Land on Upload Documents, but hydrate the portfolio from the DB so
+          // the Overview/Block Analysis nav is enabled immediately when data
+          // already exists. loadPropertiesFromApi does NOT redirect; it only
+          // sets ingestionResult when properties.length > 0 (empty DB => nav
+          // stays disabled, user must upload an SoV first).
+          loadPropertiesFromApi();
         }}
       />
     );
