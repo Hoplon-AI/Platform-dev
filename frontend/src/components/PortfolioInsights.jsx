@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import {
   PieChart,
   Pie,
@@ -127,6 +127,26 @@ const CONFIDENCE_COLORS = {
   "Likely match": "#C8923E",
   "Low confidence": "#C76A5F",
   "No reliable match": "#B8564B",
+  [UNKNOWN]: UNKNOWN_COLOR,
+};
+
+// Flood risk is ordinal — colour as a green→red spectrum so risk reads visually
+// (Very Low safest → High most severe). Bands: Very Low / Low / Medium / High.
+const FLOOD_ORDER = ["Very Low", "Low", "Medium", "High", UNKNOWN];
+const FLOOD_COLORS = {
+  "Very Low": "#4F8A6B", // green
+  Low: "#C8923E",        // gold
+  Medium: "#C76A5F",     // terracotta
+  High: "#B8564B",       // red
+  [UNKNOWN]: UNKNOWN_COLOR,
+};
+
+// Building height — fire-safety severity: <11m green, 11–18m amber, 18m+ red.
+const HEIGHT_COLORS = {
+  "<11m": "#4F8A6B",   // green
+  "11–18m": "#C8923E", // amber
+  "18–30m": "#B8564B", // red
+  "30m+": "#9B3D33",   // deep red (HRB threshold)
   [UNKNOWN]: UNKNOWN_COLOR,
 };
 
@@ -302,8 +322,14 @@ export function PortfolioInsightsPanel({ properties }) {
         .map(String)
     );
 
-    const flood = countBy(list, (p) => clean(p.flood_risk_band));
-    const height = countBy(list, (p) => heightBand(p.height_m ?? p.height_max_m));
+    const flood = ordered(
+      countBy(list, (p) => clean(p.flood_risk_band)),
+      FLOOD_ORDER
+    );
+    const height = ordered(
+      countBy(list, (p) => heightBand(p.height_m ?? p.height_max_m)),
+      ["<11m", "11–18m", "18–30m", "30m+", UNKNOWN]
+    );
     const uprn = ordered(
       countBy(list, (p) => confidenceLabel(p.uprn_confidence)),
       [
@@ -345,21 +371,35 @@ export function PortfolioInsightsPanel({ properties }) {
     };
   }, [properties]);
 
+  const [collapsed, setCollapsed] = useState(false);
+
   if (!properties?.length) return null;
 
   const { stats } = model;
 
   return (
     <div className="card">
-      <div className="card-header">
+      <div
+        className="card-header row-between"
+        style={{ cursor: "pointer", userSelect: "none", paddingBottom: collapsed ? 16 : undefined }}
+        onClick={() => setCollapsed((c) => !c)}
+      >
         <div>
           <div className="card-title">Portfolio Insights</div>
           <div className="card-subtitle">
             Composition and risk profile across the ingested portfolio and enrichment data.
           </div>
         </div>
+        <span className={`panel-chev${collapsed ? " is-collapsed" : ""}`} style={{ fontSize: 16, lineHeight: 1 }}>▾</span>
       </div>
 
+      <div
+        style={{
+          overflow: "hidden",
+          maxHeight: collapsed ? 0 : 1600,
+          transition: "max-height 0.35s ease",
+        }}
+      >
       <div className="card-body">
         <div
           style={{
@@ -388,11 +428,17 @@ export function PortfolioInsightsPanel({ properties }) {
           <DonutCard title="Roof construction" data={model.roof} />
           <BarCard title="Age band" data={model.ageRows} />
           <BarCard title="Storeys" data={model.storeyRows} />
-          <DonutCard title="Flood risk" data={model.flood} caption={model.floodCaption} />
+          <DonutCard
+            title="Flood risk"
+            data={model.flood}
+            caption={model.floodCaption}
+            colors={FLOOD_COLORS}
+          />
           <DonutCard
             title="Building height"
             data={model.height}
             caption={model.heightCaption}
+            colors={HEIGHT_COLORS}
           />
           <DonutCard
             title="UPRN match confidence"
@@ -401,6 +447,7 @@ export function PortfolioInsightsPanel({ properties }) {
             colors={CONFIDENCE_COLORS}
           />
         </div>
+      </div>
       </div>
     </div>
   );

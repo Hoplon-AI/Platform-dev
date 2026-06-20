@@ -379,201 +379,6 @@ function fireRiskSubtitle(counts) {
   );
 }
 
-function PortfolioCompositionCard({ properties, blocks, onSelectBlock, selectedBlock }) {
-  const [flatsOpen, setFlatsOpen] = useState(false);
-  const [blocksOpen, setBlocksOpen] = useState(false);
-  const [blocksSearch, setBlocksSearch] = useState("");
-  const [blocksSearchDebounced, setBlocksSearchDebounced] = useState("");
-  const [otherOpen, setOtherOpen] = useState(false);
-
-  useEffect(() => {
-    const t = setTimeout(() => setBlocksSearchDebounced(blocksSearch), 150);
-    return () => clearTimeout(t);
-  }, [blocksSearch]);
-
-  const totalUnits = properties.length;
-  const houses = properties.filter((p) => inferPortfolioClass(p) === "Houses");
-  const flats = properties.filter((p) => inferPortfolioClass(p) === "Flats");
-  const other = properties.filter((p) => inferPortfolioClass(p) === "Other");
-  const blockCount = blocks.length;
-  const thirdPartyLikeBlocks = blocks.filter(
-    (block) => !block.parent_uprn && block.count > 1
-  ).length;
-
-  const typeBreakdown = (items) => {
-    const counts = new Map();
-    items.forEach((p) => {
-      const key = p.property_type || p.type || "Unknown";
-      counts.set(key, (counts.get(key) || 0) + 1);
-    });
-    return Array.from(counts.entries())
-      .sort((a, b) => b[1] - a[1])
-      .map(([label, count]) => ({ label, count }));
-  };
-
-  const flatTypeBreakdown = useMemo(() => typeBreakdown(flats), [flats]);
-  const otherTypeBreakdown = useMemo(() => typeBreakdown(other), [other]);
-
-  const renderRow = (label, count, _total, tone = "#6B6560", meta = null) => (
-    <div style={{ marginBottom: 14 }}>
-      <div style={{ display: "grid", gridTemplateColumns: "16px 1fr auto", gap: 10, alignItems: "center" }}>
-        <div style={{ width: 8, height: 8, borderRadius: 999, background: tone, marginLeft: 4 }} />
-        <div style={{ fontWeight: 600 }}>{label}</div>
-        <div className="muted">{count} {label === "Blocks" ? "blocks" : "units"}</div>
-      </div>
-      {meta ? <div className="muted" style={{ marginTop: 6, marginLeft: 26 }}>{meta}</div> : null}
-    </div>
-  );
-
-  const renderExpandableRow = (label, items, tone, open, setOpen) => (
-    <div style={{ marginBottom: 14 }}>
-      <div
-        style={{ display: "grid", gridTemplateColumns: "16px 1fr auto auto", gap: 10, alignItems: "center", cursor: "pointer", userSelect: "none" }}
-        onClick={() => setOpen((o) => !o)}
-      >
-        <div style={{ width: 8, height: 8, borderRadius: 999, background: tone, marginLeft: 4 }} />
-        <div style={{ fontWeight: 600 }}>{label}</div>
-        <div className="muted">{items.length} units</div>
-        <div className="muted" style={{ fontSize: 11, paddingRight: 2 }}>{open ? "▲" : "▼"}</div>
-      </div>
-      {open && (
-        <div style={{ marginTop: 8, marginLeft: 26, borderLeft: `2px solid ${tone}33`, paddingLeft: 12, paddingRight: 18 }}>
-          {typeBreakdown(items).map(({ label: subLabel, count }) => (
-            <div key={subLabel} style={{ display: "flex", justifyContent: "space-between", padding: "3px 0", fontSize: 13 }}>
-              <span className="muted">{subLabel}</span>
-              <span className="muted">{count}</span>
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-
-  return (
-    <div className="card" style={{ height: "100%" }}>
-      <div className="card-header row-between">
-        <div>
-          <div className="card-title">Portfolio Composition</div>
-          {/* <div className="card-subtitle">
-            Summary split for the whole ingested SoV rather than raw row-by-row tables.
-          </div> */}
-        </div>
-        <span className="pill pill-muted">{totalUnits} units</span>
-      </div>
-
-      <div className="card-body">
-        {renderRow("Houses", houses.length, totalUnits, "#1E3246")}
-        {renderExpandableRow("Flats", flats, "#B8564B", flatsOpen, setFlatsOpen)}
-        <div style={{ marginBottom: 14 }}>
-          <div
-            style={{ display: "grid", gridTemplateColumns: "16px 1fr auto auto", gap: 10, alignItems: "center", cursor: "pointer", userSelect: "none" }}
-            onClick={() => setBlocksOpen((o) => !o)}
-          >
-            <div style={{ width: 8, height: 8, borderRadius: 999, background: "#C8923E", marginLeft: 4 }} />
-            <div style={{ fontWeight: 600 }}>Blocks</div>
-            <div className="muted">{blockCount} blocks</div>
-            <div className="muted" style={{ fontSize: 11, paddingRight: 2 }}>{blocksOpen ? "▲" : "▼"}</div>
-          </div>
-          {blocksOpen && (
-            <div style={{ marginTop: 8, marginLeft: 26 }}>
-              <input
-                type="text"
-                placeholder="Search by address, block ID or postcode…"
-                value={blocksSearch}
-                onChange={(e) => setBlocksSearch(e.target.value)}
-                style={{
-                  width: "100%",
-                  padding: "5px 10px",
-                  marginBottom: 8,
-                  fontSize: 13,
-                  borderRadius: 6,
-                  border: "1px solid var(--border)",
-                  background: "var(--panel)",
-                  color: "var(--text)",
-                  boxSizing: "border-box",
-                  outline: "none",
-                }}
-              />
-              <div style={{ borderLeft: "2px solid rgba(184,86,75,0.3)", paddingLeft: 12, paddingRight: 18, maxHeight: 288, overflowY: "auto" }}>
-                {blocks
-                  .filter((block) => {
-                    const q = blocksSearchDebounced.trim().toLowerCase();
-                    if (!q) return true;
-                    const idText = [block.block_reference, block.block_id, block.id, block.label, block.name]
-                      .filter(Boolean)
-                      .join(" ")
-                      .toLowerCase();
-                    return blockStreetText(block).includes(q) || idText.includes(q);
-                  })
-                  .map((block) => {
-                    const { street, postcode } = blockDisplayAddress(block);
-                    const ref = block.block_reference || block.name || block.label || block.block_id || block.id || "—";
-                    const isSelected = selectedBlock && (
-                      (selectedBlock.id && selectedBlock.id === block.id) ||
-                      (selectedBlock.label && selectedBlock.label === block.label)
-                    );
-                    return (
-                      <div
-                        key={block.id || block.block_id || ref}
-                        className={`block-row${isSelected ? " is-selected" : ""}`}
-                        onClick={() => onSelectBlock?.(block)}
-                        style={{
-                          display: "flex",
-                          justifyContent: "space-between",
-                          alignItems: "center",
-                          gap: 10,
-                          padding: "6px 8px",
-                          fontSize: 13,
-                          borderRadius: 8,
-                          cursor: "pointer",
-                        }}
-                      >
-                        <div style={{ minWidth: 0 }}>
-                          <div
-                            style={{
-                              fontWeight: isSelected ? 600 : 500,
-                              color: isSelected ? "var(--terracotta-2)" : "var(--text)",
-                              whiteSpace: "nowrap",
-                              overflow: "hidden",
-                              textOverflow: "ellipsis",
-                            }}
-                          >
-                            {street || ref}
-                          </div>
-                          <div className="muted" style={{ fontSize: 11.5, marginTop: 1 }}>
-                            {ref}{postcode ? ` · ${postcode}` : ""}
-                          </div>
-                        </div>
-                        <span className="muted" style={{ flexShrink: 0 }}>{block.count ?? 0}</span>
-                      </div>
-                    );
-                  })}
-              </div>
-            </div>
-          )}
-        </div>
-        {other.length > 0 && renderExpandableRow("Other", other, "#6B6560", otherOpen, setOtherOpen)}
-
-        {thirdPartyLikeBlocks > 0 && (
-          <div
-            style={{
-              marginTop: 8,
-              padding: "10px 14px",
-              borderRadius: 10,
-              background: "rgba(245,158,11,0.10)",
-              border: "1px solid rgba(245,158,11,0.30)",
-            }}
-          >
-            <div style={{ fontWeight: 600, fontSize: 13, color: "var(--muted)" }}>
-              {thirdPartyLikeBlocks} blocks were grouped without clear parent UPRN
-            </div>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
 function MiniSummaryTable({ title, subtitle, rows, columns }) {
   return (
     <div
@@ -1388,7 +1193,7 @@ export default function PortfolioDashboard({
             </span>
           </div>
 
-          <div ref={detailsScrollRef} className="details-body" style={{ flex: 1, minHeight: 0, overflowY: "auto", paddingRight: 6 }}>
+          <div ref={detailsScrollRef} className="details-body" style={{ flex: 1, minHeight: 0, overflowY: "auto" }}>
             <PropertyDetails
               property={resolvedSelectedProperty}
               selectedBlock={resolvedSelectedBlock}
@@ -1513,8 +1318,6 @@ export default function PortfolioDashboard({
         loading={fireDocumentsLoading}
         onUploadNew={onUploadNew}
       />
-
-      <PortfolioCompositionCard properties={properties} blocks={blocks} onSelectBlock={handleSelectBlock} selectedBlock={resolvedSelectedBlock} />
 
       <PortfolioAnalysisWindow
         tenancyRows={tenancyRows}
