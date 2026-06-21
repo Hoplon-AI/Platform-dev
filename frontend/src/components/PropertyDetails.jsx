@@ -740,40 +740,12 @@ function EmptyDetailsState() {
   );
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", height: "100%", gap: 28 }}>
-      <div style={{ display: "flex", flexDirection: "column", flex: 1, justifyContent: "space-between", gap: 28, minHeight: 0 }}>
-      <p style={{ margin: 0, fontSize: 14.5, color: "var(--muted, #6B6560)", lineHeight: 1.6 }}>
-        Select a block — on the map or from the list above — to inspect its insured value, building height, property mix and fire-risk status.
-      </p>
-
+    <div style={{ display: "flex", flexDirection: "column", height: "100%", justifyContent: "space-between", gap: 26, padding: "32px 16px 32px" }}>
       <div>
         <div className="tag" style={{ marginBottom: 16 }}>How to explore</div>
         <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
           {numStep("1", "Click a block on the map for its summary.")}
           {numStep("2", "Click the same block again to list every flat inside it.")}
-          <div style={{ display: "flex", alignItems: "flex-start", gap: 12 }}>
-            <span
-              style={{
-                flexShrink: 0,
-                width: 26,
-                height: 26,
-                borderRadius: 999,
-                background: "rgba(184,86,75,0.12)",
-                color: "var(--terracotta-2, #9A463D)",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-              }}
-            >
-              <svg aria-hidden="true" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                <circle cx="11" cy="11" r="7" />
-                <line x1="21" y1="21" x2="16.65" y2="16.65" />
-              </svg>
-            </span>
-            <span style={{ fontSize: 14, color: "var(--text, #1E3246)", lineHeight: 1.55 }}>
-              Or expand the block list in <strong style={{ fontWeight: 600 }}>Portfolio Composition</strong> above and click the block you want.
-            </span>
-          </div>
         </div>
       </div>
 
@@ -790,8 +762,6 @@ function EmptyDetailsState() {
           {infoItem(ic(<><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" /><path d="m9 12 2 2 4-4" /></>), "UPRN match confidence")}
           {infoItem(ic(<><path d="m12.8 2.2a2 2 0 0 0-1.6 0L2.6 6.1a1 1 0 0 0 0 1.8l8.6 3.9a2 2 0 0 0 1.6 0l8.6-3.9a1 1 0 0 0 0-1.8Z" /><path d="m22 17.7-9.2 4.1a2 2 0 0 1-1.6 0L2 17.7" /><path d="m22 12.7-9.2 4.1a2 2 0 0 1-1.6 0L2 12.7" /></>), "Construction materials")}
         </div>
-      </div>
-
       </div>
 
       <div style={{ background: "var(--warm-bg-2, #F3EFE8)", border: "1px solid var(--border-line, #DED7CC)", borderRadius: 12, padding: "20px 22px" }}>

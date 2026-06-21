@@ -1053,9 +1053,6 @@ export default function PortfolioDashboard({
         <div>
           <div className="tag">Premium Intelligence</div>
           <div className="page-title">Portfolio <em>Overview</em></div>
-          <div className="page-sub">
-            Underwriter-focused dashboard using ingested portfolio, enrichment, block grouping, fire risk evidence, and map analysis.
-          </div>
         </div>
 
         <div className="actions" style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>

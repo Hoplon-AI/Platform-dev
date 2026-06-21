@@ -469,74 +469,7 @@ export default function IngestionLandingPage({
           </div>
         </section>
 
-        <aside className="ingest-aside" aria-label="Upload context">
-          {summary ? (
-            <div className="aside-card aside-summary">
-              <div className="aside-head">
-                <span className="aside-kicker">Portfolio loaded</span>
-                <h3 title={summary.source}>{summary.source || "Schedule of Values"}</h3>
-              </div>
 
-              <div className="stat-grid">
-                <Stat icon={<IconBuilding />} label="Properties" value={fmtInt(summary.propertyCount)} />
-                <Stat icon={<IconLayers />} label="Blocks" value={fmtInt(summary.blockCount)} />
-                <Stat icon={<IconPound />} label="Total value" value={fmtMoney(summary.totalValue)} />
-                <Stat icon={<IconPin />} label="Mappable" value={`${Number(summary.geoCompletenessPct || 0)}%`} />
-              </div>
-
-              <div className="readiness">
-                <div className="readiness-top">
-                  <span>Average readiness</span>
-                  <strong>{avgReadiness}%</strong>
-                </div>
-                <div className="readiness-track">
-                  <span className={`readiness-fill ${readinessBand(avgReadiness)}`} style={{ width: `${avgReadiness}%` }} />
-                </div>
-              </div>
-
-              {lastEvidence && isEvidenceStage && (
-                <div className="aside-evidence">
-                  <span className="aside-evidence-tag">{lastEvidence.type}</span>
-                  <div>
-                    <strong>Last evidence · {lastEvidence.rating}</strong>
-                    <span>Block {lastEvidence.block}</span>
-                  </div>
-                </div>
-              )}
-
-              {nextStepText && (
-                <div className="aside-next">
-                  <IconSparkle />
-                  <p>{nextStepText}</p>
-                </div>
-              )}
-            </div>
-          ) : (
-            <div className="aside-card">
-              <div className="aside-head">
-                <span className="aside-kicker">Before you upload</span>
-                <h3>What you'll need</h3>
-              </div>
-              <ul className="checklist">
-                <li><span className="check-tick"><IconCheckMini /></span> A Schedule of Values export</li>
-                <li><span className="check-tick"><IconCheckMini /></span> One row per property or unit</li>
-                <li><span className="check-tick"><IconCheckMini /></span> Address and postcode columns</li>
-                <li><span className="check-tick"><IconCheckMini /></span> Sum insured per record</li>
-              </ul>
-              <p className="aside-hint">
-                Column names are matched automatically — there's no template to follow.
-              </p>
-            </div>
-          )}
-
-          <div className="aside-card aside-note">
-            <span className="aside-note-icon"><IconShield /></span>
-            <div>
-              <strong>Your data stays private</strong>
-              <span>Files are processed inside your tenant only and are never shared between housing associations.</span>
-            </div>
-          </div>
-        </aside>
       </div>
 
       {uploadError && <div className="ingest-alert">{uploadError}</div>}
@@ -725,7 +658,7 @@ const css = `
   /* ── Workbench: stepper rail + active panel + context aside ── */
   .ingest-workbench {
     display: grid;
-    grid-template-columns: 248px minmax(0, 1fr) 380px;
+    grid-template-columns: 248px minmax(0, 1fr)380px;
     gap: 36px;
     align-items: start;
   }
