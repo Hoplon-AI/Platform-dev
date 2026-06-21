@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import proj4 from "proj4";
 
 import LoginPage from "./pages/LoginPage.jsx";
-import IngestionPage from "./pages/IngestionLandingPage.tsx";
+import IngestionPage from "./pages/IngestionLandingPage.jsx";
 import PortfolioDashboard from "./pages/PortfolioDashboard.jsx";
 import BlockAnalysisPage from "./pages/BlockAnalysisPage.jsx";
 

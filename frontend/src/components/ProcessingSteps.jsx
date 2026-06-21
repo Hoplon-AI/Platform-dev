@@ -1,11 +1,6 @@
 import { motion, AnimatePresence } from "framer-motion";
 
-interface ProcessingStepsProps {
-  steps: string[];
-  currentIndex: number;
-}
-
-export default function ProcessingSteps({ steps, currentIndex }: ProcessingStepsProps) {
+export default function ProcessingSteps({ steps, currentIndex }) {
   const safeIndex  = Math.min(Math.max(currentIndex, 0), steps.length - 1);
   const label      = steps[safeIndex] ?? "";
   const isDone     = safeIndex === steps.length - 1;

@@ -2,62 +2,7 @@ import React, { useMemo, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import ProcessingSteps from "../components/ProcessingSteps";
 
-type UploadStage = "SOV" | "FRA" | "FRAEW";
-
-type IngestionSummary = {
-  source?: string;
-  propertyCount?: number;
-  blockCount?: number;
-  totalValue?: number;
-  mappableCount?: number;
-  geoCompletenessPct?: number;
-  sovCompletenessPct?: number;
-  avgReadiness?: number;
-  uprnMatchPct?: number;
-};
-
-type FireRiskPayload = {
-  document_type?: string;
-  block_reference?: string;
-  fra?: { risk_level?: string; raw_rating?: string };
-  fraew?: { risk_level?: string; raw_rating?: string };
-};
-
-type UploadedDocument = {
-  id: string;
-  name: string;
-  type: string;
-  linked: string;
-  rating?: string | null;
-};
-
-type IngestionLandingPageProps = {
-  hasSovData?: boolean;
-  isUploading?: boolean;
-  uploadError?: string | null;
-  pipelineStep?: string | null;
-  ingestionSummary?: IngestionSummary | null;
-  latestFireRiskPayload?: FireRiskPayload | null;
-  documents?: UploadedDocument[];
-  selectedBlockReference?: string;
-  selectedPropertyId?: string;
-  onSelectedBlockReferenceChange?: (value: string) => void;
-  onSelectedPropertyIdChange?: (value: string) => void;
-  onFilesSelected?: (files: File[], stage: UploadStage) => void;
-  stage?: UploadStage;
-  onStageChange?: (stage: UploadStage) => void;
-};
-
-const stageCopy: Record<
-  UploadStage,
-  {
-    title: string;
-    subtitle: string;
-    formats: string;
-    badge: string;
-    explainer: string;
-  }
-> = {
+const stageCopy = {
   SOV: {
     title: "Upload Schedule of Values",
     subtitle: "Start here. This creates the portfolio, properties, and block records used by later evidence uploads.",
@@ -81,15 +26,15 @@ const stageCopy: Record<
   },
 };
 
-const railTitles: Record<UploadStage, string> = {
+const railTitles = {
   SOV: "Schedule of Values",
   FRA: "Fire Risk Assessment",
   FRAEW: "External Wall Review",
 };
 
-const STAGES: UploadStage[] = ["SOV", "FRA", "FRAEW"];
+const STAGES = ["SOV", "FRA", "FRAEW"];
 
-const pipelineStepsByStage: Record<string, string[]> = {
+const pipelineStepsByStage = {
   SOV: [
     "Uploading file",
     "Validating format",
@@ -119,9 +64,9 @@ const pipelineStepsByStage: Record<string, string[]> = {
   ],
 };
 
-const fmtInt = (value?: number | null) => Number(value || 0).toLocaleString();
+const fmtInt = (value) => Number(value || 0).toLocaleString();
 
-const fmtMoney = (value?: number | null) => {
+const fmtMoney = (value) => {
   const n = Number(value || 0);
   if (n >= 1e9) return `£${(n / 1e9).toFixed(1)}B`;
   if (n >= 1e6) return `£${(n / 1e6).toFixed(1)}M`;
@@ -129,21 +74,19 @@ const fmtMoney = (value?: number | null) => {
   return `£${n.toLocaleString()}`;
 };
 
-const readinessBand = (score: number) => {
+const readinessBand = (score) => {
   if (score >= 80) return "green";
   if (score >= 50) return "amber";
   return "red";
 };
 
-const typeLabel = (type: string) => {
+const typeLabel = (type) => {
   const t = (type || "").toUpperCase();
   if (t === "SOV") return "SoV";
   return t || "Doc";
 };
 
-type FileFormat = "xls" | "csv" | "pdf" | "doc";
-
-const fileFormat = (doc: UploadedDocument): FileFormat => {
+const fileFormat = (doc) => {
   const name = (doc.name || "").toLowerCase();
   if (name.endsWith(".csv")) return "csv";
   if (name.endsWith(".xlsx") || name.endsWith(".xls") || name.endsWith(".xlsm"))
@@ -155,7 +98,7 @@ const fileFormat = (doc: UploadedDocument): FileFormat => {
   return "doc";
 };
 
-const riskTone = (rating?: string | null) => {
+const riskTone = (rating) => {
   const r = (rating || "").toLowerCase();
   if (/(high|substantial|intolerable|severe|\bred\b|p2|p3)/.test(r)) return "red";
   if (/(moderate|medium|tolerable|\bamber\b|p1)/.test(r)) return "amber";
@@ -260,14 +203,14 @@ function IconFile() {
   );
 }
 
-const FILE_FORMAT_COLOR: Record<FileFormat, string> = {
+const FILE_FORMAT_COLOR = {
   xls: "#1D7A4C",
   csv: "#2F6FB0",
   pdf: "#C0392B",
   doc: "#6B7280",
 };
 
-function FileTypeIcon({ format }: { format: FileFormat }) {
+function FileTypeIcon({ format }) {
   const fill = FILE_FORMAT_COLOR[format];
   return (
     <svg viewBox="0 0 32 40" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -300,15 +243,7 @@ function FileTypeIcon({ format }: { format: FileFormat }) {
   );
 }
 
-function Stat({
-  icon,
-  label,
-  value,
-}: {
-  icon: React.ReactNode;
-  label: string;
-  value: string;
-}) {
+function Stat({ icon, label, value }) {
   return (
     <div className="stat">
       <span className="stat-icon">{icon}</span>
@@ -335,8 +270,8 @@ export default function IngestionLandingPage({
   onFilesSelected,
   stage = "SOV",
   onStageChange,
-}: IngestionLandingPageProps) {
-  const fileInputRef = useRef<HTMLInputElement | null>(null);
+}) {
+  const fileInputRef = useRef(null);
   const [isDragOver, setIsDragOver] = useState(false);
 
   const activeCopy = stageCopy[stage];
@@ -390,7 +325,7 @@ export default function IngestionLandingPage({
 
   const accept = stage === "SOV" ? ".xlsx,.xls,.csv" : ".pdf";
 
-  const handleFiles = (files: FileList | File[] | null) => {
+  const handleFiles = (files) => {
     if (!files || files.length === 0 || isStageLocked || isUploading) return;
     onFilesSelected?.(Array.from(files), stage);
   };

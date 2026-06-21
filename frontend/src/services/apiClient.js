@@ -1,14 +1,14 @@
 export const API_BASE_URL =
   import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000";
 
-function getAuthHeader(): Record<string, string> {
+function getAuthHeader() {
   const token =
     localStorage.getItem("equirisk_token") ||
     sessionStorage.getItem("equirisk_token");
   return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
-export async function apiFetch(path: string, init?: RequestInit) {
+export async function apiFetch(path, init) {
   const url = new URL(path, API_BASE_URL).toString();
 
   // Avoid triggering CORS preflight on simple GETs by only setting Content-Type
@@ -34,4 +34,3 @@ export async function apiFetch(path: string, init?: RequestInit) {
 
   return res;
 }
-
