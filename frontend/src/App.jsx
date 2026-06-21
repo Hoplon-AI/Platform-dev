@@ -374,6 +374,7 @@ const normaliseFireDocumentItem = (item, index = 0) => {
       `fire-doc-${index + 1}`,
     upload_id: item?.upload_id ?? "",
     feature_id: item?.feature_id ?? "",
+    filename: item?.filename ?? "",
     property_id: item?.property_id ?? "",
     property_reference: item?.property_reference ?? "",
     block_id: item?.block_id ?? "",
@@ -550,6 +551,13 @@ export default function App() {
   const [selectedPropertyId, setSelectedPropertyId] = useState("");
 
   const [ingestionResult, setIngestionResult] = useState(null);
+  // Original SoV filename. Known only at upload time; the DB re-pull doesn't
+  // return it, so persist it in sessionStorage to survive the re-pull + refresh.
+  const sovFileNameRef = useRef(
+    typeof window !== "undefined"
+      ? window.sessionStorage.getItem("equirisk:sovFileName") || null
+      : null
+  );
   const [latestFireRiskPayload, setLatestFireRiskPayload] = useState(null);
   const [fireDocumentsLoading, setFireDocumentsLoading] = useState(false);
 
@@ -557,6 +565,41 @@ export default function App() {
     () => getIngestionSummary(ingestionResult),
     [ingestionResult]
   );
+
+  // Flat list of every document ingested so far (SoV + FRA/FRAEW evidence),
+  // shaped for the upload-page document summary table.
+  const uploadedDocuments = useMemo(() => {
+    if (!ingestionResult) return [];
+
+    const docs = [];
+
+    docs.push({
+      id: "sov",
+      name: ingestionSummary?.source || "Schedule of Values",
+      type: "SOV",
+      linked:
+        ingestionSummary?.propertyCount != null
+          ? `${ingestionSummary.propertyCount.toLocaleString()} properties`
+          : "Portfolio",
+      rating: null,
+    });
+
+    collectFireDocuments(ingestionResult, latestFireRiskPayload).forEach((d) => {
+      docs.push({
+        id: d.id,
+        name: d.filename || "Uploaded PDF",
+        type: d.document_type || "FIRE",
+        linked: d.block_reference
+          ? `Block ${d.block_reference}`
+          : d.property_id
+          ? `Property ${d.property_id}`
+          : "Unlinked",
+        rating: d.risk_level || null,
+      });
+    });
+
+    return docs;
+  }, [ingestionResult, ingestionSummary, latestFireRiskPayload]);
 
   const currentPortfolioId = useMemo(
     () => getPortfolioIdFromResult(ingestionResult),
@@ -580,16 +623,41 @@ export default function App() {
     return () => clearTimeout(t);
   }, [activeNav]);
 
+  // Recover the original SoV filename from the upload-audit log. Best-effort:
+  // returns the most recent "property_schedule" submission's filename, or null.
+  const fetchLatestSovFilename = async () => {
+    try {
+      const res = await apiFetch("/api/v1/upload/submissions?limit=50");
+      const data = await res.json();
+      const items = Array.isArray(data?.items) ? data.items : [];
+      // Endpoint returns newest-first; take the first SoV submission.
+      const sov = items.find((it) => it?.file_type === "property_schedule");
+      const name = sov?.filename;
+      return typeof name === "string" && name.trim() ? name : null;
+    } catch (err) {
+      console.warn("[fetchLatestSovFilename] Failed:", err);
+      return null;
+    }
+  };
+
   const loadPropertiesFromApi = async () => {
     try {
       const res = await apiFetch("/api/v1/portfolios/properties");
       const properties = await res.json();
       if (Array.isArray(properties) && properties.length > 0) {
+        // The properties endpoint doesn't carry the original SoV filename.
+        // Prefer the name captured this session; otherwise recover it from the
+        // upload-audit log (survives hard refresh / a fresh tab).
+        const sovName =
+          sovFileNameRef.current || (await fetchLatestSovFilename()) || "Portfolio";
+        if (sovName !== "Portfolio") {
+          sovFileNameRef.current = sovName;
+        }
         const normalised = normaliseBackendIngestionResult(
           // Demo portfolio id so currentPortfolioId resolves and the
           // FRA/FRAEW fire-documents reload effect fires after a refresh.
           { properties, status: "success", portfolio_id: "11111111-1111-1111-1111-111111111111" },
-          "Portfolio"
+          sovName
         );
         setIngestionResult(normalised);
         // Do NOT redirect here — navigation is controlled by explicit user actions
@@ -787,7 +855,11 @@ export default function App() {
 
     if (fireDocsPayload) {
       setIngestionResult((prev) => mergeFireDocumentsIntoPortfolio(prev, fireDocsPayload));
-      setLatestFireRiskPayload(fireDocsPayload);
+      // fireDocsPayload is a list ({ items: [...] }); latestFireRiskPayload must
+      // hold a SINGLE doc (the side panel + collectFireDocuments expect one).
+      // Use the most-recent item; null if there are none.
+      const items = Array.isArray(fireDocsPayload?.items) ? fireDocsPayload.items : [];
+      setLatestFireRiskPayload(items.length ? items[0] : null);
     }
 
     return fireDocsPayload;
@@ -872,6 +944,12 @@ export default function App() {
       console.log("Backend ingestion result:", payload);
 
       if (!isPdfMode) {
+        // Remember the real SoV filename so it survives the post-enrichment
+        // DB re-pull (loadPropertiesFromApi) and a later hard refresh.
+        sovFileNameRef.current = file.name;
+        if (typeof window !== "undefined") {
+          window.sessionStorage.setItem("equirisk:sovFileName", file.name);
+        }
         const normalised = normaliseBackendIngestionResult(payload, file.name);
 
         console.log("Normalised ingestion result:", normalised);
@@ -1084,6 +1162,8 @@ export default function App() {
                 localStorage.removeItem("equirisk_user");
                 sessionStorage.removeItem("equirisk_token");
                 sessionStorage.removeItem("equirisk_user");
+                sessionStorage.removeItem("equirisk:sovFileName");
+                sovFileNameRef.current = null;
                 setAuthUser(null);
                 setIngestionResult(null);
                 setShowLanding(true);
@@ -1099,10 +1179,8 @@ export default function App() {
             <>
               <div className="main-head">
                 <div>
-                  <div className="page-title">Upload Documents</div>
-                  <div className="page-sub">
-                    Start with an SoV, then add FRA and FRAEW evidence against the matched blocks.
-                  </div>
+                  <div className="tag">Portfolio ingestion</div>
+                  <div className="page-title">Upload your <em>portfolio</em></div>
                 </div>
               </div>
 
@@ -1115,6 +1193,7 @@ export default function App() {
                 pipelineStep={pipelineStep}
                 ingestionSummary={ingestionSummary}
                 latestFireRiskPayload={latestFireRiskPayload}
+                documents={uploadedDocuments}
                 selectedBlockReference={selectedBlockReference}
                 onSelectedBlockReferenceChange={setSelectedBlockReference}
                 selectedPropertyId={selectedPropertyId}
@@ -1143,83 +1222,7 @@ export default function App() {
                 }}
               />
 
-              {latestFireRiskPayload && (
-                <div className="card" style={{ marginTop: 16 }}>
-                  <div className="card-header row-between">
-                    <div>
-                      <div className="card-title">Latest PDF extraction</div>
-                      <div className="card-subtitle">
-                        Returned from the most recent FRA / FRAEW upload.
-                      </div>
-                    </div>
-                    <span className="pill pill-muted">
-                      {latestFireRiskPayload.document_type?.toUpperCase() || "PDF"}
-                    </span>
-                  </div>
 
-                  <div className="table-wrap">
-                    <table className="table">
-                      <tbody>
-                        <tr>
-                          <td className="td-key">Upload ID</td>
-                          <td>{latestFireRiskPayload.upload_id || "—"}</td>
-                        </tr>
-                        <tr>
-                          <td className="td-key">Feature ID</td>
-                          <td>{latestFireRiskPayload.feature_id || "—"}</td>
-                        </tr>
-                        <tr>
-                          <td className="td-key">Block reference</td>
-                          <td>{latestFireRiskPayload.block_reference || "—"}</td>
-                        </tr>
-                        <tr>
-                          <td className="td-key">Block ID</td>
-                          <td>{latestFireRiskPayload.block_id || "—"}</td>
-                        </tr>
-                        <tr>
-                          <td className="td-key">Property ID</td>
-                          <td>{latestFireRiskPayload.property_id || "—"}</td>
-                        </tr>
-                        <tr>
-                          <td className="td-key">Extraction errors</td>
-                          <td>
-                            {Array.isArray(latestFireRiskPayload.extraction_errors) &&
-                            latestFireRiskPayload.extraction_errors.length
-                              ? latestFireRiskPayload.extraction_errors.join(" · ")
-                              : "None"}
-                          </td>
-                        </tr>
-                        <tr>
-                          <td className="td-key">FRA risk</td>
-                          <td>
-                            {latestFireRiskPayload.fra?.risk_level ||
-                              latestFireRiskPayload.fra?.raw_rating ||
-                              "—"}
-                          </td>
-                        </tr>
-                        <tr>
-                          <td className="td-key">FRAEW risk</td>
-                          <td>
-                            {latestFireRiskPayload.fraew?.risk_level ||
-                              latestFireRiskPayload.fraew?.raw_rating ||
-                              "—"}
-                          </td>
-                        </tr>
-                        <tr>
-                          <td className="td-key">Remediation required</td>
-                          <td>
-                            {latestFireRiskPayload.fraew?.remediation_required === true
-                              ? "Yes"
-                              : latestFireRiskPayload.fraew?.remediation_required === false
-                              ? "No"
-                              : "—"}
-                          </td>
-                        </tr>
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              )}
             </>
           )}
 

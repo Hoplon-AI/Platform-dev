@@ -60,7 +60,7 @@ export default function ProcessingSteps({ steps, currentIndex }: ProcessingSteps
                   width: 44,
                   height: 44,
                   borderRadius: "50%",
-                  background: "#2563eb",
+                  background: "var(--terracotta)",
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
@@ -88,8 +88,8 @@ export default function ProcessingSteps({ steps, currentIndex }: ProcessingSteps
                   width: 44,
                   height: 44,
                   borderRadius: "50%",
-                  border: "3.5px solid rgba(37, 99, 235, 0.12)",
-                  borderTopColor: "#2563eb",
+                  border: "3.5px solid rgba(184, 86, 75, 0.14)",
+                  borderTopColor: "var(--terracotta)",
                   flexShrink: 0,
                 }}
               />
@@ -97,12 +97,12 @@ export default function ProcessingSteps({ steps, currentIndex }: ProcessingSteps
 
             <span
               style={{
-                fontSize: "22px",
-                fontWeight: 700,
-                color: "#1e3a8a",
-                letterSpacing: "-0.025em",
+                fontSize: "24px",
+                fontWeight: 600,
+                color: "var(--navy)",
+                letterSpacing: "-0.015em",
                 lineHeight: 1.3,
-                fontFamily: "Inter, ui-sans-serif, system-ui, sans-serif",
+                fontFamily: "var(--font-serif)",
                 whiteSpace: "nowrap",
               }}
             >
@@ -119,7 +119,7 @@ export default function ProcessingSteps({ steps, currentIndex }: ProcessingSteps
           maxWidth: 400,
           height: 4,
           borderRadius: 99,
-          background: "rgba(37, 99, 235, 0.1)",
+          background: "rgba(184, 86, 75, 0.12)",
           overflow: "hidden",
         }}
       >
@@ -129,7 +129,7 @@ export default function ProcessingSteps({ steps, currentIndex }: ProcessingSteps
           style={{
             height: "100%",
             borderRadius: 99,
-            background: "linear-gradient(90deg, #3b82f6, #2563eb)",
+            background: "linear-gradient(90deg, var(--terracotta-3), var(--terracotta))",
           }}
         />
       </div>
@@ -138,8 +138,8 @@ export default function ProcessingSteps({ steps, currentIndex }: ProcessingSteps
       <span
         style={{
           fontSize: 12,
-          color: "rgba(37, 99, 235, 0.45)",
-          fontFamily: "Inter, ui-sans-serif, system-ui, sans-serif",
+          color: "rgba(154, 70, 61, 0.55)",
+          fontFamily: "var(--font-sans)",
           letterSpacing: "0.04em",
           marginTop: -20,
         }}

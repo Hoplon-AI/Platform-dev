@@ -760,7 +760,14 @@ async def ingest_document(
         file_type=user_file_type.value,
         filename=filename,
         s3_key=s3_key,
-        metadata={"auto_detected": auto_detected.value, "user_selected": document_type},
+        metadata={
+            "auto_detected": auto_detected.value,
+            "user_selected": document_type,
+            # Persist the block reference the user typed so the document library
+            # can show "Linked to" even when no matching silver.blocks row exists
+            # yet (block detection may not have run). Independent of block_id.
+            "block_reference": block_reference.strip() if block_reference else None,
+        },
         checksum=checksum,
         file_size=len(file_content),
         user_id=user_id,

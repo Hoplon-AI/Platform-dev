@@ -1754,3 +1754,187 @@ async def red_blocks(
             "total_high_priority_actions": sum(b["high_priority_actions"] for b in blocks),
             "blocks": blocks,
         }
+
+
+# ===========================================================================
+# 8. Fire Documents — flat list of every FRA / FRAEW in the portfolio
+# ===========================================================================
+
+@router.get("/portfolios/{portfolio_id}/fire-documents")
+async def fire_documents(
+    portfolio_id: str,
+    tenant: Tuple[str, str] = Depends(get_tenant_info),
+) -> Dict[str, Any]:
+    """
+    Every FRA / FRAEW evidence document stored for the portfolio's HA.
+
+    Used by the ingestion dashboard to restore the document library after a
+    page refresh (the SoV is restored via /portfolios/properties; this does
+    the same for fire-safety PDFs).
+
+    Queries silver.fra_features / silver.fraew_features DIRECTLY by ha_id —
+    NOT through silver.blocks — so documents uploaded without a matched
+    block_reference (block_id IS NULL) still surface instead of being orphaned.
+
+    Filenames are resolved through silver.document_features → upload_audit for
+    FRA, and directly via fraew_features.upload_id → upload_audit for FRAEW.
+
+    Response shape matches the frontend's mergeFireDocumentsIntoPortfolio():
+      { portfolio_id, ha_id, count, items: [ { document_type, fra|fraew, ... } ] }
+    """
+    def _iso(v):
+        return v.isoformat() if v is not None and hasattr(v, "isoformat") else v
+
+    pool = DatabasePool.get_pool()
+    async with pool.acquire() as conn:
+        portfolio = await _resolve_portfolio(conn, portfolio_id)
+        ha_id = portfolio["ha_id"]
+
+        fra_rows = await conn.fetch(
+            """
+            SELECT
+                f.fra_id::text          AS feature_id,
+                df.upload_id::text      AS upload_id,
+                f.block_id::text        AS block_id,
+                b.name                  AS block_name,
+                df.property_id::text    AS property_id,
+                df.address              AS address,
+                df.postcode             AS postcode,
+                ua.filename             AS filename,
+                ua.metadata->>'block_reference' AS typed_block_reference,
+                f.risk_rating,
+                f.rag_status,
+                f.assessment_date,
+                f.assessment_valid_until,
+                f.is_in_date,
+                f.assessor_company,
+                f.assessor_name,
+                f.evacuation_strategy,
+                f.has_sprinkler_system,
+                f.has_fire_alarm_system,
+                f.has_fire_doors,
+                COALESCE(f.total_action_count, 0)       AS total_action_count,
+                COALESCE(f.overdue_action_count, 0)     AS overdue_action_count,
+                COALESCE(f.outstanding_action_count, 0) AS outstanding_action_count
+            FROM silver.fra_features f
+            LEFT JOIN silver.document_features df ON df.feature_id = f.feature_id
+            LEFT JOIN public.upload_audit ua       ON ua.upload_id = df.upload_id
+            LEFT JOIN silver.blocks b              ON b.block_id = f.block_id
+            WHERE f.ha_id = $1
+            ORDER BY f.assessment_date DESC NULLS LAST, f.created_at DESC
+            """,
+            ha_id,
+        )
+
+        fraew_rows = await conn.fetch(
+            """
+            SELECT
+                w.fraew_id::text        AS feature_id,
+                w.upload_id::text       AS upload_id,
+                w.block_id::text        AS block_id,
+                b.name                  AS block_name,
+                df.property_id::text    AS property_id,
+                df.address              AS address,
+                df.postcode             AS postcode,
+                ua.filename             AS filename,
+                ua.metadata->>'block_reference' AS typed_block_reference,
+                w.building_risk_rating,
+                w.rag_status,
+                w.assessment_date,
+                w.assessment_valid_until,
+                w.is_in_date,
+                w.assessor_company,
+                w.has_combustible_cladding,
+                w.eps_insulation_present,
+                w.has_remedial_actions,
+                w.interim_measures_required,
+                w.pas_9980_compliant
+            FROM silver.fraew_features w
+            LEFT JOIN silver.document_features df ON df.feature_id = w.feature_id
+            LEFT JOIN public.upload_audit ua       ON ua.upload_id = w.upload_id
+            LEFT JOIN silver.blocks b              ON b.block_id = w.block_id
+            WHERE w.ha_id = $1
+            ORDER BY w.assessment_date DESC NULLS LAST, w.created_at DESC
+            """,
+            ha_id,
+        )
+
+    items: List[Dict[str, Any]] = []
+
+    for r in fra_rows:
+        # Prefer the resolved block name (from a real block_id); fall back to the
+        # reference the user typed at upload time (persisted in upload_audit metadata).
+        block_ref = r["block_name"] or r["typed_block_reference"] or ""
+        items.append({
+            "document_type":      "fra",
+            "upload_id":          r["upload_id"] or "",
+            "feature_id":         r["feature_id"] or "",
+            "block_id":           r["block_id"] or "",
+            "block_name":         block_ref,
+            "block_reference":    block_ref,
+            "property_id":        r["property_id"] or "",
+            "property_reference": "",
+            "address":            r["address"] or "",
+            "postcode":           r["postcode"] or "",
+            "filename":           r["filename"] or "Uploaded PDF",
+            "fra": {
+                "risk_rating":              r["risk_rating"],
+                "rag_status":               r["rag_status"],
+                "risk_level":               r["rag_status"],
+                "raw_rating":               r["risk_rating"],
+                "assessment_date":          _iso(r["assessment_date"]),
+                "assessment_valid_until":   _iso(r["assessment_valid_until"]),
+                "is_in_date":               r["is_in_date"],
+                "assessor_company":         r["assessor_company"],
+                "assessor_name":            r["assessor_name"],
+                "evacuation_strategy":      r["evacuation_strategy"],
+                "has_sprinkler_system":     r["has_sprinkler_system"],
+                "has_fire_alarm_system":    r["has_fire_alarm_system"],
+                "has_fire_doors":           r["has_fire_doors"],
+                "total_action_count":       r["total_action_count"],
+                "overdue_action_count":     r["overdue_action_count"],
+                "outstanding_action_count": r["outstanding_action_count"],
+            },
+            "fraew": None,
+        })
+
+    for r in fraew_rows:
+        block_ref = r["block_name"] or r["typed_block_reference"] or ""
+        items.append({
+            "document_type":      "fraew",
+            "upload_id":          r["upload_id"] or "",
+            "feature_id":         r["feature_id"] or "",
+            "block_id":           r["block_id"] or "",
+            "block_name":         block_ref,
+            "block_reference":    block_ref,
+            "property_id":        r["property_id"] or "",
+            "property_reference": "",
+            "address":            r["address"] or "",
+            "postcode":           r["postcode"] or "",
+            "filename":           r["filename"] or "Uploaded PDF",
+            "fra": None,
+            "fraew": {
+                "building_risk_rating":      r["building_risk_rating"],
+                "rag_status":                r["rag_status"],
+                "risk_level":                r["rag_status"],
+                "raw_rating":                r["building_risk_rating"],
+                "assessment_date":           _iso(r["assessment_date"]),
+                "assessment_valid_until":    _iso(r["assessment_valid_until"]),
+                "is_in_date":                r["is_in_date"],
+                "assessor_company":          r["assessor_company"],
+                "has_combustible_cladding":  r["has_combustible_cladding"],
+                "eps_insulation_present":    r["eps_insulation_present"],
+                "has_remedial_actions":      r["has_remedial_actions"],
+                "remediation_required":      r["has_remedial_actions"],
+                "interim_measures_required": r["interim_measures_required"],
+                "pas_9980_compliant":        r["pas_9980_compliant"],
+            },
+        })
+
+    return {
+        "portfolio_id":   portfolio_id,
+        "ha_id":          ha_id,
+        "portfolio_name": portfolio["portfolio_name"],
+        "count":          len(items),
+        "items":          items,
+    }
