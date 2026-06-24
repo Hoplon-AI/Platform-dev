@@ -601,6 +601,7 @@ async def enrich_portfolio(
     epc_email: str = "",
     epc_key: str = "",
     limit: int = 0,
+    portfolio_id: str | None = None,
 ) -> dict:
     """
     Enrich all pending properties for an HA.
@@ -623,11 +624,14 @@ async def enrich_portfolio(
     try:
         with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
             lim = f"LIMIT {limit}" if limit > 0 else ""
+            portfolio_clause = "AND portfolio_id = %s::uuid" if portfolio_id else ""
+            params = (ha_id, portfolio_id) if portfolio_id else (ha_id,)
             cur.execute(f"""
                 SELECT * FROM silver.properties
                 WHERE ha_id = %s AND enrichment_status = 'pending'
+                {portfolio_clause}
                 ORDER BY property_reference {lim}
-            """, (ha_id,))
+            """, params)
             rows = cur.fetchall()
     finally:
         conn.close()

@@ -185,7 +185,9 @@ async def underwriter_home(
                 AND acc.renewal_year = po.renewal_year
                 AND ($2::text IS NULL OR acc.underwriter_id::text = $2)
 
-            LEFT JOIN silver.blocks b ON b.ha_id = po.ha_id
+            LEFT JOIN silver.blocks b
+                ON  b.ha_id        = po.ha_id
+                AND b.portfolio_id = po.portfolio_id
 
             LEFT JOIN LATERAL (
                 SELECT rag_status
@@ -294,7 +296,9 @@ async def list_portfolios(
 
             FROM silver.portfolios po
             JOIN public.housing_associations ha ON ha.ha_id = po.ha_id
-            LEFT JOIN silver.blocks b ON b.ha_id = po.ha_id
+            LEFT JOIN silver.blocks b
+                ON  b.ha_id        = po.ha_id
+                AND b.portfolio_id = po.portfolio_id
 
             -- Latest FRA per block (LATERAL)
             LEFT JOIN LATERAL (
@@ -357,14 +361,14 @@ async def portfolio_summary(
                 COALESCE(SUM(b.unit_count), 0)::bigint              AS total_units,
                 COALESCE(SUM(b.total_sum_insured), 0)               AS total_insured_value,
 
-                -- Property count (direct from silver.properties by ha_id)
-                (SELECT COUNT(*) FROM silver.properties WHERE ha_id = $2)::bigint
+                -- Property count (direct from silver.properties by ha_id + portfolio_id)
+                (SELECT COUNT(*) FROM silver.properties WHERE ha_id = $2 AND portfolio_id = $1::uuid)::bigint
                                                                     AS total_properties,
 
                 -- Enrichment
-                (SELECT COUNT(*) FROM silver.properties WHERE ha_id = $2 AND enrichment_status = 'enriched')::bigint
+                (SELECT COUNT(*) FROM silver.properties WHERE ha_id = $2 AND portfolio_id = $1::uuid AND enrichment_status = 'enriched')::bigint
                                                                     AS enriched_properties,
-                (SELECT COUNT(*) FROM silver.properties WHERE ha_id = $2 AND enrichment_status = 'pending')::bigint
+                (SELECT COUNT(*) FROM silver.properties WHERE ha_id = $2 AND portfolio_id = $1::uuid AND enrichment_status = 'pending')::bigint
                                                                     AS pending_properties,
 
                 -- FRA RAG distribution
@@ -461,7 +465,8 @@ async def portfolio_summary(
                 LIMIT 1
             ) fraew ON TRUE
 
-            WHERE b.ha_id = $2
+            WHERE b.ha_id        = $2
+              AND b.portfolio_id = $1::uuid
             """,
             portfolio_id,
             ha_id,
@@ -505,7 +510,7 @@ async def portfolio_composition(
             WITH totals AS (
                 SELECT SUM(sum_insured) AS grand_total
                 FROM silver.properties
-                WHERE ha_id = $1
+                WHERE ha_id = $1 AND portfolio_id = $2::uuid
             )
             SELECT
                 COALESCE(occupancy_type, 'Not recorded')    AS type,
@@ -516,11 +521,12 @@ async def portfolio_composition(
                     ELSE 0
                 END                                         AS pct
             FROM silver.properties, totals t
-            WHERE ha_id = $1
+            WHERE ha_id = $1 AND portfolio_id = $2::uuid
             GROUP BY occupancy_type, t.grand_total
             ORDER BY sum_insured DESC
             """,
             ha_id,
+            portfolio_id,
         )
 
         # ── 2. BY BLOCK REFERENCE ────────────────────────────────────────────
@@ -545,9 +551,10 @@ async def portfolio_composition(
                 COALESCE(SUM(sum_insured) FILTER (WHERE block_reference IS NOT NULL), 0)
                                                             AS block_tiv
             FROM silver.properties
-            WHERE ha_id = $1
+            WHERE ha_id = $1 AND portfolio_id = $2::uuid
             """,
             ha_id,
+            portfolio_id,
         )
 
         # Individual blocks — for the >£5M count and the detail list
@@ -560,11 +567,13 @@ async def portfolio_composition(
                 (SUM(sum_insured) > 5000000)                AS over_5m
             FROM silver.properties
             WHERE ha_id = $1
+              AND portfolio_id = $2::uuid
               AND block_reference IS NOT NULL
             GROUP BY block_reference
             ORDER BY tiv DESC
             """,
             ha_id,
+            portfolio_id,
         )
         blocks_over_5m = sum(1 for r in block_rows if r["over_5m"])
 
@@ -576,7 +585,7 @@ async def portfolio_composition(
             WITH totals AS (
                 SELECT SUM(sum_insured) AS grand_total
                 FROM silver.properties
-                WHERE ha_id = $1
+                WHERE ha_id = $1 AND portfolio_id = $2::uuid
             )
             SELECT
                 COALESCE(avid_property_type, 'Not recorded') AS type,
@@ -587,11 +596,12 @@ async def portfolio_composition(
                     ELSE 0
                 END                                          AS pct
             FROM silver.properties, totals t
-            WHERE ha_id = $1
+            WHERE ha_id = $1 AND portfolio_id = $2::uuid
             GROUP BY avid_property_type, t.grand_total
             ORDER BY sum_insured DESC
             """,
             ha_id,
+            portfolio_id,
         )
 
         # ── 4. BY AGE BANDING ────────────────────────────────────────────────
@@ -601,7 +611,7 @@ async def portfolio_composition(
             WITH totals AS (
                 SELECT SUM(sum_insured) AS grand_total
                 FROM silver.properties
-                WHERE ha_id = $1
+                WHERE ha_id = $1 AND portfolio_id = $2::uuid
             )
             SELECT
                 COALESCE(age_banding, 'Unknown')            AS age_band,
@@ -612,7 +622,7 @@ async def portfolio_composition(
                     ELSE 0
                 END                                         AS pct
             FROM silver.properties, totals t
-            WHERE ha_id = $1
+            WHERE ha_id = $1 AND portfolio_id = $2::uuid
             GROUP BY age_banding, t.grand_total
             ORDER BY
                 CASE age_banding
@@ -626,6 +636,7 @@ async def portfolio_composition(
                 END
             """,
             ha_id,
+            portfolio_id,
         )
 
         # ── 5. Portfolio Composition widget — responsible_party split ────────
@@ -639,11 +650,12 @@ async def portfolio_composition(
                 COUNT(*)::integer                               AS units,
                 COALESCE(SUM(sum_insured), 0)                   AS sum_insured
             FROM silver.properties
-            WHERE ha_id = $1
+            WHERE ha_id = $1 AND portfolio_id = $2::uuid
             GROUP BY avid_property_type, responsible_party
             ORDER BY avid_property_type, responsible_party
             """,
             ha_id,
+            portfolio_id,
         )
 
         # Build the nested structure the frontend needs for the progress-bar card
@@ -672,9 +684,10 @@ async def portfolio_composition(
                 COUNT(*)::integer       AS total_units,
                 SUM(sum_insured)        AS total_sum_insured
             FROM silver.properties
-            WHERE ha_id = $1
+            WHERE ha_id = $1 AND portfolio_id = $2::uuid
             """,
             ha_id,
+            portfolio_id,
         )
 
         total_units = totals["total_units"] or 1  # avoid div/0
@@ -770,7 +783,8 @@ async def portfolio_map(
                     MIN(p.address)       AS sample_address,
                     MIN(p.postcode)      AS sample_postcode
                 FROM silver.properties p
-                WHERE p.ha_id = $1
+                WHERE p.ha_id        = $1
+                  AND p.portfolio_id = $2::uuid
                   AND (
                       p.latitude IS NOT NULL
                       OR p.x_coordinate IS NOT NULL
@@ -879,7 +893,8 @@ async def portfolio_map(
                 LIMIT 1
             ) fraew ON TRUE
 
-            WHERE b.ha_id = $1
+            WHERE b.ha_id        = $1
+              AND b.portfolio_id = $2::uuid
               AND (
                   coords.lat_direct IS NOT NULL
                   OR coords.avg_easting IS NOT NULL
@@ -894,6 +909,7 @@ async def portfolio_map(
                 b.name
             """,
             ha_id,
+            portfolio_id,
         )
 
         markers = [dict(r) for r in rows]
@@ -1011,7 +1027,8 @@ async def fra_blocks(
                 LIMIT 1
             ) fraew ON TRUE
 
-            WHERE b.ha_id = $1
+            WHERE b.ha_id        = $1
+              AND b.portfolio_id = $2::uuid
               {rag_clause}
             ORDER BY
                 CASE fra.rag_status
@@ -1024,6 +1041,7 @@ async def fra_blocks(
                 b.name
             """,
             ha_id,
+            portfolio_id,
         )
 
         result_rows = [dict(r) for r in rows]
@@ -1270,9 +1288,11 @@ async def risk_summary(
                 ORDER BY assessment_date DESC NULLS LAST, created_at DESC
                 LIMIT 1
             ) fra ON TRUE
-            WHERE b.ha_id = $1
+            WHERE b.ha_id        = $1
+              AND b.portfolio_id = $2::uuid
             """,
             ha_id,
+            portfolio_id,
         )
 
         # FRAEW compliance stats
@@ -1312,9 +1332,11 @@ async def risk_summary(
                 ORDER BY created_at DESC
                 LIMIT 1
             ) fraew ON TRUE
-            WHERE b.ha_id = $1
+            WHERE b.ha_id        = $1
+              AND b.portfolio_id = $2::uuid
             """,
             ha_id,
+            portfolio_id,
         )
 
         # Blocks needing urgent attention (RED FRA or RED FRAEW, with overdue actions)
@@ -1347,7 +1369,8 @@ async def risk_summary(
                 ORDER BY created_at DESC
                 LIMIT 1
             ) fraew ON TRUE
-            WHERE b.ha_id = $1
+            WHERE b.ha_id        = $1
+              AND b.portfolio_id = $2::uuid
               AND (
                   fra.rag_status = 'RED'
                   OR fraew.rag_status = 'RED'
@@ -1359,6 +1382,7 @@ async def risk_summary(
                 b.height_max_m DESC NULLS LAST
             """,
             ha_id,
+            portfolio_id,
         )
 
         fra = dict(fra_stats)
@@ -1498,9 +1522,11 @@ async def doc_completeness(
                 LIMIT 1
             ) fraew ON TRUE
 
-            WHERE b.ha_id = $1
+            WHERE b.ha_id        = $1
+              AND b.portfolio_id = $2::uuid
             """,
             ha_id,
+            portfolio_id,
         )
 
         doc_b_field_keys = [
@@ -1708,7 +1734,8 @@ async def red_blocks(
                 LIMIT 1
             ) fraew ON TRUE
 
-            WHERE b.ha_id = $1
+            WHERE b.ha_id        = $1
+              AND b.portfolio_id = $2::uuid
               AND (fra.rag_status = 'RED' OR fraew.rag_status = 'RED')
 
             ORDER BY
@@ -1717,6 +1744,7 @@ async def red_blocks(
                 b.total_sum_insured DESC NULLS LAST
             """,
             ha_id,
+            portfolio_id,
         )
 
         blocks = []
