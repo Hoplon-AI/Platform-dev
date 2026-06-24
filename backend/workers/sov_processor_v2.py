@@ -1144,6 +1144,7 @@ def _stage_c_extract(ws, sheet_info: dict, join_data: dict | None,
                       join_plan: dict | None,
                       ha_id: str, upload_id: str,
                       auto_ref_prefix: str,
+                      portfolio_id: str | None = None,
                       data_rows_for_uniqueness: list[tuple] | None = None,
                       ) -> list[dict]:
     rows = _sheet_rows(ws)
@@ -1283,6 +1284,7 @@ def _stage_c_extract(ws, sheet_info: dict, join_data: dict | None,
             # Issue #9 — _clamp() on every string field
             record = {
                 "ha_id":              ha_id,
+                "portfolio_id":       portfolio_id,
                 "submission_id":      upload_id,
                 "property_reference": _clamp(prop_ref, DB_COLUMN_LIMITS["property_reference"]),
                 "block_reference":    _clamp(block_ref, DB_COLUMN_LIMITS["block_reference"]),
@@ -1349,7 +1351,7 @@ def _compute_confidence(address, postcode, sum_insured, block_ref,
 
 UPSERT_SQL = """
 INSERT INTO silver.properties (
-    ha_id, submission_id, property_reference, block_reference,
+    ha_id, portfolio_id, submission_id, property_reference, block_reference,
     address, address_2, address_3, postcode,
     occupancy_type, sum_insured, sum_insured_type,
     property_type, avid_property_type,
@@ -1360,7 +1362,7 @@ INSERT INTO silver.properties (
     enrichment_status, metadata, created_at, updated_at
 )
 VALUES (
-    %(ha_id)s, %(submission_id)s::uuid, %(property_reference)s, %(block_reference)s,
+    %(ha_id)s, %(portfolio_id)s::uuid, %(submission_id)s::uuid, %(property_reference)s, %(block_reference)s,
     %(address)s, %(address_2)s, %(address_3)s, %(postcode)s,
     %(occupancy_type)s, %(sum_insured)s, %(sum_insured_type)s,
     %(property_type)s, %(avid_property_type)s,
@@ -1372,6 +1374,7 @@ VALUES (
 )
 ON CONFLICT (ha_id, property_reference)
 DO UPDATE SET
+    portfolio_id       = EXCLUDED.portfolio_id,
     block_reference    = EXCLUDED.block_reference,
     address            = EXCLUDED.address,
     address_2          = EXCLUDED.address_2,
@@ -1409,6 +1412,15 @@ DO UPDATE SET
     updated_at         = NOW()
 """
 
+# After upsert, delete rows belonging to this portfolio from a previous upload
+# (re-upload = replace, not accumulate)
+DELETE_STALE_SQL = """
+DELETE FROM silver.properties
+WHERE ha_id = %(ha_id)s
+  AND portfolio_id = %(portfolio_id)s::uuid
+  AND submission_id != %(submission_id)s::uuid
+"""
+
 
 def _get_db_conn():
     return psycopg2.connect(
@@ -1416,7 +1428,7 @@ def _get_db_conn():
     )
 
 
-def _stage_d_upsert(records: list[dict], upload_id: str) -> int:
+def _stage_d_upsert(records: list[dict], upload_id: str, portfolio_id: str | None = None) -> int:
     if not records:
         return 0
     for r in records:
@@ -1427,6 +1439,17 @@ def _stage_d_upsert(records: list[dict], upload_id: str) -> int:
             with conn:
                 with conn.cursor() as cur:
                     psycopg2.extras.execute_batch(cur, UPSERT_SQL, records, page_size=500)
+                    # Delete rows from a previous upload to this same portfolio
+                    # so re-uploading replaces rather than accumulates
+                    if portfolio_id:
+                        cur.execute(DELETE_STALE_SQL, {
+                            "ha_id": records[0]["ha_id"],
+                            "portfolio_id": portfolio_id,
+                            "submission_id": upload_id,
+                        })
+                        deleted = cur.rowcount
+                        if deleted:
+                            logger.info(f"[{upload_id}] Stage D — deleted {deleted} stale rows from previous upload")
             logger.info(f"[{upload_id}] Stage D — upserted {len(records)} rows")
             return len(records)
         finally:
@@ -1482,6 +1505,7 @@ async def process_sov_to_silver(
     upload_id: str = "",
     filename: str = "upload.xlsx",
     submission_id: str | None = None,
+    portfolio_id: str | None = None,
     db_pool: Any = None,
     **kwargs: Any,
 ) -> dict:
@@ -1556,7 +1580,7 @@ async def process_sov_to_silver(
             records = _stage_c_extract(
                 ws=ws, sheet_info=sheet_info, join_data=join_data,
                 join_plan=join_plan, ha_id=ha_id, upload_id=upload_id,
-                auto_ref_prefix=safe_prefix,
+                auto_ref_prefix=safe_prefix, portfolio_id=portfolio_id,
             )
 
             for r in records:
@@ -1568,7 +1592,7 @@ async def process_sov_to_silver(
         logger.info(f"[{upload_id}] Total records: {len(all_records)}")
 
         # ── Stage D: Upsert ──
-        rows_written = _stage_d_upsert(all_records, upload_id)
+        rows_written = _stage_d_upsert(all_records, upload_id, portfolio_id=portfolio_id)
 
         report = _build_coverage_report(all_records, upload_id)
         report["rows_written"] = rows_written

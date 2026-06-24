@@ -681,6 +681,38 @@ def _make_serializable(obj):
 # Unified ingest endpoint
 # ─────────────────────────────────────────────────────────────────────────────
 
+async def _resolve_or_create_portfolio(conn, ha_id: str, portfolio_id: Optional[str], filename: str) -> str:
+    """
+    Return a valid portfolio_id for this upload.
+    - If portfolio_id provided: verify it belongs to ha_id.
+    - If not provided: create a new portfolio row named after the file.
+    """
+    if portfolio_id:
+        row = await conn.fetchrow(
+            "SELECT portfolio_id FROM silver.portfolios WHERE portfolio_id = $1::uuid AND ha_id = $2",
+            portfolio_id, ha_id,
+        )
+        if not row:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Portfolio '{portfolio_id}' not found for this housing association.",
+            )
+        return portfolio_id
+
+    name = os.path.splitext(filename)[0] if filename else "Portfolio"
+    renewal_year = datetime.utcnow().year
+    new_id = str(uuid.uuid4())
+    await conn.execute(
+        """
+        INSERT INTO silver.portfolios (portfolio_id, ha_id, name, renewal_year, created_at, updated_at)
+        VALUES ($1::uuid, $2, $3, $4, NOW(), NOW())
+        """,
+        new_id, ha_id, name, renewal_year,
+    )
+    logger.info("[INGEST] Created portfolio '%s' (%s) for ha_id=%s", name, new_id, ha_id)
+    return new_id
+
+
 @router.post("/ingest", summary="Unified ingestion — SoV (Excel) or FRA/FRAEW (PDF)")
 async def ingest_document(
     background_tasks: BackgroundTasks,
@@ -692,6 +724,10 @@ async def ingest_document(
     block_reference: Optional[str] = Query(
         None,
         description="Block reference (e.g. '02BR') to link FRA/FRAEW to a specific block. If omitted, auto-resolved from block name in PDF.",
+    ),
+    portfolio_id: Optional[str] = Query(
+        None,
+        description="Portfolio UUID to upload into. If omitted for a SoV upload, a new portfolio is created automatically.",
     ),
     tenant: Tuple[str, str] = Depends(get_tenant_info),
 ):
@@ -779,11 +815,20 @@ async def ingest_document(
     # SoV → sov_processor_v2 → auto-enrich (background, limit 50)
     if document_type == "sov":
         pool = DatabasePool.get_pool()
+
+        # Resolve or create portfolio before processing so every property row
+        # is stamped with the correct portfolio_id from the start.
+        async with pool.acquire() as _conn:
+            resolved_portfolio_id = await _resolve_or_create_portfolio(
+                _conn, ha_id, portfolio_id, filename
+            )
+
         await process_sov_to_silver(
             file_bytes=file_content,
             ha_id=ha_id,
             submission_id=upload_id,
             upload_id=upload_id,
+            portfolio_id=resolved_portfolio_id,
             db_pool=pool,
         )
 
@@ -855,6 +900,7 @@ async def ingest_document(
             "success": True,
             "document_type": "sov",
             "ha_id": ha_id,
+            "portfolio_id": resolved_portfolio_id,
             "upload_id": upload_id,
             "filename": filename,
             "file_size": len(file_content),
