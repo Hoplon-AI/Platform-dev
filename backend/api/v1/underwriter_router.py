@@ -72,7 +72,13 @@ async def get_tenant_info(
 # Helper — resolve portfolio_id → {portfolio_id, ha_id, ha_name, ...}
 # ---------------------------------------------------------------------------
 
-async def _resolve_portfolio(conn, portfolio_id: str) -> Dict[str, Any]:
+async def _resolve_portfolio(conn, portfolio_id: str, ha_id: str) -> Dict[str, Any]:
+    """Fetch portfolio metadata, enforcing tenant ownership.
+
+    Raises 404 if the portfolio does not exist OR does not belong to ha_id,
+    intentionally indistinguishable so callers cannot enumerate other tenants'
+    portfolio UUIDs.
+    """
     row = await conn.fetchrow(
         """
         SELECT
@@ -85,8 +91,10 @@ async def _resolve_portfolio(conn, portfolio_id: str) -> Dict[str, Any]:
         FROM silver.portfolios po
         JOIN public.housing_associations ha ON ha.ha_id = po.ha_id
         WHERE po.portfolio_id = $1
+          AND po.ha_id        = $2
         """,
         portfolio_id,
+        ha_id,
     )
     if not row:
         raise HTTPException(
@@ -346,7 +354,7 @@ async def portfolio_summary(
     """
     pool = DatabasePool.get_pool()
     async with pool.acquire() as conn:
-        portfolio = await _resolve_portfolio(conn, portfolio_id)
+        portfolio = await _resolve_portfolio(conn, portfolio_id, tenant[0])
         ha_id = portfolio["ha_id"]
 
         row = await conn.fetchrow(
@@ -500,7 +508,7 @@ async def portfolio_composition(
     """
     pool = DatabasePool.get_pool()
     async with pool.acquire() as conn:
-        portfolio = await _resolve_portfolio(conn, portfolio_id)
+        portfolio = await _resolve_portfolio(conn, portfolio_id, tenant[0])
         ha_id = portfolio["ha_id"]
 
         # ── 1. BY TENANCY / OWNERSHIP ────────────────────────────────────────
@@ -763,7 +771,7 @@ async def portfolio_map(
     """
     pool = DatabasePool.get_pool()
     async with pool.acquire() as conn:
-        portfolio = await _resolve_portfolio(conn, portfolio_id)
+        portfolio = await _resolve_portfolio(conn, portfolio_id, tenant[0])
         ha_id = portfolio["ha_id"]
 
         rows = await conn.fetch(
@@ -958,7 +966,7 @@ async def fra_blocks(
     """
     pool = DatabasePool.get_pool()
     async with pool.acquire() as conn:
-        portfolio = await _resolve_portfolio(conn, portfolio_id)
+        portfolio = await _resolve_portfolio(conn, portfolio_id, tenant[0])
         ha_id = portfolio["ha_id"]
 
         # Build optional RAG filter
@@ -1091,7 +1099,7 @@ async def fraew_blocks(
     """
     pool = DatabasePool.get_pool()
     async with pool.acquire() as conn:
-        portfolio = await _resolve_portfolio(conn, portfolio_id)
+        portfolio = await _resolve_portfolio(conn, portfolio_id, tenant[0])
         ha_id = portfolio["ha_id"]
 
         filters = ["b.ha_id = $1"]
@@ -1255,7 +1263,7 @@ async def risk_summary(
     """
     pool = DatabasePool.get_pool()
     async with pool.acquire() as conn:
-        portfolio = await _resolve_portfolio(conn, portfolio_id)
+        portfolio = await _resolve_portfolio(conn, portfolio_id, tenant[0])
         ha_id = portfolio["ha_id"]
 
         # FRA compliance stats
@@ -1443,7 +1451,7 @@ async def doc_completeness(
     """
     pool = DatabasePool.get_pool()
     async with pool.acquire() as conn:
-        portfolio = await _resolve_portfolio(conn, portfolio_id)
+        portfolio = await _resolve_portfolio(conn, portfolio_id, tenant[0])
         ha_id = portfolio["ha_id"]
 
         # ── Doc A: per-property SoV field fill rates ─────────────────────────
@@ -1682,7 +1690,7 @@ async def red_blocks(
     """
     pool = DatabasePool.get_pool()
     async with pool.acquire() as conn:
-        portfolio = await _resolve_portfolio(conn, portfolio_id)
+        portfolio = await _resolve_portfolio(conn, portfolio_id, tenant[0])
         ha_id = portfolio["ha_id"]
 
         rows = await conn.fetch(
@@ -1815,7 +1823,7 @@ async def fire_documents(
 
     pool = DatabasePool.get_pool()
     async with pool.acquire() as conn:
-        portfolio = await _resolve_portfolio(conn, portfolio_id)
+        portfolio = await _resolve_portfolio(conn, portfolio_id, tenant[0])
         ha_id = portfolio["ha_id"]
 
         fra_rows = await conn.fetch(

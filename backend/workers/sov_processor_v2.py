@@ -1372,9 +1372,8 @@ VALUES (
     %(alarms)s, %(flood_insured)s, %(storm_insured)s, %(deductible)s, %(basis_of_deductible)s,
     %(enrichment_status)s, %(metadata)s::jsonb, NOW(), NOW()
 )
-ON CONFLICT (ha_id, property_reference)
+ON CONFLICT (ha_id, portfolio_id, property_reference)
 DO UPDATE SET
-    portfolio_id       = EXCLUDED.portfolio_id,
     block_reference    = EXCLUDED.block_reference,
     address            = EXCLUDED.address,
     address_2          = EXCLUDED.address_2,
