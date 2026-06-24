@@ -550,6 +550,9 @@ export default function App() {
   const [selectedBlockReference, setSelectedBlockReference] = useState("");
   const [selectedPropertyId, setSelectedPropertyId] = useState("");
 
+  const [accessibleHAs, setAccessibleHAs] = useState([]);
+  const [selectedHaId, setSelectedHaId] = useState("ha_demo");
+
   const [ingestionResult, setIngestionResult] = useState(null);
   // Original SoV filename. Known only at upload time; the DB re-pull doesn't
   // return it, so persist it in sessionStorage to survive the re-pull + refresh.
@@ -640,7 +643,34 @@ export default function App() {
     }
   };
 
-  const loadPropertiesFromApi = async () => {
+  // Fetch the list of HAs this underwriter has access to.
+  const fetchAccessibleHAs = async () => {
+    try {
+      const res = await apiFetch("/api/v1/underwriter/home");
+      const data = await res.json();
+      const portfolios = data?.portfolios || [];
+      const seen = new Set();
+      const has = [];
+      for (const p of portfolios) {
+        if (!seen.has(p.ha_id)) {
+          seen.add(p.ha_id);
+          has.push({ ha_id: p.ha_id, ha_name: p.ha_name });
+        }
+      }
+      if (has.length > 0) {
+        setAccessibleHAs(has);
+        setSelectedHaId((prev) => (has.find((h) => h.ha_id === prev) ? prev : has[0].ha_id));
+      } else {
+        setAccessibleHAs([{ ha_id: "ha_demo", ha_name: "Demo Housing Association" }]);
+        setSelectedHaId("ha_demo");
+      }
+    } catch {
+      setAccessibleHAs([{ ha_id: "ha_demo", ha_name: "Demo Housing Association" }]);
+      setSelectedHaId("ha_demo");
+    }
+  };
+
+  const loadPropertiesFromApi = async (overridePortfolioId = null) => {
     try {
       const res = await apiFetch("/api/v1/portfolios/properties");
       const properties = await res.json();
@@ -653,10 +683,13 @@ export default function App() {
         if (sovName !== "Portfolio") {
           sovFileNameRef.current = sovName;
         }
+        // Use override (from upload response) → first property's portfolio_id → null
+        const portfolioId =
+          overridePortfolioId ??
+          properties[0]?.portfolio_id ??
+          null;
         const normalised = normaliseBackendIngestionResult(
-          // Demo portfolio id so currentPortfolioId resolves and the
-          // FRA/FRAEW fire-documents reload effect fires after a refresh.
-          { properties, status: "success", portfolio_id: "11111111-1111-1111-1111-111111111111" },
+          { properties, status: "success", portfolio_id: portfolioId },
           sovName
         );
         setIngestionResult(normalised);
@@ -681,10 +714,8 @@ export default function App() {
         const user = JSON.parse(raw);
         setAuthUser(user);
         setShowLanding(false);
-        // Re-hydrate the portfolio from the DB so previous uploads survive a
-        // page refresh / server restart. Does NOT redirect — navigation stays
-        // wherever the user was; this just repopulates state and re-enables
-        // the Overview nav.
+        // Re-hydrate accessible HAs + portfolio from DB.
+        fetchAccessibleHAs();
         loadPropertiesFromApi();
       } catch {
         // corrupted storage — ignore
@@ -899,6 +930,7 @@ export default function App() {
 
       const query = new URLSearchParams();
       query.set("document_type", documentType);
+      if (selectedHaId) query.set("ha_id", selectedHaId);
 
       if (isPdfMode && selectedBlockReference.trim()) {
         query.set("block_reference", selectedBlockReference.trim());
@@ -980,11 +1012,12 @@ export default function App() {
         pipelineTimersRef.current = [];
 
         // Keep the loading screen up until enrichment completes.
-        const haId = payload?.ha_id || "ha_demo";
+        const haId = payload?.ha_id || selectedHaId || "ha_demo";
         await waitForEnrichment(haId);
 
         // Re-pull rows so the dashboard opens with enriched coords + blocks.
-        await loadPropertiesFromApi();
+        // Pass portfolio_id from the upload response so we restore the right portfolio.
+        await loadPropertiesFromApi(payload?.portfolio_id ?? null);
 
         setActiveNav("overview");
       } else {
@@ -1074,11 +1107,7 @@ export default function App() {
         onLogin={(user) => {
           setAuthUser(user);
           setActiveNav("uploads");
-          // Land on Upload Documents, but hydrate the portfolio from the DB so
-          // the Overview/Block Analysis nav is enabled immediately when data
-          // already exists. loadPropertiesFromApi does NOT redirect; it only
-          // sets ingestionResult when properties.length > 0 (empty DB => nav
-          // stays disabled, user must upload an SoV first).
+          fetchAccessibleHAs();
           loadPropertiesFromApi();
         }}
       />
@@ -1106,6 +1135,32 @@ export default function App() {
             <img src="/logo.png" alt="EquiRisk" style={{ height: 36, width: "auto", display: "block", marginBottom: 8 }} />
             <div className="pill pill-muted">UNDERWRITER</div>
           </div>
+
+          {accessibleHAs.length > 0 && (
+            <div className="side-section">
+              <div className="side-head">Housing Association</div>
+              {accessibleHAs.length === 1 ? (
+                <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text)", padding: "6px 10px", background: "var(--panel-soft)", borderRadius: 8, border: "1px solid var(--border-soft)" }}>
+                  {accessibleHAs[0].ha_name}
+                </div>
+              ) : (
+                <select
+                  value={selectedHaId}
+                  onChange={(e) => {
+                    setSelectedHaId(e.target.value);
+                    setIngestionResult(null);
+                    setActiveNav("uploads");
+                    setUploadStage("SOV");
+                  }}
+                  style={{ width: "100%", padding: "6px 8px", fontSize: 13, borderRadius: 8, border: "1px solid var(--border)", background: "var(--panel)", color: "var(--text)", cursor: "pointer" }}
+                >
+                  {accessibleHAs.map((ha) => (
+                    <option key={ha.ha_id} value={ha.ha_id}>{ha.ha_name}</option>
+                  ))}
+                </select>
+              )}
+            </div>
+          )}
 
           <div className="side-section">
             <div className="side-head">Portfolio Workspace</div>
@@ -1166,6 +1221,8 @@ export default function App() {
                 sovFileNameRef.current = null;
                 setAuthUser(null);
                 setIngestionResult(null);
+                setAccessibleHAs([]);
+                setSelectedHaId("ha_demo");
                 setShowLanding(true);
               }}
             >
@@ -1181,6 +1238,11 @@ export default function App() {
                 <div>
                   <div className="tag">Portfolio ingestion</div>
                   <div className="page-title">Upload your <em>portfolio</em></div>
+                  {accessibleHAs.find((h) => h.ha_id === selectedHaId)?.ha_name && (
+                    <div style={{ fontSize: 13, color: "var(--muted)", marginTop: 4 }}>
+                      For: <strong style={{ color: "var(--terracotta)" }}>{accessibleHAs.find((h) => h.ha_id === selectedHaId)?.ha_name}</strong>
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -1188,7 +1250,8 @@ export default function App() {
                 stage={uploadStage}
                 onStageChange={setUploadStage}
                 hasSovData={Boolean(ingestionResult)}
-                haName={authUser?.organisation || ""}
+                haId={selectedHaId}
+                haName={accessibleHAs.find((h) => h.ha_id === selectedHaId)?.ha_name || authUser?.organisation || ""}
                 isUploading={isUploading}
                 uploadError={uploadError}
                 pipelineStep={pipelineStep}

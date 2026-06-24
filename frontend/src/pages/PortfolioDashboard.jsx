@@ -688,8 +688,7 @@ export default function PortfolioDashboard({
   const [mapDataLoading, setMapDataLoading] = useState(false);
   const [suppressMapFit, setSuppressMapFit] = useState(false);
 
-  // Fall back to ha_demo portfolio ID if ingestionResult doesn't carry one
-  const resolvedPortfolioId = portfolioId || (ingestionSummary ? "11111111-1111-1111-1111-111111111111" : null);
+  const resolvedPortfolioId = portfolioId || null;
 
   const fireDocuments = useMemo(
     () => collectFireDocumentsFromIngestion(ingestionResult, latestFireRiskPayload),
