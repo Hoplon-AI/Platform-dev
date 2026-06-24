@@ -194,10 +194,19 @@ async def _fetch_blocks(db_pool, ha_id: str, portfolio_id: Optional[str]) -> lis
             COALESCE(SUM(p.units), COUNT(*))                AS units,
             MAX(p.storeys)                                  AS storeys,
             MAX(p.height_max_m)                             AS height_max_m,
-            MAX(p.year_of_build)                            AS build_year,
-            MAX(p.wall_construction)                        AS wall_construction,
-            MAX(p.floor_construction)                       AS floor_construction,
-            MAX(p.roof_construction)                        AS roof_construction,
+            -- M: year_of_build is VARCHAR — cast to integer for numeric MIN so
+            --    "1920" < "2010" rather than alphabetical "2010" < "920".
+            --    MIN gives the earliest construction year (oldest part of block).
+            MIN(
+                CASE WHEN p.year_of_build ~ '^\d{4}$'
+                     THEN p.year_of_build::integer
+                END
+            )                                               AS build_year,
+            -- L: MODE() returns the most-common value rather than MAX() which
+            --    returns alphabetical last (e.g. "Timber Frame" > "Brick").
+            MODE() WITHIN GROUP (ORDER BY p.wall_construction)  AS wall_construction,
+            MODE() WITHIN GROUP (ORDER BY p.floor_construction) AS floor_construction,
+            MODE() WITHIN GROUP (ORDER BY p.roof_construction)  AS roof_construction,
             BOOL_OR(p.basement)                             AS basement,
             BOOL_OR(p.is_listed)                            AS is_listed
         FROM silver.properties p
