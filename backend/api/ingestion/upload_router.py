@@ -839,7 +839,7 @@ async def ingest_document(
         # run's stale "complete" during the gap before the task starts.
         from backend.api.enrichment.enrichment_router import _run_background, _active_jobs
         _active_jobs[ha_id] = {"status": "running", "result": None, "target": 20}
-        background_tasks.add_task(_run_background, ha_id, 20)
+        background_tasks.add_task(_run_background, ha_id, 20, resolved_portfolio_id)
         logger.info("[INGEST] SoV done — enrichment queued for ha_id=%s limit=20", ha_id)
 
         # Fetch property rows back so the frontend can render them immediately

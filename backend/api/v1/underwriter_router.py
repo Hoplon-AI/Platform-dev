@@ -1102,7 +1102,7 @@ async def fraew_blocks(
         portfolio = await _resolve_portfolio(conn, portfolio_id, tenant[0])
         ha_id = portfolio["ha_id"]
 
-        filters = ["b.ha_id = $1"]
+        filters = ["b.ha_id = $1", "b.portfolio_id = $2::uuid"]
         if rag_filter == "unassessed":
             filters.append("fraew.rag_status IS NULL")
         elif rag_filter in ("RED", "AMBER", "GREEN"):
@@ -1217,6 +1217,7 @@ async def fraew_blocks(
                 b.name
             """,
             ha_id,
+            portfolio_id,
         )
 
         result_rows = [dict(r) for r in rows]
