@@ -202,6 +202,7 @@ async def _fetch_blocks(db_pool, ha_id: str, portfolio_id: Optional[str]) -> lis
             BOOL_OR(p.is_listed)                            AS is_listed
         FROM silver.properties p
         WHERE p.ha_id = $1
+          AND ($2::uuid IS NULL OR p.portfolio_id = $2::uuid)
         GROUP BY COALESCE(p.block_reference, p.address)
     ),
     -- Most common value per block, with alphabetical tiebreak (ASC) so ties
@@ -219,7 +220,9 @@ async def _fetch_blocks(db_pool, ha_id: str, portfolio_id: Optional[str]) -> lis
                     PARTITION BY COALESCE(p.block_reference, p.address),
                                  p.occupancy_type
                 ) AS cnt
-            FROM silver.properties p WHERE p.ha_id = $1
+            FROM silver.properties p
+            WHERE p.ha_id = $1
+              AND ($2::uuid IS NULL OR p.portfolio_id = $2::uuid)
         ) sub
         ORDER BY blk, cnt DESC, property_id ASC
     ),
@@ -234,7 +237,9 @@ async def _fetch_blocks(db_pool, ha_id: str, portfolio_id: Optional[str]) -> lis
                     PARTITION BY COALESCE(p.block_reference, p.address),
                                  p.postcode
                 ) AS cnt
-            FROM silver.properties p WHERE p.ha_id = $1
+            FROM silver.properties p
+            WHERE p.ha_id = $1
+              AND ($2::uuid IS NULL OR p.portfolio_id = $2::uuid)
         ) sub
         ORDER BY blk, cnt DESC, postcode ASC
     ),
@@ -249,7 +254,9 @@ async def _fetch_blocks(db_pool, ha_id: str, portfolio_id: Optional[str]) -> lis
                     PARTITION BY COALESCE(p.block_reference, p.address),
                                  p.property_type
                 ) AS cnt
-            FROM silver.properties p WHERE p.ha_id = $1
+            FROM silver.properties p
+            WHERE p.ha_id = $1
+              AND ($2::uuid IS NULL OR p.portfolio_id = $2::uuid)
         ) sub
         ORDER BY blk, cnt DESC, property_type ASC
     ),
@@ -262,6 +269,7 @@ async def _fetch_blocks(db_pool, ha_id: str, portfolio_id: Optional[str]) -> lis
             p.address_3 AS address_3
         FROM silver.properties p
         WHERE p.ha_id = $1
+          AND ($2::uuid IS NULL OR p.portfolio_id = $2::uuid)
         ORDER BY COALESCE(p.block_reference, p.address), p.property_id
     )
     SELECT
@@ -339,7 +347,7 @@ async def _fetch_blocks(db_pool, ha_id: str, portfolio_id: Optional[str]) -> lis
     ORDER BY a.block_reference
     """
     async with db_pool.acquire() as conn:
-        return await conn.fetch(sql, ha_id)
+        return await conn.fetch(sql, ha_id, portfolio_id)
 
 
 # ---------------------------------------------------------------------------

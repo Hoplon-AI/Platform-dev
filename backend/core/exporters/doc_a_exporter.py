@@ -194,10 +194,11 @@ async def _fetch_properties(db_pool, ha_id: str, portfolio_id: Optional[str]) ->
         p.enrichment_source
     FROM silver.properties p
     WHERE p.ha_id = $1
+      AND ($2::uuid IS NULL OR p.portfolio_id = $2::uuid)
     ORDER BY p.block_reference NULLS LAST, p.address
     """
     async with db_pool.acquire() as conn:
-        return await conn.fetch(sql, ha_id)
+        return await conn.fetch(sql, ha_id, portfolio_id)
 
 
 # ---------------------------------------------------------------------------
