@@ -1188,6 +1188,7 @@ export default function App() {
                 stage={uploadStage}
                 onStageChange={setUploadStage}
                 hasSovData={Boolean(ingestionResult)}
+                haName={authUser?.organisation || ""}
                 isUploading={isUploading}
                 uploadError={uploadError}
                 pipelineStep={pipelineStep}

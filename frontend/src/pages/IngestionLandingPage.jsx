@@ -270,6 +270,7 @@ export default function IngestionLandingPage({
   onFilesSelected,
   stage = "SOV",
   onStageChange,
+  haName = "",
 }) {
   const fileInputRef = useRef(null);
   const [isDragOver, setIsDragOver] = useState(false);
@@ -472,6 +473,59 @@ export default function IngestionLandingPage({
 
       </div>
 
+      {hasSovData && summary && (() => {
+        const portfolioName = (summary.source || "Portfolio").replace(/\.[^/.]+$/, "");
+        const readinessColour = avgReadiness >= 80
+          ? "var(--accent)"
+          : avgReadiness >= 50
+          ? "var(--warning)"
+          : "var(--danger)";
+        return (
+          <div className="portfolio-card">
+            <div className="portfolio-card-header">
+              <div>
+                <div className="portfolio-card-kicker">Portfolio loaded</div>
+                <h2 className="portfolio-card-title">{portfolioName}</h2>
+                <div className="portfolio-card-sub">
+                  {fmtInt(summary.propertyCount)} properties &nbsp;·&nbsp; {fmtInt(summary.blockCount)} blocks
+                </div>
+              </div>
+            </div>
+
+            <div className="portfolio-stats">
+              <div className="portfolio-stat">
+                <div className="portfolio-stat-icon">£</div>
+                <div className="portfolio-stat-value">{fmtMoney(summary.totalValue)}</div>
+                <div className="portfolio-stat-label">Total Value</div>
+              </div>
+              <div className="portfolio-stat">
+                <div className="portfolio-stat-icon">⌂</div>
+                <div className="portfolio-stat-value">{fmtInt(summary.propertyCount)}</div>
+                <div className="portfolio-stat-label">Properties</div>
+              </div>
+              <div className="portfolio-stat">
+                <div className="portfolio-stat-icon">◎</div>
+                <div className="portfolio-stat-value">{summary.uprnMatchPct}%</div>
+                <div className="portfolio-stat-label">UPRN Matched</div>
+              </div>
+              <div className="portfolio-stat">
+                <div className="portfolio-stat-icon">
+                  <span style={{ display: "inline-block", width: 10, height: 10, borderRadius: "50%", background: readinessColour, marginRight: 2, verticalAlign: "middle" }} />
+                </div>
+                <div className="portfolio-stat-value">{avgReadiness}%</div>
+                <div className="portfolio-stat-label">Data Readiness</div>
+              </div>
+            </div>
+
+            {haName && (
+              <div className="portfolio-card-footer">
+                Uploaded for {haName}
+              </div>
+            )}
+          </div>
+        );
+      })()}
+
       {uploadError && <div className="ingest-alert">{uploadError}</div>}
 
       <div className="ingest-documents">
@@ -658,9 +712,93 @@ const css = `
   /* ── Workbench: stepper rail + active panel + context aside ── */
   .ingest-workbench {
     display: grid;
-    grid-template-columns: 248px minmax(0, 1fr)380px;
+    grid-template-columns: 248px minmax(0, 1fr);
     gap: 36px;
     align-items: start;
+  }
+
+  /* ── Portfolio summary card (below workbench) ── */
+  .portfolio-card {
+    background: var(--warm-bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-soft);
+    padding: 28px 32px 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+
+  .portfolio-card-kicker {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--terracotta);
+    margin-bottom: 6px;
+  }
+
+  .portfolio-card-title {
+    font-family: var(--font-serif);
+    font-size: 26px;
+    font-weight: 600;
+    color: var(--navy);
+    line-height: 1.2;
+    margin: 0;
+  }
+
+  .portfolio-card-sub {
+    font-size: 13px;
+    color: var(--muted);
+    margin-top: 4px;
+  }
+
+  .portfolio-stats {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 1px;
+    background: var(--border);
+    border-radius: var(--radius-sm);
+    overflow: hidden;
+  }
+
+  .portfolio-stat {
+    background: #fff;
+    padding: 16px 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .portfolio-stat-icon {
+    font-size: 14px;
+    color: var(--terracotta);
+    height: 20px;
+    display: flex;
+    align-items: center;
+  }
+
+  .portfolio-stat-value {
+    font-family: var(--font-serif);
+    font-size: 22px;
+    font-weight: 600;
+    color: var(--navy);
+    line-height: 1.1;
+  }
+
+  .portfolio-stat-label {
+    font-size: 11px;
+    color: var(--muted);
+    font-weight: 500;
+    letter-spacing: 0.03em;
+  }
+
+  .portfolio-card-footer {
+    font-size: 12px;
+    color: var(--muted);
+    font-family: var(--font-sans);
+    padding-top: 4px;
+    border-top: 1px solid var(--border-soft);
   }
 
   .ingest-rail {
