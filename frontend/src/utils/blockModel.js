@@ -136,12 +136,13 @@ const asActionArray = (raw) => {
 };
 
 // Prefer denormalised counts on the doc; otherwise compute from action_items.
+// Works for both FRA (action_items) and FRAEW (remedial_actions).
 export const fraActionStats = (fra) => {
   const empty = { total: 0, overdue: 0, noDate: 0, high: 0, outstanding: 0, items: [] };
   if (!fra) return empty;
 
   const raw = asActionArray(
-    fra.action_items ?? fra.actions ?? fra.recommendations ?? fra.significant_findings
+    fra.action_items ?? fra.remedial_actions ?? fra.actions ?? fra.recommendations ?? fra.significant_findings
   );
   const items = raw.map((it) => (typeof it === "string" ? { description: it } : it || {}));
 

@@ -1897,6 +1897,8 @@ async def fire_documents(
                 w.eps_insulation_present,
                 w.has_remedial_actions,
                 w.interim_measures_required,
+                w.interim_measures_detail,
+                w.remedial_actions,
                 w.pas_9980_compliant
             FROM silver.fraew_features w
             LEFT JOIN silver.document_features df ON df.feature_id = w.feature_id
@@ -1987,7 +1989,9 @@ async def fire_documents(
                 "has_remedial_actions":      r["has_remedial_actions"],
                 "remediation_required":      r["has_remedial_actions"],
                 "interim_measures_required": r["interim_measures_required"],
+                "interim_measures_detail":   r["interim_measures_detail"],
                 "pas_9980_compliant":        r["pas_9980_compliant"],
+                "remedial_actions":          (json.loads(r["remedial_actions"]) if isinstance(r["remedial_actions"], str) else r["remedial_actions"]) if r["remedial_actions"] else [],
             },
         })
 
