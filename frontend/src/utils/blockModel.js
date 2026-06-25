@@ -257,11 +257,16 @@ export const collectFireDocuments = (ingestionResult, latestFireRiskPayload = nu
   const latest = normaliseFireDoc(latestFireRiskPayload, docs.length);
   if (latest) docs.unshift(latest);
 
+  // Dedup by upload_id (identical across the upload + API sources); feature_id is
+  // unreliable (API returns fra_id AS feature_id). Prefix with document_type so an
+  // FRA and FRAEW never collide. Fall back to block+filename only when no id.
   const seen = new Set();
   return docs.filter((doc) => {
-    const key = [doc.document_type, doc.upload_id, doc.feature_id, doc.block_reference, doc.filename]
-      .map(normaliseKey)
-      .join("|");
+    const idPart =
+      normaliseKey(doc.upload_id) ||
+      normaliseKey(doc.feature_id) ||
+      [doc.block_reference, doc.filename].map(normaliseKey).join("~");
+    const key = `${normaliseKey(doc.document_type)}|${idPart}`;
     if (seen.has(key)) return false;
     seen.add(key);
     return true;

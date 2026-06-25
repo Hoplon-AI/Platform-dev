@@ -118,9 +118,20 @@ const buildBreakdown = (items, keyFn, valueFn) => {
 };
 
 const normaliseActions = (value) => {
-  if (Array.isArray(value)) return value.filter(Boolean).map(String);
   if (!value) return [];
-  return [String(value)];
+  const arr = Array.isArray(value) ? value : [value];
+  return arr.filter(Boolean).map((a) => {
+    if (typeof a === "string") return a;
+    // Action items are objects — extract a readable label rather than [object Object]
+    return (
+      a.description ??
+      a.action ??
+      a.finding ??
+      a.recommendation ??
+      a.issue_ref ??
+      "Action"
+    );
+  });
 };
 
 const getFireDocumentRisk = (doc) =>
@@ -255,11 +266,19 @@ const collectFireDocumentsFromIngestion = (ingestionResult, latestFireRiskPayloa
   const latest = normaliseFirePayloadToDocument(latestFireRiskPayload, docs.length);
   if (latest) docs.unshift(latest);
 
+  // Dedup by the most stable identifier. The same document arrives from two sources
+  // (latestFireRiskPayload from an upload + ingestionResult.fire_documents from the
+  // API) with different shapes. upload_id is identical across both (same upload);
+  // feature_id is NOT reliable (API returns fra_id AS feature_id, upload uses the
+  // processor's feature_id). Prefix with document_type so an FRA and FRAEW never
+  // collide. Fall back to block+filename only when no id is present.
   const seen = new Set();
   return docs.filter((doc) => {
-    const key = [doc.document_type, doc.upload_id, doc.feature_id, doc.block_reference, doc.filename]
-      .map(normaliseKey)
-      .join("|");
+    const idPart =
+      normaliseKey(doc.upload_id) ||
+      normaliseKey(doc.feature_id) ||
+      [doc.block_reference, doc.filename].map(normaliseKey).join("~");
+    const key = `${normaliseKey(doc.document_type)}|${idPart}`;
     if (seen.has(key)) return false;
     seen.add(key);
     return true;
