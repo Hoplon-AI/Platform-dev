@@ -999,6 +999,7 @@ async def ingest_document(
         #      manual block-reference entry that was previously required every upload.
         resolved_block_id: Optional[str] = None
         resolved_block_ref: Optional[str] = None
+        resolved_portfolio_id: Optional[str] = None
 
         candidate_refs: list[str] = []
         if block_reference and block_reference.strip():
@@ -1011,14 +1012,25 @@ async def ingest_document(
 
         for ref in candidate_refs:
             row = await conn.fetchrow(
-                "SELECT block_id::text, name FROM silver.blocks WHERE ha_id=$1 AND UPPER(name)=$2 LIMIT 1",
+                "SELECT block_id::text, name, portfolio_id::text FROM silver.blocks WHERE ha_id=$1 AND UPPER(name)=$2 LIMIT 1",
                 ha_id, ref,
             )
             if row:
                 resolved_block_id = row["block_id"]
                 resolved_block_ref = row["name"]
+                resolved_portfolio_id = row["portfolio_id"]
                 logger.info("[INGEST] FRA/FRAEW linked to block '%s' (block_id=%s)", row["name"], resolved_block_id)
                 break
+
+        # Fall back to the HA's most recent portfolio so the frontend always has a
+        # portfolio_id to re-pull fire documents against (even if no block matched).
+        if not resolved_portfolio_id:
+            prow = await conn.fetchrow(
+                "SELECT portfolio_id::text FROM silver.portfolios WHERE ha_id=$1 ORDER BY created_at DESC LIMIT 1",
+                ha_id,
+            )
+            if prow:
+                resolved_portfolio_id = prow["portfolio_id"]
 
         if not resolved_block_id:
             logger.warning(
@@ -1103,6 +1115,7 @@ async def ingest_document(
         "document_type": document_type,
         "upload_id": upload_id,
         "feature_id": result.get("feature_id"),
+        "portfolio_id": resolved_portfolio_id,
         "block_id": resolved_block_id,
         "block_reference": resolved_block_ref or block_reference,
         "block_auto_resolved": bool(resolved_block_ref and not (block_reference and block_reference.strip())),

@@ -1056,7 +1056,13 @@ export default function App() {
           attachSingleFirePayloadToPortfolio(prev, normalisedFirePayload)
         );
 
-        const portfolioId = currentPortfolioId ?? getPortfolioIdFromResult(ingestionResult);
+        // Prefer the portfolio_id the backend resolved for this FRA/FRAEW — it's
+        // always present, unlike the closure-captured currentPortfolioId which can
+        // be stale, which is why new uploads previously only showed after a refresh.
+        const portfolioId =
+          payload?.portfolio_id ??
+          currentPortfolioId ??
+          getPortfolioIdFromResult(ingestionResult);
 
         if (portfolioId) {
           const fireDocsPayload = await fetchFireDocuments(portfolioId);
