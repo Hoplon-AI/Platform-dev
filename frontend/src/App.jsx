@@ -8,9 +8,12 @@ import BlockAnalysisPage from "./pages/BlockAnalysisPage.jsx";
 
 import { getIngestionSummary } from "./utils/ingestion";
 import { collectFireDocuments } from "./utils/blockModel";
-import { apiFetch } from "./services/apiClient";
+import { apiFetch, API_BASE_URL as CLIENT_API_BASE_URL } from "./services/apiClient";
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "";
+// Single source of truth — same default as apiClient.js ("http://localhost:8000").
+// Previously this fell back to "" which silently blocked the fire-documents fetch
+// (the !API_BASE_URL guard) while apiFetch-based calls still worked.
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || CLIENT_API_BASE_URL;
 
 // EPSG:27700 (British National Grid) -> EPSG:4326 (WGS84)
 proj4.defs(
@@ -673,8 +676,8 @@ export default function App() {
   const loadPropertiesFromApi = async (overridePortfolioId = null) => {
     try {
       const res = await apiFetch("/api/v1/portfolios/properties");
-      const properties = await res.json();
-      if (Array.isArray(properties) && properties.length > 0) {
+      const rawRows = await res.json();
+      if (Array.isArray(rawRows) && rawRows.length > 0) {
         // The properties endpoint doesn't carry the original SoV filename.
         // Prefer the name captured this session; otherwise recover it from the
         // upload-audit log (survives hard refresh / a fresh tab).
@@ -683,11 +686,14 @@ export default function App() {
         if (sovName !== "Portfolio") {
           sovFileNameRef.current = sovName;
         }
-        // Use override (from upload response) → first property's portfolio_id → null
+        // Read portfolio_id from the RAW rows before normalisation —
+        // normaliseProperty doesn't copy portfolio_id so we must read it here.
         const portfolioId =
           overridePortfolioId ??
-          properties[0]?.portfolio_id ??
+          rawRows[0]?.portfolio_id ??
           null;
+        // Normalise rows for the rest of the app
+        const properties = rawRows;
         const normalised = normaliseBackendIngestionResult(
           { properties, status: "success", portfolio_id: portfolioId },
           sovName
