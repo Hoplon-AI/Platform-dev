@@ -766,15 +766,20 @@ function Dossier({ block }) {
             <thead><tr><th>Address</th><th>UPRN</th><th>Sum insured</th><th>FRA</th><th>FRAEW</th></tr></thead>
             <tbody>
               {block.properties.map((p, i) => {
-                const pf = getFireRiskBand(p.latest_fra);
-                const pfe = getFireRiskBand(p.latest_fraew);
+                // FRA/FRAEW are assessed at block level (common/internal areas), so
+                // every unit in the block inherits the block's assessment when the
+                // property doesn't carry its own.
+                const propFra = p.latest_fra ?? block.latest_fra;
+                const propFraew = p.latest_fraew ?? block.latest_fraew;
+                const pf = getFireRiskBand(propFra);
+                const pfe = getFireRiskBand(propFraew);
                 return (
                   <tr key={p.id ?? p.property_reference ?? i}>
                     <td>{p.address_line_1 || p.address || p.property_reference || `Property ${i + 1}`}</td>
                     <td>{p.uprn ?? "—"}</td>
                     <td>£{fmtMoney(p.sum_insured)}</td>
-                    <td>{p.latest_fra ? <span className={`pill ${bandClass(pf)}`}>{pf}</span> : "—"}</td>
-                    <td>{p.latest_fraew ? <span className={`pill ${bandClass(pfe)}`}>{pfe}</span> : "—"}</td>
+                    <td>{propFra ? <span className={`pill ${bandClass(pf)}`}>{pf}</span> : "—"}</td>
+                    <td>{propFraew ? <span className={`pill ${bandClass(pfe)}`}>{pfe}</span> : "—"}</td>
                   </tr>
                 );
               })}
