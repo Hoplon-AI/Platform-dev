@@ -3,7 +3,7 @@ FastAPI router for file uploads.
 """
 from fastapi import APIRouter, UploadFile, File, Depends, HTTPException, Query, status, BackgroundTasks
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response
 from typing import Optional, List, Tuple, Literal
 import decimal
 import hashlib
@@ -623,6 +623,62 @@ async def get_upload_status(
     )
 
 
+@router.get("/{upload_id}/file")
+async def get_upload_file(
+    upload_id: str,
+    tenant: Tuple[str, str] = Depends(get_tenant_info),
+):
+    """
+    Stream the original uploaded source file (e.g. an FRA/FRAEW PDF) from S3.
+
+    Used by the Data Provenance section so underwriters can open the source
+    document an extraction was derived from. Returns the file inline so the
+    browser renders the PDF rather than forcing a download.
+    """
+    ha_id, _user_id = tenant
+
+    pool = DatabasePool.get_pool()
+    async with pool.acquire() as conn:
+        row = await conn.fetchrow(
+            """
+            SELECT s3_key, filename, file_type
+            FROM upload_audit
+            WHERE upload_id = $1 AND ha_id = $2
+            """,
+            upload_id,
+            ha_id,
+        )
+
+    if not row or not row["s3_key"]:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Source file not found")
+
+    try:
+        upload_service = get_upload_service()
+        content = upload_service.get_file(row["s3_key"])
+    except Exception as exc:
+        logger.error("Failed to fetch %s from S3: %s", row["s3_key"], exc)
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail="Could not retrieve source file from storage")
+
+    filename = row["filename"] or "document"
+    ext = os.path.splitext(filename)[1].lower()
+    media_type = {
+        ".pdf":  "application/pdf",
+        ".xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        ".xls":  "application/vnd.ms-excel",
+        ".csv":  "text/csv",
+    }.get(ext, "application/octet-stream")
+
+    return Response(
+        content=content,
+        media_type=media_type,
+        headers={
+            # inline → browser renders PDF in a new tab instead of downloading
+            "Content-Disposition": f'inline; filename="{filename}"',
+            "Content-Length": str(len(content)),
+        },
+    )
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # Helpers for the unified ingest endpoint
 # ─────────────────────────────────────────────────────────────────────────────
@@ -838,8 +894,8 @@ async def ingest_document(
         # synchronously (before returning) so a re-upload never sees a previous
         # run's stale "complete" during the gap before the task starts.
         from backend.api.enrichment.enrichment_router import _run_background, _active_jobs
-        _active_jobs[ha_id] = {"status": "running", "result": None, "target": 20}
-        background_tasks.add_task(_run_background, ha_id, 20, resolved_portfolio_id)
+        _active_jobs[ha_id] = {"status": "running", "result": None, "target": 100}
+        background_tasks.add_task(_run_background, ha_id, 100, resolved_portfolio_id)
         logger.info("[INGEST] SoV done — enrichment queued for ha_id=%s limit=20", ha_id)
 
         # Fetch property rows back so the frontend can render them immediately

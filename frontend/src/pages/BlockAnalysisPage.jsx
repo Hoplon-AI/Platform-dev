@@ -1,5 +1,6 @@
 import { useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { API_BASE_URL } from "../services/apiClient";
 import {
   buildBlocks,
   collectFireDocuments,
@@ -24,6 +25,29 @@ import {
   boolLabel,
   isPresent,
 } from "../utils/blockModel";
+
+// Fetch the source document (FRA/FRAEW PDF) with auth and open it in a new tab.
+// Uses a blob URL so the Authorization header is sent (a plain window.open of the
+// URL wouldn't carry the token).
+async function openSourceDocument(uploadId, filename) {
+  if (!uploadId) return;
+  try {
+    const token =
+      localStorage.getItem("equirisk_token") || sessionStorage.getItem("equirisk_token");
+    const res = await fetch(`${API_BASE_URL}/api/v1/upload/${uploadId}/file`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    });
+    if (!res.ok) throw new Error(`Could not load document (${res.status})`);
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    window.open(url, "_blank", "noopener,noreferrer");
+    // Revoke after a delay so the new tab has time to load it.
+    setTimeout(() => URL.revokeObjectURL(url), 60000);
+  } catch (err) {
+    console.error("Failed to open source document:", err);
+    alert(`Could not open ${filename || "the source document"}: ${err.message}`);
+  }
+}
 
 // Plain-language explanations for jargon, surfaced on hover. "What it is + why it matters".
 const G = {
@@ -663,10 +687,57 @@ function Dossier({ block }) {
       {/* Provenance */}
       <Section title="Data provenance" subtitle="Source documents & extraction confidence">
         {block.linkedDocs?.length ? (
-          <div>
-            {block.linkedDocs.map((d, i) => (
-              <KV key={i} label={`${d.document_type} · ${d.filename}`} tip={G.confidence} value={isPresent(d.raw?.extraction_confidence) ? `confidence ${fmt(d.raw.extraction_confidence, 2)}` : (getFireDocumentRisk(d) || "linked")} />
-            ))}
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            {block.linkedDocs.map((d, i) => {
+              const conf = isPresent(d.raw?.extraction_confidence)
+                ? `Confidence ${fmt(d.raw.extraction_confidence, 2)}`
+                : (getFireDocumentRisk(d) || "Linked");
+              const uploadId = d.upload_id || d.raw?.upload_id;
+              return (
+                <div
+                  key={i}
+                  style={{
+                    display: "flex", alignItems: "center", gap: 12,
+                    padding: "10px 12px", border: "1px solid var(--border-soft, #eef2f7)",
+                    borderRadius: 8, background: "#fff",
+                  }}
+                >
+                  {/* Doc-type badge */}
+                  <span style={{
+                    padding: "2px 8px", borderRadius: 999, fontSize: 11, fontWeight: 700,
+                    background: "var(--panel-soft, #f1f5f9)", color: "var(--navy, #1E3246)",
+                    whiteSpace: "nowrap", flexShrink: 0,
+                  }}>{d.document_type}</span>
+
+                  {/* Filename + confidence */}
+                  <span style={{ flex: 1, minWidth: 0 }}>
+                    <span style={{ fontSize: 13, color: "var(--text)", display: "block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      {d.filename || "Source document"}
+                    </span>
+                    <span style={{ fontSize: 11, color: "var(--muted)" }}>{conf}</span>
+                  </span>
+
+                  {/* View PDF button */}
+                  {uploadId ? (
+                    <button
+                      type="button"
+                      className="btn btn-ghost"
+                      style={{
+                        flexShrink: 0, fontSize: 12, fontWeight: 600, padding: "6px 12px",
+                        display: "inline-flex", alignItems: "center", gap: 6,
+                        border: "1px solid var(--border, #DED7CC)", borderRadius: 8,
+                        cursor: "pointer", color: "var(--terracotta, #B8564B)", background: "#fff",
+                      }}
+                      onClick={() => openSourceDocument(uploadId, d.filename)}
+                    >
+                      <span aria-hidden>📄</span> View PDF
+                    </button>
+                  ) : (
+                    <span style={{ fontSize: 11, color: "var(--muted)", flexShrink: 0 }}>No source file</span>
+                  )}
+                </div>
+              );
+            })}
           </div>
         ) : (
           <div className="muted">No fire-risk documents linked to this block yet.</div>
