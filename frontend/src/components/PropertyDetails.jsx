@@ -307,19 +307,19 @@ function KeyValueCard({ label, value }) {
   );
 }
 
-// Action items are objects ({description|action, priority, due_date, ...}); pull a
-// readable label rather than stringifying the object to "[object Object]".
-const actionText = (item) => {
-  if (typeof item === "string") return item;
+// Action items are objects; show a CONCISE label in this compact side panel
+// (issue ref + hazard category for FRA; a short action snippet for FRAEW). The
+// full text lives on the Block Analysis page. Never stringify the raw object.
+const actionLabelShort = (item) => {
+  if (typeof item === "string") return truncate(item, 90);
   if (!item || typeof item !== "object") return "";
-  return (
-    item.description ??
-    item.action ??
-    item.finding ??
-    item.recommendation ??
-    item.issue_ref ??
-    ""
-  );
+  // FRA actions carry an issue_ref + hazard_type — short and meaningful.
+  const ref = item.issue_ref ? String(item.issue_ref) : "";
+  const hazard = item.hazard_type ? String(item.hazard_type) : "";
+  if (ref || hazard) return [ref, hazard].filter(Boolean).join(" · ");
+  // FRAEW actions only have a long description — truncate hard.
+  const text = item.action ?? item.description ?? item.finding ?? item.recommendation ?? "";
+  return truncate(text, 90);
 };
 
 function BulletList({ items, max = 5 }) {
@@ -329,7 +329,7 @@ function BulletList({ items, max = 5 }) {
   return (
     <ul style={{ margin: "8px 0 0 18px", padding: 0 }}>
       {safeItems.slice(0, max).map((item, index) => {
-        const text = actionText(item);
+        const text = actionLabelShort(item);
         if (!text) return null;
         const pr = String(item?.priority ?? "").toLowerCase();
         return (
@@ -341,7 +341,7 @@ function BulletList({ items, max = 5 }) {
                 marginRight: 6,
               }}>[{pr}]</span>
             ) : null}
-            {truncate(text, 180)}
+            {text}
           </li>
         );
       })}
