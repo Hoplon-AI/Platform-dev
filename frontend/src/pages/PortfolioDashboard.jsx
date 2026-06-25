@@ -118,9 +118,20 @@ const buildBreakdown = (items, keyFn, valueFn) => {
 };
 
 const normaliseActions = (value) => {
-  if (Array.isArray(value)) return value.filter(Boolean).map(String);
   if (!value) return [];
-  return [String(value)];
+  const arr = Array.isArray(value) ? value : [value];
+  return arr.filter(Boolean).map((a) => {
+    if (typeof a === "string") return a;
+    // Action items are objects — extract a readable label rather than [object Object]
+    return (
+      a.description ??
+      a.action ??
+      a.finding ??
+      a.recommendation ??
+      a.issue_ref ??
+      "Action"
+    );
+  });
 };
 
 const getFireDocumentRisk = (doc) =>
@@ -207,12 +218,28 @@ const normaliseFirePayloadToDocument = (payload, fallbackIndex = 0) => {
     property_id: firePayload.property_id ?? payload.property_id ?? "",
     risk_level: riskLevel,
     rag_status: riskLevel,
-    summary:
-      primary?.summary ??
-      primary?.executive_summary ??
-      primary?.findings_summary ??
-      primary?.interim_measures_detail ??
-      "No summary extracted.",
+    summary: (() => {
+      const txt =
+        primary?.summary ??
+        primary?.executive_summary ??
+        primary?.findings_summary ??
+        primary?.interim_measures_detail ??
+        null;
+      if (txt) return txt;
+      // Build from structured fields when no free-text summary exists
+      const parts = [];
+      if (primary?.risk_rating) parts.push(`Risk rating: ${primary.risk_rating}.`);
+      if (primary?.building_risk_rating) parts.push(`Building risk: ${primary.building_risk_rating}.`);
+      if (primary?.evacuation_strategy) parts.push(`Evacuation: ${primary.evacuation_strategy.replace(/_/g, " ")}.`);
+      if (primary?.total_action_count) {
+        const overdue = primary.overdue_action_count ? ` (${primary.overdue_action_count} overdue)` : "";
+        parts.push(`${primary.total_action_count} action item(s)${overdue}.`);
+      }
+      if (primary?.has_combustible_cladding) parts.push("Combustible cladding present.");
+      if (primary?.has_sprinkler_system === false) parts.push("No sprinkler system.");
+      if (primary?.has_fire_alarm_system === false) parts.push("No fire alarm system.");
+      return parts.length > 0 ? parts.join(" ") : null;
+    })(),
     actions,
     fra,
     fraew,
@@ -239,11 +266,19 @@ const collectFireDocumentsFromIngestion = (ingestionResult, latestFireRiskPayloa
   const latest = normaliseFirePayloadToDocument(latestFireRiskPayload, docs.length);
   if (latest) docs.unshift(latest);
 
+  // Dedup by the most stable identifier. The same document arrives from two sources
+  // (latestFireRiskPayload from an upload + ingestionResult.fire_documents from the
+  // API) with different shapes. upload_id is identical across both (same upload);
+  // feature_id is NOT reliable (API returns fra_id AS feature_id, upload uses the
+  // processor's feature_id). Prefix with document_type so an FRA and FRAEW never
+  // collide. Fall back to block+filename only when no id is present.
   const seen = new Set();
   return docs.filter((doc) => {
-    const key = [doc.document_type, doc.upload_id, doc.feature_id, doc.block_reference, doc.filename]
-      .map(normaliseKey)
-      .join("|");
+    const idPart =
+      normaliseKey(doc.upload_id) ||
+      normaliseKey(doc.feature_id) ||
+      [doc.block_reference, doc.filename].map(normaliseKey).join("~");
+    const key = `${normaliseKey(doc.document_type)}|${idPart}`;
     if (seen.has(key)) return false;
     seen.add(key);
     return true;
@@ -654,13 +689,6 @@ function FireEvidencePanel({ fireDocuments, loading, onUploadNew }) {
                   <RiskBadge band={band} />
                 </div>
                 <p className="muted" style={{ marginTop: 10 }}>{doc.summary}</p>
-                {doc.actions?.length > 0 ? (
-                  <ul style={{ margin: "8px 0 0 18px" }}>
-                    {doc.actions.slice(0, 4).map((action, idx) => (
-                      <li key={idx}>{action}</li>
-                    ))}
-                  </ul>
-                ) : null}
               </article>
             );
           })
@@ -688,8 +716,7 @@ export default function PortfolioDashboard({
   const [mapDataLoading, setMapDataLoading] = useState(false);
   const [suppressMapFit, setSuppressMapFit] = useState(false);
 
-  // Fall back to ha_demo portfolio ID if ingestionResult doesn't carry one
-  const resolvedPortfolioId = portfolioId || (ingestionSummary ? "11111111-1111-1111-1111-111111111111" : null);
+  const resolvedPortfolioId = portfolioId || null;
 
   const fireDocuments = useMemo(
     () => collectFireDocumentsFromIngestion(ingestionResult, latestFireRiskPayload),
@@ -1338,8 +1365,9 @@ function UnderwriterDocumentsPanel({ portfolioId, propertyCount, properties, blo
   const enrichedCount = properties.filter(p => p.uprn || p.enrichment_status === "enriched").length;
   const docACompletion = propertyCount > 0 ? Math.min(100, Math.round(((enrichedCount + (propertyCount - enrichedCount) * 0.6) / propertyCount) * 100)) : 0;
 
-  const highValueBlocks = blocks.filter(b => (b.height_max_m || 0) >= 18);
-  const blocksWithData = blocks.filter(b => b.height_max_m || b.unit_count);
+  // Client-side blocks use maxHeight (from enrichment) and count (units) — not height_max_m/unit_count
+  const highValueBlocks = blocks.filter(b => (b.maxHeight || 0) >= 18);
+  const blocksWithData = blocks.filter(b => (b.maxHeight || 0) > 0);
   const docBCompletion = blocks.length > 0 ? Math.round((blocksWithData.length / blocks.length) * 100) : 0;
 
   const completionColor = (pct) => {

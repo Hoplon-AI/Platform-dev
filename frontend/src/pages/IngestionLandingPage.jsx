@@ -271,6 +271,7 @@ export default function IngestionLandingPage({
   stage = "SOV",
   onStageChange,
   haName = "",
+  haId = "",
 }) {
   const fileInputRef = useRef(null);
   const [isDragOver, setIsDragOver] = useState(false);

@@ -3,7 +3,7 @@ FastAPI router for file uploads.
 """
 from fastapi import APIRouter, UploadFile, File, Depends, HTTPException, Query, status, BackgroundTasks
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response
 from typing import Optional, List, Tuple, Literal
 import decimal
 import hashlib
@@ -11,6 +11,7 @@ import io
 import json
 import logging
 import os
+import re
 import uuid
 from datetime import date, datetime, timezone
 
@@ -623,6 +624,62 @@ async def get_upload_status(
     )
 
 
+@router.get("/{upload_id}/file")
+async def get_upload_file(
+    upload_id: str,
+    tenant: Tuple[str, str] = Depends(get_tenant_info),
+):
+    """
+    Stream the original uploaded source file (e.g. an FRA/FRAEW PDF) from S3.
+
+    Used by the Data Provenance section so underwriters can open the source
+    document an extraction was derived from. Returns the file inline so the
+    browser renders the PDF rather than forcing a download.
+    """
+    ha_id, _user_id = tenant
+
+    pool = DatabasePool.get_pool()
+    async with pool.acquire() as conn:
+        row = await conn.fetchrow(
+            """
+            SELECT s3_key, filename, file_type
+            FROM upload_audit
+            WHERE upload_id = $1 AND ha_id = $2
+            """,
+            upload_id,
+            ha_id,
+        )
+
+    if not row or not row["s3_key"]:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Source file not found")
+
+    try:
+        upload_service = get_upload_service()
+        content = upload_service.get_file(row["s3_key"])
+    except Exception as exc:
+        logger.error("Failed to fetch %s from S3: %s", row["s3_key"], exc)
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail="Could not retrieve source file from storage")
+
+    filename = row["filename"] or "document"
+    ext = os.path.splitext(filename)[1].lower()
+    media_type = {
+        ".pdf":  "application/pdf",
+        ".xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        ".xls":  "application/vnd.ms-excel",
+        ".csv":  "text/csv",
+    }.get(ext, "application/octet-stream")
+
+    return Response(
+        content=content,
+        media_type=media_type,
+        headers={
+            # inline → browser renders PDF in a new tab instead of downloading
+            "Content-Disposition": f'inline; filename="{filename}"',
+            "Content-Length": str(len(content)),
+        },
+    )
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # Helpers for the unified ingest endpoint
 # ─────────────────────────────────────────────────────────────────────────────
@@ -681,6 +738,38 @@ def _make_serializable(obj):
 # Unified ingest endpoint
 # ─────────────────────────────────────────────────────────────────────────────
 
+async def _resolve_or_create_portfolio(conn, ha_id: str, portfolio_id: Optional[str], filename: str) -> str:
+    """
+    Return a valid portfolio_id for this upload.
+    - If portfolio_id provided: verify it belongs to ha_id.
+    - If not provided: create a new portfolio row named after the file.
+    """
+    if portfolio_id:
+        row = await conn.fetchrow(
+            "SELECT portfolio_id FROM silver.portfolios WHERE portfolio_id = $1::uuid AND ha_id = $2",
+            portfolio_id, ha_id,
+        )
+        if not row:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Portfolio '{portfolio_id}' not found for this housing association.",
+            )
+        return portfolio_id
+
+    name = os.path.splitext(filename)[0] if filename else "Portfolio"
+    renewal_year = datetime.utcnow().year
+    new_id = str(uuid.uuid4())
+    await conn.execute(
+        """
+        INSERT INTO silver.portfolios (portfolio_id, ha_id, name, renewal_year, created_at, updated_at)
+        VALUES ($1::uuid, $2, $3, $4, NOW(), NOW())
+        """,
+        new_id, ha_id, name, renewal_year,
+    )
+    logger.info("[INGEST] Created portfolio '%s' (%s) for ha_id=%s", name, new_id, ha_id)
+    return new_id
+
+
 @router.post("/ingest", summary="Unified ingestion — SoV (Excel) or FRA/FRAEW (PDF)")
 async def ingest_document(
     background_tasks: BackgroundTasks,
@@ -692,6 +781,10 @@ async def ingest_document(
     block_reference: Optional[str] = Query(
         None,
         description="Block reference (e.g. '02BR') to link FRA/FRAEW to a specific block. If omitted, auto-resolved from block name in PDF.",
+    ),
+    portfolio_id: Optional[str] = Query(
+        None,
+        description="Portfolio UUID to upload into. If omitted for a SoV upload, a new portfolio is created automatically.",
     ),
     tenant: Tuple[str, str] = Depends(get_tenant_info),
 ):
@@ -779,11 +872,20 @@ async def ingest_document(
     # SoV → sov_processor_v2 → auto-enrich (background, limit 50)
     if document_type == "sov":
         pool = DatabasePool.get_pool()
+
+        # Resolve or create portfolio before processing so every property row
+        # is stamped with the correct portfolio_id from the start.
+        async with pool.acquire() as _conn:
+            resolved_portfolio_id = await _resolve_or_create_portfolio(
+                _conn, ha_id, portfolio_id, filename
+            )
+
         await process_sov_to_silver(
             file_bytes=file_content,
             ha_id=ha_id,
             submission_id=upload_id,
             upload_id=upload_id,
+            portfolio_id=resolved_portfolio_id,
             db_pool=pool,
         )
 
@@ -793,9 +895,9 @@ async def ingest_document(
         # synchronously (before returning) so a re-upload never sees a previous
         # run's stale "complete" during the gap before the task starts.
         from backend.api.enrichment.enrichment_router import _run_background, _active_jobs
-        _active_jobs[ha_id] = {"status": "running", "result": None, "target": 20}
-        background_tasks.add_task(_run_background, ha_id, 20)
-        logger.info("[INGEST] SoV done — enrichment queued for ha_id=%s limit=20", ha_id)
+        _active_jobs[ha_id] = {"status": "running", "result": None, "target": 50}
+        background_tasks.add_task(_run_background, ha_id, 50, resolved_portfolio_id)
+        logger.info("[INGEST] SoV done — enrichment queued for ha_id=%s limit=50", ha_id)
 
         # Fetch property rows back so the frontend can render them immediately
         async with pool.acquire() as conn:
@@ -855,6 +957,7 @@ async def ingest_document(
             "success": True,
             "document_type": "sov",
             "ha_id": ha_id,
+            "portfolio_id": resolved_portfolio_id,
             "upload_id": upload_id,
             "filename": filename,
             "file_size": len(file_content),
@@ -888,21 +991,52 @@ async def ingest_document(
     pool = DatabasePool.get_pool()
     async with pool.acquire() as conn:
 
-        # Resolve block_id: explicit block_reference param takes priority,
-        # then fall back to matching by block name in silver.blocks
+        # Resolve block_id:
+        #   1. explicit block_reference param (user-typed) takes priority
+        #   2. otherwise AUTO-RESOLVE from the filename — FRA/FRAEW files follow a
+        #      naming convention like "FRA_04CR_Clarkston_Road.pdf" where the block
+        #      code (e.g. 04CR, 01BR, 03BR) is a token in the name. This removes the
+        #      manual block-reference entry that was previously required every upload.
         resolved_block_id: Optional[str] = None
-        if block_reference:
+        resolved_block_ref: Optional[str] = None
+        resolved_portfolio_id: Optional[str] = None
+
+        candidate_refs: list[str] = []
+        if block_reference and block_reference.strip():
+            candidate_refs.append(block_reference.strip().upper())
+        # Auto-derive candidate block codes from the filename (e.g. 04CR, 01BR, 12HR).
+        for token in re.split(r"[ _\-.]+", filename or ""):
+            t = token.strip().upper()
+            if re.fullmatch(r"\d{1,3}[A-Z]{1,3}", t) and t not in candidate_refs:
+                candidate_refs.append(t)
+
+        for ref in candidate_refs:
             row = await conn.fetchrow(
-                "SELECT block_id::text FROM silver.blocks WHERE ha_id=$1 AND name=$2 LIMIT 1",
-                ha_id, block_reference.strip().upper(),
+                "SELECT block_id::text, name, portfolio_id::text FROM silver.blocks WHERE ha_id=$1 AND UPPER(name)=$2 LIMIT 1",
+                ha_id, ref,
             )
             if row:
                 resolved_block_id = row["block_id"]
-            else:
-                logger.warning(
-                    "block_reference '%s' not found in silver.blocks for ha_id=%s — block_id will be NULL",
-                    block_reference, ha_id,
-                )
+                resolved_block_ref = row["name"]
+                resolved_portfolio_id = row["portfolio_id"]
+                logger.info("[INGEST] FRA/FRAEW linked to block '%s' (block_id=%s)", row["name"], resolved_block_id)
+                break
+
+        # Fall back to the HA's most recent portfolio so the frontend always has a
+        # portfolio_id to re-pull fire documents against (even if no block matched).
+        if not resolved_portfolio_id:
+            prow = await conn.fetchrow(
+                "SELECT portfolio_id::text FROM silver.portfolios WHERE ha_id=$1 ORDER BY created_at DESC LIMIT 1",
+                ha_id,
+            )
+            if prow:
+                resolved_portfolio_id = prow["portfolio_id"]
+
+        if not resolved_block_id:
+            logger.warning(
+                "Could not resolve a block for %s (candidates=%s) — block_id will be NULL",
+                filename, candidate_refs,
+            )
 
         processor = None
         try:
@@ -981,8 +1115,10 @@ async def ingest_document(
         "document_type": document_type,
         "upload_id": upload_id,
         "feature_id": result.get("feature_id"),
+        "portfolio_id": resolved_portfolio_id,
         "block_id": resolved_block_id,
-        "block_reference": block_reference,
+        "block_reference": resolved_block_ref or block_reference,
+        "block_auto_resolved": bool(resolved_block_ref and not (block_reference and block_reference.strip())),
         "filename": filename,
         "file_size": len(file_content),
         "s3_key": s3_key,
@@ -990,13 +1126,17 @@ async def ingest_document(
         "auto_detected": auto_detected.value,
         "user_selected": document_type,
         "detection_warning": detection_warning,
-        "message": f"{document_type.upper()} extracted by Bedrock and written to silver.{document_type}_features",
+        "message": (
+            f"{document_type.upper()} extracted and linked to block {resolved_block_ref}."
+            if resolved_block_ref else
+            f"{document_type.upper()} extracted but no matching block found — link it manually."
+        ),
         "fire_risk_payload": {
             "document_type": document_type,
             "upload_id": str(upload_id),
             "feature_id": result.get("feature_id"),
             "block_id": resolved_block_id,
-            "block_reference": block_reference,
+            "block_reference": resolved_block_ref or block_reference,
             document_type: extracted_feature,
         },
     }))

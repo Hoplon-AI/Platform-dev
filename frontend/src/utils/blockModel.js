@@ -136,12 +136,13 @@ const asActionArray = (raw) => {
 };
 
 // Prefer denormalised counts on the doc; otherwise compute from action_items.
+// Works for both FRA (action_items) and FRAEW (remedial_actions).
 export const fraActionStats = (fra) => {
   const empty = { total: 0, overdue: 0, noDate: 0, high: 0, outstanding: 0, items: [] };
   if (!fra) return empty;
 
   const raw = asActionArray(
-    fra.action_items ?? fra.actions ?? fra.recommendations ?? fra.significant_findings
+    fra.action_items ?? fra.remedial_actions ?? fra.actions ?? fra.recommendations ?? fra.significant_findings
   );
   const items = raw.map((it) => (typeof it === "string" ? { description: it } : it || {}));
 
@@ -225,12 +226,20 @@ const normaliseFireDoc = (payload, idx = 0) => {
     property_id: fp.property_id ?? payload.property_id ?? "",
     risk_level: riskLevel,
     rag_status: riskLevel,
-    summary:
-      primary?.summary ??
-      primary?.executive_summary ??
-      primary?.findings_summary ??
-      primary?.interim_measures_detail ??
-      "",
+    summary: (() => {
+      const txt = primary?.summary ?? primary?.executive_summary ?? primary?.findings_summary ?? primary?.interim_measures_detail ?? null;
+      if (txt) return txt;
+      const parts = [];
+      if (primary?.risk_rating) parts.push(`Risk rating: ${primary.risk_rating}.`);
+      if (primary?.building_risk_rating) parts.push(`Building risk: ${primary.building_risk_rating}.`);
+      if (primary?.evacuation_strategy) parts.push(`Evacuation: ${primary.evacuation_strategy.replace(/_/g, " ")}.`);
+      if (primary?.total_action_count) {
+        const overdue = primary.overdue_action_count ? ` (${primary.overdue_action_count} overdue)` : "";
+        parts.push(`${primary.total_action_count} action item(s)${overdue}.`);
+      }
+      if (primary?.has_combustible_cladding) parts.push("Combustible cladding present.");
+      return parts.length > 0 ? parts.join(" ") : "";
+    })(),
     fra,
     fraew,
     raw: fp,
@@ -248,11 +257,16 @@ export const collectFireDocuments = (ingestionResult, latestFireRiskPayload = nu
   const latest = normaliseFireDoc(latestFireRiskPayload, docs.length);
   if (latest) docs.unshift(latest);
 
+  // Dedup by upload_id (identical across the upload + API sources); feature_id is
+  // unreliable (API returns fra_id AS feature_id). Prefix with document_type so an
+  // FRA and FRAEW never collide. Fall back to block+filename only when no id.
   const seen = new Set();
   return docs.filter((doc) => {
-    const key = [doc.document_type, doc.upload_id, doc.feature_id, doc.block_reference, doc.filename]
-      .map(normaliseKey)
-      .join("|");
+    const idPart =
+      normaliseKey(doc.upload_id) ||
+      normaliseKey(doc.feature_id) ||
+      [doc.block_reference, doc.filename].map(normaliseKey).join("~");
+    const key = `${normaliseKey(doc.document_type)}|${idPart}`;
     if (seen.has(key)) return false;
     seen.add(key);
     return true;

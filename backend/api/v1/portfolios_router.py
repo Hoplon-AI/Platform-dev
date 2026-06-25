@@ -228,7 +228,7 @@ async def get_properties(
         rows = await conn.fetch(
             """
             SELECT
-                property_id, property_reference, submission_id, block_reference,
+                property_id, portfolio_id, property_reference, submission_id, block_reference,
                 address, address_2, address_3, postcode, occupancy_type, sum_insured,
                 property_type, wall_construction, roof_construction,
                 year_of_build, storeys, units, uprn, parent_uprn,

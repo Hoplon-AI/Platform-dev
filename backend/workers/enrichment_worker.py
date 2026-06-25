@@ -434,7 +434,7 @@ def enrich_single_property(
 # Block Detection — uses EXISTING silver.blocks table
 # ─────────────────────────────────────────────────────────────────
 
-def run_block_detection(ha_id: str, places_key: str = "") -> dict:
+def run_block_detection(ha_id: str, places_key: str = "", portfolio_id: str | None = None) -> dict:
     """
     After enrichment, group properties into blocks using detect_block_properties().
 
@@ -459,13 +459,16 @@ def run_block_detection(ha_id: str, places_key: str = "") -> dict:
     try:
         # ── Step 1: fetch all enriched properties that have a UPRN ──────────
         with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
-            cur.execute("""
+            portfolio_clause = "AND portfolio_id = %s::uuid" if portfolio_id else ""
+            params = (ha_id, portfolio_id) if portfolio_id else (ha_id,)
+            cur.execute(f"""
                 SELECT uprn, parent_uprn, address, property_id
                 FROM silver.properties
                 WHERE ha_id = %s
                   AND uprn IS NOT NULL
                   AND uprn != ''
-            """, (ha_id,))
+                  {portfolio_clause}
+            """, params)
             enriched_rows = cur.fetchall()
 
         if not enriched_rows:
@@ -530,14 +533,14 @@ def run_block_detection(ha_id: str, places_key: str = "") -> dict:
 
                     cur.execute("""
                         INSERT INTO silver.blocks (
-                            ha_id, name,
+                            ha_id, portfolio_id, name,
                             parent_uprn, unit_count, total_sum_insured,
                             max_storeys, predominant_wall, predominant_roof,
                             height_max_m, is_listed, listed_grade
                         ) VALUES (
-                            %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s
+                            %s, %s::uuid, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s
                         )
-                        ON CONFLICT (ha_id, name)
+                        ON CONFLICT (ha_id, portfolio_id, name)
                         DO UPDATE SET
                             parent_uprn       = EXCLUDED.parent_uprn,
                             unit_count        = EXCLUDED.unit_count,
@@ -550,7 +553,7 @@ def run_block_detection(ha_id: str, places_key: str = "") -> dict:
                             listed_grade      = EXCLUDED.listed_grade,
                             updated_at        = NOW()
                     """, (
-                        ha_id, agg["block_name"],
+                        ha_id, portfolio_id, agg["block_name"],
                         root_parent_uprn, agg["unit_count"], agg["total_si"],
                         agg["max_storeys"], agg["wall"], agg["roof"],
                         agg["height"], agg["listed"], agg["grade"],
@@ -558,7 +561,9 @@ def run_block_detection(ha_id: str, places_key: str = "") -> dict:
                     upserted += 1
 
                 # Fill NULL block_reference on properties via parent_uprn match
-                cur.execute("""
+                portfolio_fill_clause = "AND p.portfolio_id = %s::uuid AND blk.portfolio_id = %s::uuid" if portfolio_id else ""
+                fill_params = (ha_id, ha_id, portfolio_id, portfolio_id) if portfolio_id else (ha_id, ha_id)
+                cur.execute(f"""
                     UPDATE silver.properties p
                     SET block_reference = blk.name
                     FROM silver.blocks blk
@@ -566,7 +571,8 @@ def run_block_detection(ha_id: str, places_key: str = "") -> dict:
                       AND p.parent_uprn = blk.parent_uprn
                       AND blk.ha_id = %s
                       AND (p.block_reference IS NULL OR p.block_reference = '')
-                """, (ha_id, ha_id))
+                      {portfolio_fill_clause}
+                """, fill_params)
                 filled = cur.rowcount
 
         logger.info(f"Block detection: {upserted} blocks upserted, "
@@ -601,6 +607,7 @@ async def enrich_portfolio(
     epc_email: str = "",
     epc_key: str = "",
     limit: int = 0,
+    portfolio_id: str | None = None,
 ) -> dict:
     """
     Enrich all pending properties for an HA.
@@ -623,11 +630,14 @@ async def enrich_portfolio(
     try:
         with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
             lim = f"LIMIT {limit}" if limit > 0 else ""
+            portfolio_clause = "AND portfolio_id = %s::uuid" if portfolio_id else ""
+            params = (ha_id, portfolio_id) if portfolio_id else (ha_id,)
             cur.execute(f"""
                 SELECT * FROM silver.properties
                 WHERE ha_id = %s AND enrichment_status = 'pending'
+                {portfolio_clause}
                 ORDER BY property_reference {lim}
-            """, (ha_id,))
+            """, params)
             rows = cur.fetchall()
     finally:
         conn.close()
@@ -708,7 +718,7 @@ async def enrich_portfolio(
     # Block detection
     block_result = {}
     try:
-        block_result = run_block_detection(ha_id, places_key=places_key)
+        block_result = run_block_detection(ha_id, places_key=places_key, portfolio_id=portfolio_id)
     except Exception as exc:
         logger.error(f"[ENRICH] Block detection failed: {exc}")
         block_result = {"error": str(exc)}

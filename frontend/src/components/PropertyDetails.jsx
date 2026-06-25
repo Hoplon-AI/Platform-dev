@@ -307,17 +307,44 @@ function KeyValueCard({ label, value }) {
   );
 }
 
+// Action items are objects; show a CONCISE label in this compact side panel
+// (issue ref + hazard category for FRA; a short action snippet for FRAEW). The
+// full text lives on the Block Analysis page. Never stringify the raw object.
+const actionLabelShort = (item) => {
+  if (typeof item === "string") return truncate(item, 90);
+  if (!item || typeof item !== "object") return "";
+  // Lead with the hazard category — meaningful to an underwriter at a glance.
+  // The assessor's internal issue_ref (e.g. CPFS-01BR-001) is kept on the
+  // Block Analysis detail cards, not here.
+  if (item.hazard_type) return String(item.hazard_type);
+  // FRAEW actions only have a long description — truncate hard.
+  const text = item.action ?? item.description ?? item.finding ?? item.recommendation ?? "";
+  return truncate(text, 90);
+};
+
 function BulletList({ items, max = 5 }) {
   const safeItems = asArray(items);
   if (!safeItems.length) return null;
 
   return (
     <ul style={{ margin: "8px 0 0 18px", padding: 0 }}>
-      {safeItems.slice(0, max).map((item, index) => (
-        <li key={`${String(item).slice(0, 20)}-${index}`} style={{ marginBottom: 4 }}>
-          {truncate(item, 180)}
-        </li>
-      ))}
+      {safeItems.slice(0, max).map((item, index) => {
+        const text = actionLabelShort(item);
+        if (!text) return null;
+        const pr = String(item?.priority ?? "").toLowerCase();
+        return (
+          <li key={index} style={{ marginBottom: 4 }}>
+            {pr ? (
+              <span style={{
+                fontSize: 10, fontWeight: 700, textTransform: "capitalize",
+                color: pr === "high" ? "#991b1b" : pr === "medium" || pr === "med" ? "#92400e" : "#64748b",
+                marginRight: 6,
+              }}>[{pr}]</span>
+            ) : null}
+            {text}
+          </li>
+        );
+      })}
     </ul>
   );
 }

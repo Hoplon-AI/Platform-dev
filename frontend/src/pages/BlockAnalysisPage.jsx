@@ -1,5 +1,6 @@
 import { useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { API_BASE_URL } from "../services/apiClient";
 import {
   buildBlocks,
   collectFireDocuments,
@@ -24,6 +25,128 @@ import {
   boolLabel,
   isPresent,
 } from "../utils/blockModel";
+
+// Fetch the source document (FRA/FRAEW PDF) with auth and open it in a new tab.
+// Uses a blob URL so the Authorization header is sent (a plain window.open of the
+// URL wouldn't carry the token).
+async function openSourceDocument(uploadId, filename) {
+  if (!uploadId) return;
+  try {
+    const token =
+      localStorage.getItem("equirisk_token") || sessionStorage.getItem("equirisk_token");
+    const res = await fetch(`${API_BASE_URL}/api/v1/upload/${uploadId}/file`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    });
+    if (!res.ok) throw new Error(`Could not load document (${res.status})`);
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    window.open(url, "_blank", "noopener,noreferrer");
+    // Revoke after a delay so the new tab has time to load it.
+    setTimeout(() => URL.revokeObjectURL(url), 60000);
+  } catch (err) {
+    console.error("Failed to open source document:", err);
+    alert(`Could not open ${filename || "the source document"}: ${err.message}`);
+  }
+}
+
+// A small PDF-document thumbnail (pure SVG) — a page with a red PDF tab and
+// faux text lines. Gives each provenance card a recognisable "source file" visual.
+function PdfThumbnail() {
+  return (
+    <svg width="46" height="58" viewBox="0 0 46 58" fill="none" style={{ flexShrink: 0, filter: "drop-shadow(0 2px 4px rgba(30,50,70,0.12))" }}>
+      {/* page */}
+      <path d="M4 3a3 3 0 0 1 3-3h24l11 11v44a3 3 0 0 1-3 3H7a3 3 0 0 1-3-3V3Z" fill="#fff" stroke="#E2DACE" strokeWidth="1" />
+      {/* folded corner */}
+      <path d="M31 0l11 11H34a3 3 0 0 1-3-3V0Z" fill="#F1ECE4" />
+      {/* faux text lines */}
+      <rect x="10" y="20" width="20" height="2.4" rx="1.2" fill="#D8D2C8" />
+      <rect x="10" y="26" width="26" height="2.4" rx="1.2" fill="#D8D2C8" />
+      <rect x="10" y="32" width="22" height="2.4" rx="1.2" fill="#D8D2C8" />
+      {/* red PDF tab */}
+      <rect x="6" y="40" width="26" height="13" rx="2.5" fill="#B8564B" />
+      <text x="19" y="49.5" textAnchor="middle" fontSize="8" fontWeight="700" fill="#fff" fontFamily="Arial, sans-serif">PDF</text>
+    </svg>
+  );
+}
+
+// One source-document row in Data Provenance — PDF thumbnail + meta + View button.
+// Whole card is clickable; hover lifts it. Local hover state (inline styles can't do :hover).
+function ProvenanceCard({ doc }) {
+  const [hover, setHover] = useState(false);
+  const uploadId = doc.upload_id || doc.raw?.upload_id;
+  const conf = isPresent(doc.raw?.extraction_confidence)
+    ? `Confidence ${fmt(doc.raw.extraction_confidence, 2)}`
+    : null;
+  const typeLabel = doc.document_type === "FRA"
+    ? "Fire Risk Assessment"
+    : doc.document_type === "FRAEW"
+    ? "External Wall Appraisal"
+    : doc.document_type;
+  const clickable = Boolean(uploadId);
+
+  return (
+    <div
+      role={clickable ? "button" : undefined}
+      tabIndex={clickable ? 0 : undefined}
+      onClick={clickable ? () => openSourceDocument(uploadId, doc.filename) : undefined}
+      onKeyDown={clickable ? (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openSourceDocument(uploadId, doc.filename); } } : undefined}
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
+      style={{
+        display: "flex", alignItems: "center", gap: 16,
+        padding: "14px 16px",
+        border: `1px solid ${hover && clickable ? "var(--terracotta, #B8564B)" : "var(--border, #DED7CC)"}`,
+        borderRadius: 14,
+        background: hover && clickable ? "#FFFDFB" : "#fff",
+        boxShadow: hover && clickable ? "0 6px 18px -8px rgba(184,86,75,0.28)" : "0 1px 2px rgba(30,50,70,0.04)",
+        cursor: clickable ? "pointer" : "default",
+        transition: "border-color 0.18s, box-shadow 0.18s, background 0.18s, transform 0.18s",
+        transform: hover && clickable ? "translateY(-1px)" : "none",
+      }}
+    >
+      <PdfThumbnail />
+
+      {/* Meta */}
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+          <span style={{
+            padding: "2px 9px", borderRadius: 999, fontSize: 10.5, fontWeight: 800, letterSpacing: "0.04em",
+            background: "var(--navy, #1E3246)", color: "#fff", whiteSpace: "nowrap",
+          }}>{doc.document_type}</span>
+          <span style={{ fontSize: 12, color: "var(--muted)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+            {typeLabel}
+          </span>
+        </div>
+        <div style={{
+          fontSize: 14, fontWeight: 600, color: "var(--navy, #1E3246)", lineHeight: 1.35,
+          overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+        }} title={doc.filename}>
+          {doc.filename || "Source document"}
+        </div>
+        {conf && (
+          <div style={{ fontSize: 11.5, color: "var(--muted)", marginTop: 2 }}>{conf}</div>
+        )}
+      </div>
+
+      {/* Action */}
+      {clickable ? (
+        <span style={{
+          flexShrink: 0, display: "inline-flex", alignItems: "center", gap: 6,
+          fontSize: 13, fontWeight: 700, whiteSpace: "nowrap",
+          padding: "8px 16px", borderRadius: 10,
+          background: hover ? "var(--terracotta, #B8564B)" : "var(--blush, #F7E4D5)",
+          color: hover ? "#fff" : "var(--terracotta-2, #9A463D)",
+          transition: "background 0.18s, color 0.18s",
+        }}>
+          View PDF
+          <span aria-hidden style={{ fontSize: 14 }}>↗</span>
+        </span>
+      ) : (
+        <span style={{ flexShrink: 0, fontSize: 12, color: "var(--muted)" }}>No source file</span>
+      )}
+    </div>
+  );
+}
 
 // Plain-language explanations for jargon, surfaced on hover. "What it is + why it matters".
 const G = {
@@ -252,31 +375,139 @@ function SubHead({ children, tip }) {
   return <div style={{ margin: "16px 0 2px" }}>{tip ? <InfoTip text={tip}>{el}</InfoTip> : el}</div>;
 }
 
-function ActionList({ items, max = 8 }) {
-  if (!items?.length) return null;
+function ActionCard({ a, index }) {
+  const [open, setOpen] = useState(false);
   const today = new Date();
   today.setHours(0, 0, 0, 0);
-  const prTone = (p) =>
-    p === "high" ? { bg: "#fee2e2", fg: "#991b1b" } :
-    p === "medium" || p === "med" ? { bg: "#fef3c7", fg: "#92400e" } :
-    { bg: "#f1f5f9", fg: "#475569" };
+  const pr = String(a.priority ?? "").toLowerCase();
+  const overdue = a.due_date && new Date(a.due_date) < today && String(a.status ?? "").toLowerCase() !== "completed";
+
+  const prTone = pr === "high"
+    ? { bg: "#fee2e2", fg: "#991b1b", border: "#fca5a5" }
+    : pr === "medium" || pr === "med"
+    ? { bg: "#fef3c7", fg: "#92400e", border: "#fde68a" }
+    : { bg: "#f1f5f9", fg: "#475569", border: "#e2e8f0" };
+
+  const description = a.description ?? a.action ?? a.finding ?? a.recommendation ?? "";
+
+  // Split description into issue (first ~2 sentences) and action (rest)
+  const sentences = description.split(/(?<=[.!?])\s+/);
+  const preview = sentences.slice(0, 2).join(" ");
+  const hasMore = sentences.length > 2;
+
   return (
-    <div style={{ marginTop: 10, display: "flex", flexDirection: "column", gap: 6 }}>
-      {items.slice(0, max).map((a, i) => {
-        const pr = String(a.priority ?? "").toLowerCase();
-        const overdue = a.due_date && new Date(a.due_date) < today && String(a.status ?? "").toLowerCase() !== "completed";
-        const t = prTone(pr);
-        return (
-          <div key={i} style={{ display: "flex", gap: 10, alignItems: "flex-start", padding: "8px 10px", border: "1px solid var(--border-soft, #eef2f7)", borderRadius: 8 }}>
-            {pr ? <span style={{ padding: "2px 8px", borderRadius: 999, fontSize: 11, fontWeight: 700, background: t.bg, color: t.fg, textTransform: "capitalize", whiteSpace: "nowrap" }}>{pr}</span> : null}
-            <span style={{ flex: 1, fontSize: 13, color: "var(--text-light, #475569)" }}>{actionLabel(a)}</span>
-            <span style={{ fontSize: 12, fontWeight: 600, color: overdue ? "#991b1b" : "var(--muted)", whiteSpace: "nowrap" }}>
-              {a.due_date ? `${overdue ? "Overdue · " : ""}${a.due_date}` : "No date"}
+    <div
+      style={{
+        border: `1px solid ${overdue ? "#fca5a5" : prTone.border}`,
+        borderRadius: 10,
+        overflow: "hidden",
+        background: overdue ? "#fff9f9" : "#fff",
+      }}
+    >
+      {/* ── Header row — always visible, click to expand ── */}
+      <button
+        type="button"
+        onClick={() => setOpen(o => !o)}
+        style={{
+          width: "100%", textAlign: "left", background: "none", border: "none",
+          cursor: "pointer", padding: "10px 12px",
+          display: "flex", gap: 10, alignItems: "flex-start",
+        }}
+      >
+        {/* Priority badge */}
+        {pr && (
+          <span style={{
+            padding: "2px 8px", borderRadius: 999, fontSize: 11, fontWeight: 700,
+            background: prTone.bg, color: prTone.fg, textTransform: "capitalize",
+            whiteSpace: "nowrap", marginTop: 1, flexShrink: 0,
+          }}>{pr}</span>
+        )}
+
+        {/* Issue ref + preview */}
+        <span style={{ flex: 1, minWidth: 0 }}>
+          {a.issue_ref && (
+            <span style={{ fontSize: 11, fontWeight: 700, color: "var(--muted)", display: "block", marginBottom: 2 }}>
+              {a.issue_ref}
+              {a.hazard_type ? ` · ${a.hazard_type}` : ""}
             </span>
+          )}
+          <span style={{ fontSize: 13, color: "var(--text)", lineHeight: 1.5 }}>
+            {open ? description : (hasMore ? `${preview}…` : preview)}
+          </span>
+        </span>
+
+        {/* Due date + expand chevron */}
+        <span style={{ flexShrink: 0, textAlign: "right" }}>
+          <span style={{
+            fontSize: 12, fontWeight: 600, display: "block",
+            color: overdue ? "#991b1b" : "var(--muted)",
+          }}>
+            {a.due_date ? (overdue ? `⚠ Overdue` : a.due_date) : "No date"}
+          </span>
+          {a.due_date && overdue && (
+            <span style={{ fontSize: 11, color: "var(--muted)", display: "block" }}>{a.due_date}</span>
+          )}
+          <span style={{ fontSize: 11, color: "var(--muted)", display: "block", marginTop: 4 }}>
+            {open ? "▲ less" : "▼ more"}
+          </span>
+        </span>
+      </button>
+
+      {/* ── Expanded detail panel ── */}
+      {open && (
+        <div style={{
+          borderTop: "1px solid var(--border-soft, #eef2f7)",
+          padding: "12px 14px",
+          background: "#f9fafb",
+          display: "flex", flexDirection: "column", gap: 8,
+        }}>
+          {/* Full description already shown above — show meta fields here */}
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "6px 16px" }}>
+            {a.status && (
+              <div>
+                <div style={{ fontSize: 10, fontWeight: 700, color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.06em" }}>Status</div>
+                <div style={{ fontSize: 13, color: "var(--text)", textTransform: "capitalize" }}>{a.status}</div>
+              </div>
+            )}
+            {a.responsible && (
+              <div>
+                <div style={{ fontSize: 10, fontWeight: 700, color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.06em" }}>Responsible</div>
+                <div style={{ fontSize: 13, color: "var(--text)" }}>{a.responsible}</div>
+              </div>
+            )}
+            {a.hazard_type && (
+              <div>
+                <div style={{ fontSize: 10, fontWeight: 700, color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.06em" }}>Hazard type</div>
+                <div style={{ fontSize: 13, color: "var(--text)" }}>{a.hazard_type}</div>
+              </div>
+            )}
+            {a.due_date && (
+              <div>
+                <div style={{ fontSize: 10, fontWeight: 700, color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.06em" }}>Due date</div>
+                <div style={{ fontSize: 13, fontWeight: 600, color: overdue ? "#991b1b" : "var(--text)" }}>
+                  {overdue ? `⚠ ${a.due_date} (Overdue)` : a.due_date}
+                </div>
+              </div>
+            )}
           </div>
-        );
-      })}
-      {items.length > max ? <div style={{ fontSize: 12, color: "var(--muted)" }}>+{items.length - max} more…</div> : null}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ActionList({ items, max = 8 }) {
+  if (!items?.length) return null;
+  return (
+    <div style={{ marginTop: 10, display: "flex", flexDirection: "column", gap: 8 }}>
+      {items.slice(0, max).map((a, i) => (
+        <ActionCard key={i} a={a} index={i} />
+      ))}
+      {items.length > max && (
+        <div style={{ fontSize: 12, color: "var(--muted)", padding: "4px 0" }}>
+          +{items.length - max} more actions…
+        </div>
+      )}
     </div>
   );
 }
@@ -290,6 +521,7 @@ function Dossier({ block }) {
   const { street, postcode } = blockDisplayAddress(block);
   const alerts = useMemo(() => computeBlockAlerts(block), [block]);
   const stats = useMemo(() => fraActionStats(fra), [fra]);
+  const fraewStats = useMemo(() => fraActionStats(fraew), [fraew]);
   const wallTypes = useMemo(() => getWallTypes(fraew), [fraew]);
   const fraStatus = useMemo(() => assessmentStatus(fra), [fra]);
   const fraewStatus = useMemo(() => assessmentStatus(fraew), [fraew]);
@@ -426,7 +658,7 @@ function Dossier({ block }) {
               <StatTile label="No date" value={stats.noDate} tone={stats.noDate > 0 ? "amber" : "default"} tip={G.noDateActions} tipAlign="right" />
               <StatTile label="High priority" value={stats.high} tone={stats.high > 0 ? "amber" : "default"} tip={G.highActions} tipAlign="right" />
             </div>
-            <ActionList items={stats.items} />
+            <ActionList items={stats.items} max={20} />
             {fra.summary ? <div style={{ marginTop: 12, fontSize: 13, color: "var(--text-light, #475569)" }}><b>Summary:</b> {fra.summary}</div> : null}
           </>
         )}
@@ -509,6 +741,18 @@ function Dossier({ block }) {
                 </div>
               </>
             )}
+            {fraewStats.items.length > 0 && (
+              <>
+                <SubHead>Remedial actions</SubHead>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(110px, 1fr))", gap: 10 }}>
+                  <StatTile label="Total" value={fraewStats.total} tip={G.totalActions} />
+                  <StatTile label="Overdue" value={fraewStats.overdue} tone={fraewStats.overdue > 0 ? "red" : "default"} tip={G.overdueActions} />
+                  <StatTile label="No date" value={fraewStats.noDate} tone={fraewStats.noDate > 0 ? "amber" : "default"} tip={G.noDateActions} tipAlign="right" />
+                  <StatTile label="High priority" value={fraewStats.high} tone={fraewStats.high > 0 ? "amber" : "default"} tip={G.highActions} tipAlign="right" />
+                </div>
+                <ActionList items={fraewStats.items} max={20} />
+              </>
+            )}
             {fraew.interim_measures_detail ? <div style={{ marginTop: 12, fontSize: 13, color: "var(--text-light, #475569)" }}><b>Interim measures:</b> {fraew.interim_measures_detail}</div> : null}
             {fraew.summary ? <div style={{ marginTop: 8, fontSize: 13, color: "var(--text-light, #475569)" }}><b>Summary:</b> {fraew.summary}</div> : null}
           </>
@@ -522,15 +766,20 @@ function Dossier({ block }) {
             <thead><tr><th>Address</th><th>UPRN</th><th>Sum insured</th><th>FRA</th><th>FRAEW</th></tr></thead>
             <tbody>
               {block.properties.map((p, i) => {
-                const pf = getFireRiskBand(p.latest_fra);
-                const pfe = getFireRiskBand(p.latest_fraew);
+                // FRA/FRAEW are assessed at block level (common/internal areas), so
+                // every unit in the block inherits the block's assessment when the
+                // property doesn't carry its own.
+                const propFra = p.latest_fra ?? block.latest_fra;
+                const propFraew = p.latest_fraew ?? block.latest_fraew;
+                const pf = getFireRiskBand(propFra);
+                const pfe = getFireRiskBand(propFraew);
                 return (
                   <tr key={p.id ?? p.property_reference ?? i}>
                     <td>{p.address_line_1 || p.address || p.property_reference || `Property ${i + 1}`}</td>
                     <td>{p.uprn ?? "—"}</td>
                     <td>£{fmtMoney(p.sum_insured)}</td>
-                    <td>{p.latest_fra ? <span className={`pill ${bandClass(pf)}`}>{pf}</span> : "—"}</td>
-                    <td>{p.latest_fraew ? <span className={`pill ${bandClass(pfe)}`}>{pfe}</span> : "—"}</td>
+                    <td>{propFra ? <span className={`pill ${bandClass(pf)}`}>{pf}</span> : "—"}</td>
+                    <td>{propFraew ? <span className={`pill ${bandClass(pfe)}`}>{pfe}</span> : "—"}</td>
                   </tr>
                 );
               })}
@@ -542,9 +791,9 @@ function Dossier({ block }) {
       {/* Provenance */}
       <Section title="Data provenance" subtitle="Source documents & extraction confidence">
         {block.linkedDocs?.length ? (
-          <div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
             {block.linkedDocs.map((d, i) => (
-              <KV key={i} label={`${d.document_type} · ${d.filename}`} tip={G.confidence} value={isPresent(d.raw?.extraction_confidence) ? `confidence ${fmt(d.raw.extraction_confidence, 2)}` : (getFireDocumentRisk(d) || "linked")} />
+              <ProvenanceCard key={i} doc={d} />
             ))}
           </div>
         ) : (
