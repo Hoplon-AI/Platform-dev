@@ -689,13 +689,6 @@ function FireEvidencePanel({ fireDocuments, loading, onUploadNew }) {
                   <RiskBadge band={band} />
                 </div>
                 <p className="muted" style={{ marginTop: 10 }}>{doc.summary}</p>
-                {doc.actions?.length > 0 ? (
-                  <ul style={{ margin: "8px 0 0 18px" }}>
-                    {doc.actions.slice(0, 4).map((action, idx) => (
-                      <li key={idx}>{action}</li>
-                    ))}
-                  </ul>
-                ) : null}
               </article>
             );
           })
