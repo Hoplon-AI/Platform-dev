@@ -307,17 +307,44 @@ function KeyValueCard({ label, value }) {
   );
 }
 
+// Action items are objects ({description|action, priority, due_date, ...}); pull a
+// readable label rather than stringifying the object to "[object Object]".
+const actionText = (item) => {
+  if (typeof item === "string") return item;
+  if (!item || typeof item !== "object") return "";
+  return (
+    item.description ??
+    item.action ??
+    item.finding ??
+    item.recommendation ??
+    item.issue_ref ??
+    ""
+  );
+};
+
 function BulletList({ items, max = 5 }) {
   const safeItems = asArray(items);
   if (!safeItems.length) return null;
 
   return (
     <ul style={{ margin: "8px 0 0 18px", padding: 0 }}>
-      {safeItems.slice(0, max).map((item, index) => (
-        <li key={`${String(item).slice(0, 20)}-${index}`} style={{ marginBottom: 4 }}>
-          {truncate(item, 180)}
-        </li>
-      ))}
+      {safeItems.slice(0, max).map((item, index) => {
+        const text = actionText(item);
+        if (!text) return null;
+        const pr = String(item?.priority ?? "").toLowerCase();
+        return (
+          <li key={index} style={{ marginBottom: 4 }}>
+            {pr ? (
+              <span style={{
+                fontSize: 10, fontWeight: 700, textTransform: "capitalize",
+                color: pr === "high" ? "#991b1b" : pr === "medium" || pr === "med" ? "#92400e" : "#64748b",
+                marginRight: 6,
+              }}>[{pr}]</span>
+            ) : null}
+            {truncate(text, 180)}
+          </li>
+        );
+      })}
     </ul>
   );
 }
