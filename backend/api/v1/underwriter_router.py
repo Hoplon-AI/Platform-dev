@@ -24,6 +24,7 @@ Design notes:
 
 from __future__ import annotations
 
+import json
 import os
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -1862,7 +1863,8 @@ async def fire_documents(
                 COALESCE(f.overdue_action_count, 0)          AS overdue_action_count,
                 COALESCE(f.outstanding_action_count, 0)      AS outstanding_action_count,
                 COALESCE(f.high_priority_action_count, 0)    AS high_priority_action_count,
-                COALESCE(f.no_date_action_count, 0)          AS no_date_action_count
+                COALESCE(f.no_date_action_count, 0)          AS no_date_action_count,
+                f.action_items
             FROM silver.fra_features f
             LEFT JOIN silver.document_features df ON df.feature_id = f.feature_id
             LEFT JOIN public.upload_audit ua       ON ua.upload_id = df.upload_id
@@ -1951,6 +1953,7 @@ async def fire_documents(
                 "outstanding_action_count":     r["outstanding_action_count"],
                 "high_priority_action_count":   r["high_priority_action_count"],
                 "no_date_action_count":         r["no_date_action_count"],
+                "action_items":                 (json.loads(r["action_items"]) if isinstance(r["action_items"], str) else r["action_items"]) if r["action_items"] else [],
             },
             "fraew": None,
         })
