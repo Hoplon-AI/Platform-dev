@@ -207,12 +207,28 @@ const normaliseFirePayloadToDocument = (payload, fallbackIndex = 0) => {
     property_id: firePayload.property_id ?? payload.property_id ?? "",
     risk_level: riskLevel,
     rag_status: riskLevel,
-    summary:
-      primary?.summary ??
-      primary?.executive_summary ??
-      primary?.findings_summary ??
-      primary?.interim_measures_detail ??
-      "No summary extracted.",
+    summary: (() => {
+      const txt =
+        primary?.summary ??
+        primary?.executive_summary ??
+        primary?.findings_summary ??
+        primary?.interim_measures_detail ??
+        null;
+      if (txt) return txt;
+      // Build from structured fields when no free-text summary exists
+      const parts = [];
+      if (primary?.risk_rating) parts.push(`Risk rating: ${primary.risk_rating}.`);
+      if (primary?.building_risk_rating) parts.push(`Building risk: ${primary.building_risk_rating}.`);
+      if (primary?.evacuation_strategy) parts.push(`Evacuation: ${primary.evacuation_strategy.replace(/_/g, " ")}.`);
+      if (primary?.total_action_count) {
+        const overdue = primary.overdue_action_count ? ` (${primary.overdue_action_count} overdue)` : "";
+        parts.push(`${primary.total_action_count} action item(s)${overdue}.`);
+      }
+      if (primary?.has_combustible_cladding) parts.push("Combustible cladding present.");
+      if (primary?.has_sprinkler_system === false) parts.push("No sprinkler system.");
+      if (primary?.has_fire_alarm_system === false) parts.push("No fire alarm system.");
+      return parts.length > 0 ? parts.join(" ") : null;
+    })(),
     actions,
     fra,
     fraew,
@@ -1337,8 +1353,9 @@ function UnderwriterDocumentsPanel({ portfolioId, propertyCount, properties, blo
   const enrichedCount = properties.filter(p => p.uprn || p.enrichment_status === "enriched").length;
   const docACompletion = propertyCount > 0 ? Math.min(100, Math.round(((enrichedCount + (propertyCount - enrichedCount) * 0.6) / propertyCount) * 100)) : 0;
 
-  const highValueBlocks = blocks.filter(b => (b.height_max_m || 0) >= 18);
-  const blocksWithData = blocks.filter(b => b.height_max_m || b.unit_count);
+  // Client-side blocks use maxHeight (from enrichment) and count (units) — not height_max_m/unit_count
+  const highValueBlocks = blocks.filter(b => (b.maxHeight || 0) >= 18);
+  const blocksWithData = blocks.filter(b => (b.maxHeight || 0) > 0);
   const docBCompletion = blocks.length > 0 ? Math.round((blocksWithData.length / blocks.length) * 100) : 0;
 
   const completionColor = (pct) => {

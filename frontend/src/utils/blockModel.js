@@ -225,12 +225,20 @@ const normaliseFireDoc = (payload, idx = 0) => {
     property_id: fp.property_id ?? payload.property_id ?? "",
     risk_level: riskLevel,
     rag_status: riskLevel,
-    summary:
-      primary?.summary ??
-      primary?.executive_summary ??
-      primary?.findings_summary ??
-      primary?.interim_measures_detail ??
-      "",
+    summary: (() => {
+      const txt = primary?.summary ?? primary?.executive_summary ?? primary?.findings_summary ?? primary?.interim_measures_detail ?? null;
+      if (txt) return txt;
+      const parts = [];
+      if (primary?.risk_rating) parts.push(`Risk rating: ${primary.risk_rating}.`);
+      if (primary?.building_risk_rating) parts.push(`Building risk: ${primary.building_risk_rating}.`);
+      if (primary?.evacuation_strategy) parts.push(`Evacuation: ${primary.evacuation_strategy.replace(/_/g, " ")}.`);
+      if (primary?.total_action_count) {
+        const overdue = primary.overdue_action_count ? ` (${primary.overdue_action_count} overdue)` : "";
+        parts.push(`${primary.total_action_count} action item(s)${overdue}.`);
+      }
+      if (primary?.has_combustible_cladding) parts.push("Combustible cladding present.");
+      return parts.length > 0 ? parts.join(" ") : "";
+    })(),
     fra,
     fraew,
     raw: fp,
