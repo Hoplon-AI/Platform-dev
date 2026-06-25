@@ -11,6 +11,7 @@ import io
 import json
 import logging
 import os
+import re
 import uuid
 from datetime import date, datetime, timezone
 
@@ -894,9 +895,9 @@ async def ingest_document(
         # synchronously (before returning) so a re-upload never sees a previous
         # run's stale "complete" during the gap before the task starts.
         from backend.api.enrichment.enrichment_router import _run_background, _active_jobs
-        _active_jobs[ha_id] = {"status": "running", "result": None, "target": 100}
-        background_tasks.add_task(_run_background, ha_id, 100, resolved_portfolio_id)
-        logger.info("[INGEST] SoV done — enrichment queued for ha_id=%s limit=20", ha_id)
+        _active_jobs[ha_id] = {"status": "running", "result": None, "target": 50}
+        background_tasks.add_task(_run_background, ha_id, 50, resolved_portfolio_id)
+        logger.info("[INGEST] SoV done — enrichment queued for ha_id=%s limit=50", ha_id)
 
         # Fetch property rows back so the frontend can render them immediately
         async with pool.acquire() as conn:
@@ -990,21 +991,40 @@ async def ingest_document(
     pool = DatabasePool.get_pool()
     async with pool.acquire() as conn:
 
-        # Resolve block_id: explicit block_reference param takes priority,
-        # then fall back to matching by block name in silver.blocks
+        # Resolve block_id:
+        #   1. explicit block_reference param (user-typed) takes priority
+        #   2. otherwise AUTO-RESOLVE from the filename — FRA/FRAEW files follow a
+        #      naming convention like "FRA_04CR_Clarkston_Road.pdf" where the block
+        #      code (e.g. 04CR, 01BR, 03BR) is a token in the name. This removes the
+        #      manual block-reference entry that was previously required every upload.
         resolved_block_id: Optional[str] = None
-        if block_reference:
+        resolved_block_ref: Optional[str] = None
+
+        candidate_refs: list[str] = []
+        if block_reference and block_reference.strip():
+            candidate_refs.append(block_reference.strip().upper())
+        # Auto-derive candidate block codes from the filename (e.g. 04CR, 01BR, 12HR).
+        for token in re.split(r"[ _\-.]+", filename or ""):
+            t = token.strip().upper()
+            if re.fullmatch(r"\d{1,3}[A-Z]{1,3}", t) and t not in candidate_refs:
+                candidate_refs.append(t)
+
+        for ref in candidate_refs:
             row = await conn.fetchrow(
-                "SELECT block_id::text FROM silver.blocks WHERE ha_id=$1 AND name=$2 LIMIT 1",
-                ha_id, block_reference.strip().upper(),
+                "SELECT block_id::text, name FROM silver.blocks WHERE ha_id=$1 AND UPPER(name)=$2 LIMIT 1",
+                ha_id, ref,
             )
             if row:
                 resolved_block_id = row["block_id"]
-            else:
-                logger.warning(
-                    "block_reference '%s' not found in silver.blocks for ha_id=%s — block_id will be NULL",
-                    block_reference, ha_id,
-                )
+                resolved_block_ref = row["name"]
+                logger.info("[INGEST] FRA/FRAEW linked to block '%s' (block_id=%s)", row["name"], resolved_block_id)
+                break
+
+        if not resolved_block_id:
+            logger.warning(
+                "Could not resolve a block for %s (candidates=%s) — block_id will be NULL",
+                filename, candidate_refs,
+            )
 
         processor = None
         try:
@@ -1084,7 +1104,8 @@ async def ingest_document(
         "upload_id": upload_id,
         "feature_id": result.get("feature_id"),
         "block_id": resolved_block_id,
-        "block_reference": block_reference,
+        "block_reference": resolved_block_ref or block_reference,
+        "block_auto_resolved": bool(resolved_block_ref and not (block_reference and block_reference.strip())),
         "filename": filename,
         "file_size": len(file_content),
         "s3_key": s3_key,
@@ -1092,13 +1113,17 @@ async def ingest_document(
         "auto_detected": auto_detected.value,
         "user_selected": document_type,
         "detection_warning": detection_warning,
-        "message": f"{document_type.upper()} extracted by Bedrock and written to silver.{document_type}_features",
+        "message": (
+            f"{document_type.upper()} extracted and linked to block {resolved_block_ref}."
+            if resolved_block_ref else
+            f"{document_type.upper()} extracted but no matching block found — link it manually."
+        ),
         "fire_risk_payload": {
             "document_type": document_type,
             "upload_id": str(upload_id),
             "feature_id": result.get("feature_id"),
             "block_id": resolved_block_id,
-            "block_reference": block_reference,
+            "block_reference": resolved_block_ref or block_reference,
             document_type: extracted_feature,
         },
     }))
