@@ -49,6 +49,105 @@ async function openSourceDocument(uploadId, filename) {
   }
 }
 
+// A small PDF-document thumbnail (pure SVG) — a page with a red PDF tab and
+// faux text lines. Gives each provenance card a recognisable "source file" visual.
+function PdfThumbnail() {
+  return (
+    <svg width="46" height="58" viewBox="0 0 46 58" fill="none" style={{ flexShrink: 0, filter: "drop-shadow(0 2px 4px rgba(30,50,70,0.12))" }}>
+      {/* page */}
+      <path d="M4 3a3 3 0 0 1 3-3h24l11 11v44a3 3 0 0 1-3 3H7a3 3 0 0 1-3-3V3Z" fill="#fff" stroke="#E2DACE" strokeWidth="1" />
+      {/* folded corner */}
+      <path d="M31 0l11 11H34a3 3 0 0 1-3-3V0Z" fill="#F1ECE4" />
+      {/* faux text lines */}
+      <rect x="10" y="20" width="20" height="2.4" rx="1.2" fill="#D8D2C8" />
+      <rect x="10" y="26" width="26" height="2.4" rx="1.2" fill="#D8D2C8" />
+      <rect x="10" y="32" width="22" height="2.4" rx="1.2" fill="#D8D2C8" />
+      {/* red PDF tab */}
+      <rect x="6" y="40" width="26" height="13" rx="2.5" fill="#B8564B" />
+      <text x="19" y="49.5" textAnchor="middle" fontSize="8" fontWeight="700" fill="#fff" fontFamily="Arial, sans-serif">PDF</text>
+    </svg>
+  );
+}
+
+// One source-document row in Data Provenance — PDF thumbnail + meta + View button.
+// Whole card is clickable; hover lifts it. Local hover state (inline styles can't do :hover).
+function ProvenanceCard({ doc }) {
+  const [hover, setHover] = useState(false);
+  const uploadId = doc.upload_id || doc.raw?.upload_id;
+  const conf = isPresent(doc.raw?.extraction_confidence)
+    ? `Confidence ${fmt(doc.raw.extraction_confidence, 2)}`
+    : null;
+  const typeLabel = doc.document_type === "FRA"
+    ? "Fire Risk Assessment"
+    : doc.document_type === "FRAEW"
+    ? "External Wall Appraisal"
+    : doc.document_type;
+  const clickable = Boolean(uploadId);
+
+  return (
+    <div
+      role={clickable ? "button" : undefined}
+      tabIndex={clickable ? 0 : undefined}
+      onClick={clickable ? () => openSourceDocument(uploadId, doc.filename) : undefined}
+      onKeyDown={clickable ? (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openSourceDocument(uploadId, doc.filename); } } : undefined}
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
+      style={{
+        display: "flex", alignItems: "center", gap: 16,
+        padding: "14px 16px",
+        border: `1px solid ${hover && clickable ? "var(--terracotta, #B8564B)" : "var(--border, #DED7CC)"}`,
+        borderRadius: 14,
+        background: hover && clickable ? "#FFFDFB" : "#fff",
+        boxShadow: hover && clickable ? "0 6px 18px -8px rgba(184,86,75,0.28)" : "0 1px 2px rgba(30,50,70,0.04)",
+        cursor: clickable ? "pointer" : "default",
+        transition: "border-color 0.18s, box-shadow 0.18s, background 0.18s, transform 0.18s",
+        transform: hover && clickable ? "translateY(-1px)" : "none",
+      }}
+    >
+      <PdfThumbnail />
+
+      {/* Meta */}
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+          <span style={{
+            padding: "2px 9px", borderRadius: 999, fontSize: 10.5, fontWeight: 800, letterSpacing: "0.04em",
+            background: "var(--navy, #1E3246)", color: "#fff", whiteSpace: "nowrap",
+          }}>{doc.document_type}</span>
+          <span style={{ fontSize: 12, color: "var(--muted)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+            {typeLabel}
+          </span>
+        </div>
+        <div style={{
+          fontSize: 14, fontWeight: 600, color: "var(--navy, #1E3246)", lineHeight: 1.35,
+          overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+        }} title={doc.filename}>
+          {doc.filename || "Source document"}
+        </div>
+        {conf && (
+          <div style={{ fontSize: 11.5, color: "var(--muted)", marginTop: 2 }}>{conf}</div>
+        )}
+      </div>
+
+      {/* Action */}
+      {clickable ? (
+        <span style={{
+          flexShrink: 0, display: "inline-flex", alignItems: "center", gap: 6,
+          fontSize: 13, fontWeight: 700, whiteSpace: "nowrap",
+          padding: "8px 16px", borderRadius: 10,
+          background: hover ? "var(--terracotta, #B8564B)" : "var(--blush, #F7E4D5)",
+          color: hover ? "#fff" : "var(--terracotta-2, #9A463D)",
+          transition: "background 0.18s, color 0.18s",
+        }}>
+          View PDF
+          <span aria-hidden style={{ fontSize: 14 }}>↗</span>
+        </span>
+      ) : (
+        <span style={{ flexShrink: 0, fontSize: 12, color: "var(--muted)" }}>No source file</span>
+      )}
+    </div>
+  );
+}
+
 // Plain-language explanations for jargon, surfaced on hover. "What it is + why it matters".
 const G = {
   fra: "Fire Risk Assessment — reviews fire safety of the building's common and internal areas, required under the Regulatory Reform (Fire Safety) Order 2005.",
@@ -687,57 +786,10 @@ function Dossier({ block }) {
       {/* Provenance */}
       <Section title="Data provenance" subtitle="Source documents & extraction confidence">
         {block.linkedDocs?.length ? (
-          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-            {block.linkedDocs.map((d, i) => {
-              const conf = isPresent(d.raw?.extraction_confidence)
-                ? `Confidence ${fmt(d.raw.extraction_confidence, 2)}`
-                : (getFireDocumentRisk(d) || "Linked");
-              const uploadId = d.upload_id || d.raw?.upload_id;
-              return (
-                <div
-                  key={i}
-                  style={{
-                    display: "flex", alignItems: "center", gap: 12,
-                    padding: "10px 12px", border: "1px solid var(--border-soft, #eef2f7)",
-                    borderRadius: 8, background: "#fff",
-                  }}
-                >
-                  {/* Doc-type badge */}
-                  <span style={{
-                    padding: "2px 8px", borderRadius: 999, fontSize: 11, fontWeight: 700,
-                    background: "var(--panel-soft, #f1f5f9)", color: "var(--navy, #1E3246)",
-                    whiteSpace: "nowrap", flexShrink: 0,
-                  }}>{d.document_type}</span>
-
-                  {/* Filename + confidence */}
-                  <span style={{ flex: 1, minWidth: 0 }}>
-                    <span style={{ fontSize: 13, color: "var(--text)", display: "block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                      {d.filename || "Source document"}
-                    </span>
-                    <span style={{ fontSize: 11, color: "var(--muted)" }}>{conf}</span>
-                  </span>
-
-                  {/* View PDF button */}
-                  {uploadId ? (
-                    <button
-                      type="button"
-                      className="btn btn-ghost"
-                      style={{
-                        flexShrink: 0, fontSize: 12, fontWeight: 600, padding: "6px 12px",
-                        display: "inline-flex", alignItems: "center", gap: 6,
-                        border: "1px solid var(--border, #DED7CC)", borderRadius: 8,
-                        cursor: "pointer", color: "var(--terracotta, #B8564B)", background: "#fff",
-                      }}
-                      onClick={() => openSourceDocument(uploadId, d.filename)}
-                    >
-                      <span aria-hidden>📄</span> View PDF
-                    </button>
-                  ) : (
-                    <span style={{ fontSize: 11, color: "var(--muted)", flexShrink: 0 }}>No source file</span>
-                  )}
-                </div>
-              );
-            })}
+          <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+            {block.linkedDocs.map((d, i) => (
+              <ProvenanceCard key={i} doc={d} />
+            ))}
           </div>
         ) : (
           <div className="muted">No fire-risk documents linked to this block yet.</div>
