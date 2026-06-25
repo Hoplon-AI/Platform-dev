@@ -909,6 +909,16 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentPortfolioId]);
 
+  // Re-pull FRA/FRAEW whenever the user opens Overview or Block Analysis, so newly
+  // uploaded fire documents appear without a manual page refresh.
+  useEffect(() => {
+    if (!currentPortfolioId || !API_BASE_URL || !ingestionResult) return;
+    if (activeNav === "overview" || activeNav === "block-analysis") {
+      refetchFireDocuments();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeNav]);
+
   const handleFiles = async (fileList, stageOverride = null) => {
     const files = Array.from(fileList || []);
     if (!files.length) return;
