@@ -313,10 +313,10 @@ function KeyValueCard({ label, value }) {
 const actionLabelShort = (item) => {
   if (typeof item === "string") return truncate(item, 90);
   if (!item || typeof item !== "object") return "";
-  // FRA actions carry an issue_ref + hazard_type — short and meaningful.
-  const ref = item.issue_ref ? String(item.issue_ref) : "";
-  const hazard = item.hazard_type ? String(item.hazard_type) : "";
-  if (ref || hazard) return [ref, hazard].filter(Boolean).join(" · ");
+  // Lead with the hazard category — meaningful to an underwriter at a glance.
+  // The assessor's internal issue_ref (e.g. CPFS-01BR-001) is kept on the
+  // Block Analysis detail cards, not here.
+  if (item.hazard_type) return String(item.hazard_type);
   // FRAEW actions only have a long description — truncate hard.
   const text = item.action ?? item.description ?? item.finding ?? item.recommendation ?? "";
   return truncate(text, 90);
