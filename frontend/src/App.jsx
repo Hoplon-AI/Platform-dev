@@ -1189,6 +1189,13 @@ export default function App() {
             <div className="side-head">Portfolio Workspace</div>
 
             <button
+              className={`side-link ${activeNav === "uploads" ? "active" : ""}`}
+              onClick={goToNextUpload}
+            >
+              Upload Documents
+            </button>
+
+            <button
               className={`side-link ${activeNav === "overview" ? "active" : ""}`}
               onClick={() => setActiveNav("overview")}
               disabled={!ingestionResult}
@@ -1202,13 +1209,6 @@ export default function App() {
               disabled={!ingestionResult}
             >
               Portfolio Insights
-            </button>
-
-            <button
-              className={`side-link ${activeNav === "uploads" ? "active" : ""}`}
-              onClick={goToNextUpload}
-            >
-              Upload Documents
             </button>
           </div>
 
@@ -1332,6 +1332,7 @@ export default function App() {
                 refetchFireDocuments={refetchFireDocuments}
                 portfolioId={getPortfolioIdFromResult(ingestionResult)}
                 onLoadMapData={loadPropertiesFromApi}
+                haName={accessibleHAs.find((h) => h.ha_id === selectedHaId)?.ha_name || authUser?.organisation || ""}
               />
             </div>
           )}
@@ -1341,6 +1342,7 @@ export default function App() {
               <PortfolioInsightsPage
                 ingestionResult={ingestionResult}
                 onUploadNew={handleUploadNew}
+                haName={accessibleHAs.find((h) => h.ha_id === selectedHaId)?.ha_name || authUser?.organisation || ""}
               />
             </div>
           )}
@@ -1351,6 +1353,7 @@ export default function App() {
                 ingestionResult={ingestionResult}
                 latestFireRiskPayload={latestFireRiskPayload}
                 onUploadNew={handleUploadNew}
+                haName={accessibleHAs.find((h) => h.ha_id === selectedHaId)?.ha_name || authUser?.organisation || ""}
               />
             </div>
           )}

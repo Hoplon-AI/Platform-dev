@@ -904,7 +904,7 @@ function compareBlocks(a, b, key) {
 
 // ---------------------------------------------------------------- page
 
-export default function BlockAnalysisPage({ ingestionResult, latestFireRiskPayload = null, onUploadNew }) {
+export default function BlockAnalysisPage({ ingestionResult, latestFireRiskPayload = null, onUploadNew, haName = "" }) {
   const [query, setQuery] = useState("");
   const [bandFilter, setBandFilter] = useState("all");
   const [sort, setSort] = useState({ key: null, dir: "desc" });
@@ -962,6 +962,11 @@ export default function BlockAnalysisPage({ ingestionResult, latestFireRiskPaylo
         <div className="main-head">
           <div>
             <div className="page-title">Block Analysis</div>
+            {haName && (
+              <div style={{ fontSize: 13, color: "var(--muted)", marginTop: 4 }}>
+                For: <strong style={{ color: "var(--terracotta)" }}>{haName}</strong>
+              </div>
+            )}
             <div className="page-sub">Search a block by street and review its full risk profile.</div>
           </div>
         </div>
@@ -1015,6 +1020,11 @@ export default function BlockAnalysisPage({ ingestionResult, latestFireRiskPaylo
       <div className="main-head">
         <div>
           <div className="page-title">Block Analysis</div>
+          {haName && (
+            <div style={{ fontSize: 13, color: "var(--muted)", marginTop: 4 }}>
+              For: <strong style={{ color: "var(--terracotta)" }}>{haName}</strong>
+            </div>
+          )}
           <div className="page-sub">Every block with address, size, UPRN and FRA / FRAEW fire-risk banding. Click a row for the full risk profile.</div>
         </div>
         <span className="pill pill-muted">{blocks.length} blocks</span>

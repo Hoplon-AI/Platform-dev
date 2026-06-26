@@ -643,6 +643,7 @@ export default function PortfolioDashboard({
   refetchFireDocuments,
   portfolioId = null,
   onLoadMapData,
+  haName = "",
 }) {
   const properties = ingestionResult?.properties || [];
   const [selectedBlock, setSelectedBlock] = useState(null);
@@ -983,6 +984,11 @@ export default function PortfolioDashboard({
         <div>
           <div className="tag">Premium Intelligence</div>
           <div className="page-title">Portfolio <em>Overview</em></div>
+          {haName && (
+            <div style={{ fontSize: 13, color: "var(--muted)", marginTop: 4 }}>
+              For: <strong style={{ color: "var(--terracotta)" }}>{haName}</strong>
+            </div>
+          )}
         </div>
 
         <div className="actions" style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
@@ -1089,8 +1095,8 @@ export default function PortfolioDashboard({
           value={`${enrichedPropertiesPct}%`}
           subtitle={
             <span style={{ display: "flex", flexDirection: "column", lineHeight: 1.35 }}>
-              <span>{enrichedPropertiesCount} of {properties.length} enhanced</span>
-              <span>{greenMatchCount} of {enrichedPropertiesCount} with green confidence</span>
+              <span>{enrichedPropertiesCount} of {properties.length} properties now have <strong>improved</strong> data</span>
+                <span>{greenMatchCount} of {enrichedPropertiesCount} improvements have a <strong>high-confidence</strong> rating</span>
             </span>
           }
           tone="green"

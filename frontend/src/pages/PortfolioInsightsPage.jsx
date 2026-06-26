@@ -9,7 +9,7 @@ import {
   ageBandKey,
 } from "../utils/portfolioBreakdown.js";
 
-export default function PortfolioInsightsPage({ ingestionResult, onUploadNew }) {
+export default function PortfolioInsightsPage({ ingestionResult, onUploadNew, haName = "" }) {
   const properties = ingestionResult?.properties || [];
 
   const tenancyRows = useMemo(
@@ -48,6 +48,11 @@ export default function PortfolioInsightsPage({ ingestionResult, onUploadNew }) 
         <div>
           <div className="tag">Premium Intelligence</div>
           <div className="page-title">Portfolio <em>Insights</em></div>
+          {haName && (
+            <div style={{ fontSize: 13, color: "var(--muted)", marginTop: 4 }}>
+              For: <strong style={{ color: "var(--terracotta)" }}>{haName}</strong>
+            </div>
+          )}
         </div>
       </div>
 
