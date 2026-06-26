@@ -4,6 +4,7 @@ import proj4 from "proj4";
 import LoginPage from "./pages/LoginPage.jsx";
 import IngestionPage from "./pages/IngestionLandingPage.jsx";
 import PortfolioDashboard from "./pages/PortfolioDashboard.jsx";
+import PortfolioInsightsPage from "./pages/PortfolioInsightsPage.jsx";
 import BlockAnalysisPage from "./pages/BlockAnalysisPage.jsx";
 
 import { getIngestionSummary } from "./utils/ingestion";
@@ -664,11 +665,11 @@ export default function App() {
         setAccessibleHAs(has);
         setSelectedHaId((prev) => (has.find((h) => h.ha_id === prev) ? prev : has[0].ha_id));
       } else {
-        setAccessibleHAs([{ ha_id: "ha_demo", ha_name: "Demo Housing Association" }]);
+        setAccessibleHAs([{ ha_id: "ha_demo", ha_name: "Albyn Housing Association" }]);
         setSelectedHaId("ha_demo");
       }
     } catch {
-      setAccessibleHAs([{ ha_id: "ha_demo", ha_name: "Demo Housing Association" }]);
+      setAccessibleHAs([{ ha_id: "ha_demo", ha_name: "Albyn Housing Association" }]);
       setSelectedHaId("ha_demo");
     }
   };
@@ -1196,6 +1197,14 @@ export default function App() {
             </button>
 
             <button
+              className={`side-link ${activeNav === "insights" ? "active" : ""}`}
+              onClick={() => setActiveNav("insights")}
+              disabled={!ingestionResult}
+            >
+              Portfolio Insights
+            </button>
+
+            <button
               className={`side-link ${activeNav === "uploads" ? "active" : ""}`}
               onClick={goToNextUpload}
             >
@@ -1323,6 +1332,15 @@ export default function App() {
                 refetchFireDocuments={refetchFireDocuments}
                 portfolioId={getPortfolioIdFromResult(ingestionResult)}
                 onLoadMapData={loadPropertiesFromApi}
+              />
+            </div>
+          )}
+
+          {(visitedNav.insights || activeNav === "insights") && (
+            <div style={{ display: activeNav === "insights" ? "block" : "none" }}>
+              <PortfolioInsightsPage
+                ingestionResult={ingestionResult}
+                onUploadNew={handleUploadNew}
               />
             </div>
           )}

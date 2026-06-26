@@ -156,6 +156,11 @@ select {
   display: flex;
   flex-direction: column;
   gap: 18px;
+  position: sticky;
+  top: 56px;
+  align-self: start;
+  height: calc(100vh - 56px);
+  overflow-y: auto;
 }
 
 .brand {
@@ -1656,6 +1661,9 @@ select {
     border-right: none;
     border-bottom: 1px solid var(--border);
     gap: 14px;
+    position: static;
+    max-height: none;
+    overflow-y: visible;
   }
 
   .main {

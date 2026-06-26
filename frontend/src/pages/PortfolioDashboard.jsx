@@ -2,7 +2,6 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 
 import PortfolioMap from "../components/PortfolioMap.jsx";
 import PropertyDetails from "../components/PropertyDetails.jsx";
-import { PortfolioInsightsPanel } from "../components/PortfolioInsights.jsx";
 import { blockStreetText, blockDisplayAddress } from "../utils/blockModel.js";
 
 const fmtMoney = (n) => {
@@ -50,71 +49,6 @@ const sameBlock = (a, b) => {
       String(a.block_reference) === String(b.block_reference)) ||
     (a.parent_uprn && b.parent_uprn && String(a.parent_uprn) === String(b.parent_uprn))
   );
-};
-
-const inferPortfolioClass = (property) => {
-  const propertyType = String(property?.property_type ?? property?.type ?? "").toLowerCase();
-  const builtForm = String(property?.built_form ?? "").toLowerCase();
-  const address = String(
-    property?.address_line_1 ?? property?.address ?? property?.property_reference ?? ""
-  ).toLowerCase();
-
-  const combined = `${propertyType} ${builtForm} ${address}`;
-
-  if (
-    propertyType.includes("lock up") ||
-    propertyType.includes("lockup") ||
-    propertyType.includes("office") ||
-    propertyType.includes("commercial") ||
-    propertyType.includes("mixed use")
-  ) {
-    return "Other";
-  }
-
-  if (
-    combined.includes("flat") ||
-    combined.includes("apartment") ||
-    combined.includes("maisonette") ||
-    combined.includes("tenement")
-  ) {
-    return "Flats";
-  }
-
-  if (
-    combined.includes("house") ||
-    combined.includes("bungalow") ||
-    combined.includes("terrace") ||
-    combined.includes("semi") ||
-    combined.includes("detached")
-  ) {
-    return "Houses";
-  }
-
-  return "Other";
-};
-
-const buildBreakdown = (items, keyFn, valueFn) => {
-  const grouped = new Map();
-
-  (items || []).forEach((item) => {
-    const key = keyFn(item) || "Not recorded";
-    if (!grouped.has(key)) {
-      grouped.set(key, {
-        label: key,
-        count: 0,
-        totalValue: 0,
-      });
-    }
-
-    const entry = grouped.get(key);
-    entry.count += 1;
-    entry.totalValue += Number(valueFn(item) || 0);
-  });
-
-  return Array.from(grouped.values()).sort((a, b) => {
-    if (b.totalValue !== a.totalValue) return b.totalValue - a.totalValue;
-    return b.count - a.count;
-  });
 };
 
 const normaliseActions = (value) => {
@@ -459,7 +393,7 @@ function MiniSummaryTable({ title, subtitle, rows, columns }) {
   );
 }
 
-function PortfolioAnalysisWindow({ tenancyRows, blockRows, propertyTypeRows, ageBandRows }) {
+export function PortfolioAnalysisWindow({ tenancyRows, blockRows, propertyTypeRows, ageBandRows }) {
   const [collapsed, setCollapsed] = React.useState(false);
   return (
     <div className="card">
@@ -833,43 +767,6 @@ export default function PortfolioDashboard({
     });
   }, [baseBlocks, fireDocuments]);
 
-  const tenancyRows = useMemo(
-    () => buildBreakdown(properties, (property) => property.occupancy_type || "Not recorded", (property) => property.sum_insured),
-    [properties]
-  );
-
-  const blockRows = useMemo(
-    () => blocks.map((block) => ({ label: block.label || "Unassigned block", count: block.count || 0, totalValue: block.totalValue || 0 })),
-    [blocks]
-  );
-
-  const propertyTypeRows = useMemo(
-    () => buildBreakdown(properties, (property) => property.property_type || inferPortfolioClass(property), (property) => property.sum_insured),
-    [properties]
-  );
-
-  const ageBandRows = useMemo(
-    () =>
-      buildBreakdown(
-        properties,
-        (property) => {
-          if (property.year_of_build) {
-            const year = Number(property.year_of_build);
-            if (Number.isFinite(year)) {
-              if (year < 1919) return "Pre-1919";
-              if (year < 1945) return "1920-1944";
-              if (year < 1980) return "1945-1979";
-              if (year < 2001) return "1980-2000";
-              return "2001+";
-            }
-          }
-          return "Unknown";
-        },
-        (property) => property.sum_insured
-      ),
-    [properties]
-  );
-
   // Auto-poll for enriched coordinates after SoV upload.
   // Fires every 15s while properties exist but none have coords, up to 3 minutes.
   useEffect(() => {
@@ -945,7 +842,13 @@ export default function PortfolioDashboard({
   const amberBlocks = blocks.filter((b) => (Number(b.maxHeight) >= 11 && Number(b.maxHeight) < 18) || (Number(b.max_storeys) >= 4 && Number(b.max_storeys) < 7)).length;
   const mappedBlocksCount = blocks.filter((b) => b.hasValidCoords).length;
   const enrichedPropertiesCount = properties.filter((p) => p.uprn || p.enrichment_status === "enriched").length;
-  const enrichedPropertiesPct = properties.length > 0 ? Math.round((enrichedPropertiesCount / properties.length) * 100) : 0;
+  // Quality of the matches we made: share of enriched properties with a GREEN
+  // (confident) OS Places UPRN match, not coverage over the whole portfolio.
+  const greenMatchCount = properties.filter(
+    (p) => String(p.uprn_confidence).trim().toLowerCase() === "green"
+  ).length;
+  const enrichedPropertiesPct =
+    enrichedPropertiesCount > 0 ? Math.round((greenMatchCount / enrichedPropertiesCount) * 100) : 0;
 
   // Block-level RAG counts, split by evidence type (FRA vs FRAEW).
   const fireRiskCounts = useMemo(() => {
@@ -1104,7 +1007,7 @@ export default function PortfolioDashboard({
         <KpiCard
           title={
             <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
-              Blocks detected
+              Flats spread across
               <HoverTooltip
                 tip="Our engine groups the properties in your SoV by shared parent UPRN and address to detect the distinct blocks across your portfolio."
                 tipWidth={280}
@@ -1114,7 +1017,7 @@ export default function PortfolioDashboard({
               </HoverTooltip>
             </span>
           }
-          value={blocks.length}
+          value={blocks.length + " blocks"}
           subtitle={
             <span style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
               <HoverTooltip
@@ -1173,9 +1076,9 @@ export default function PortfolioDashboard({
         <KpiCard
           title={
             <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
-              Properties enhanced
+              UPRN match confidence
               <HoverTooltip
-                tip="The share of properties we matched to a verified UPRN from their address, then enriched with trusted external data — coordinates, EPC rating, building height, flood risk and listed-building status."
+                tip="Of the properties we enriched, the share with a confident (green) UPRN match from their address — the high-quality matches we then enriched with trusted external data: coordinates, EPC rating, building height, flood risk and listed-building status."
                 tipWidth={280}
                 badgeStyle={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 15, height: 15, borderRadius: 999, background: "rgba(184,86,75,0.12)", color: "var(--terracotta-2)", fontSize: 10, fontWeight: 700, fontStyle: "italic", cursor: "help" }}
               >
@@ -1184,7 +1087,12 @@ export default function PortfolioDashboard({
             </span>
           }
           value={`${enrichedPropertiesPct}%`}
-          subtitle={`${enrichedPropertiesCount} of ${properties.length} properties`}
+          subtitle={
+            <span style={{ display: "flex", flexDirection: "column", lineHeight: 1.35 }}>
+              <span>{enrichedPropertiesCount} of {properties.length} enhanced</span>
+              <span>{greenMatchCount} of {enrichedPropertiesCount} with green confidence</span>
+            </span>
+          }
           tone="green"
           icon={KPI_ICONS.enhanced}
         />
@@ -1335,19 +1243,10 @@ export default function PortfolioDashboard({
         </div>
       </div>
 
-      <PortfolioInsightsPanel properties={properties} />
-
       <FireEvidencePanel
         fireDocuments={fireDocuments}
         loading={fireDocumentsLoading}
         onUploadNew={onUploadNew}
-      />
-
-      <PortfolioAnalysisWindow
-        tenancyRows={tenancyRows}
-        blockRows={blockRows}
-        propertyTypeRows={propertyTypeRows}
-        ageBandRows={ageBandRows}
       />
 
       <UnderwriterDocumentsPanel
