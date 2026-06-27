@@ -37,7 +37,7 @@ def get_coordinates_from_uprn(uprn, api_key):
     }
 
     try:
-        response = requests.get(url, params=params)
+        response = requests.get(url, params=params, timeout=15)
 
         response.raise_for_status()
 
@@ -79,7 +79,7 @@ def get_uprn_from_address(address, api_key):
     }
 
     try:
-        response = requests.get(url, params=params)
+        response = requests.get(url, params=params, timeout=15)
 
         response.raise_for_status()
 
@@ -171,8 +171,11 @@ def get_uprns_from_addresses(addresses: list[str], api_key: str) -> list[dict | 
 
 # Usage example
 if __name__ == "__main__":
-    MY_API_KEY = "1cNGEE0jL0R5pXlDpPd55wyEXnIBCF2J"
-    search_address = "Flat 2/1, 60 Grange Road, Battlefield, Glasgow, G42 9LF"
+    MY_API_KEY = "7VakhnbibvboaY9eE0385zORrBJAc2sw"
+    search_address = "78 Rowntree Lodge, Haxby Road, New Earswick, York, YO32 4AA"
+
+    #    "78 Rowntree Lodge, Haxby Road, New Earswick, York, YO32 4AA",
+      #  "4 Rowntree Lodge, Haxby Road, New Earswick, York, YO32 4AA"
 
     #parent_uprn: 906421443
 

@@ -5,620 +5,55 @@ import "leaflet.markercluster/dist/MarkerCluster.css";
 import "leaflet.markercluster/dist/MarkerCluster.Default.css";
 import "leaflet.markercluster";
 
-const DEFAULT_CENTER = [54.5, -3];
-const DEFAULT_ZOOM = 5;
-const CLUSTER_ZOOM = 13;
-const BLOCK_ZOOM = 18;
-const FOCUSED_ZOOM = 19;
-const CONTEXT_BLOCK_ZOOM = 16.5;
-const CONTEXT_BLOCK_FADE_START_ZOOM = 18.5;
-const CONTEXT_BLOCK_HIDE_ZOOM = 19;
-const BUILDINGS_URL = "/buildings_cathcart.geojson";
-
-const UK_LAT_BOUNDS = { min: 49.0, max: 61.5 };
-const UK_LON_BOUNDS = { min: -8.8, max: 2.8 };
-
-const PROPERTY_TYPE_COLORS = {
-  flats: "#8b5cf6",
-  houses: "#22c55e",
-  commercial: "#f59e0b",
-  mixed: "#3b82f6",
-  other: "#64748b",
-};
-
-const fmtMoney = (n) => {
-  const x = Number(n);
-  if (!Number.isFinite(x)) return "—";
-  return `£${x.toLocaleString("en-GB", { maximumFractionDigits: 0 })}`;
-};
-
-const toNumberOrNull = (value) => {
-  const n = Number(value);
-  return Number.isFinite(n) ? n : null;
-};
-
-const isWithinUkBounds = (lat, lon) => {
-  const safeLat = Number(lat);
-  const safeLon = Number(lon);
-  return (
-    Number.isFinite(safeLat) &&
-    Number.isFinite(safeLon) &&
-    safeLat >= UK_LAT_BOUNDS.min &&
-    safeLat <= UK_LAT_BOUNDS.max &&
-    safeLon >= UK_LON_BOUNDS.min &&
-    safeLon <= UK_LON_BOUNDS.max
-  );
-};
-
-const normaliseLatLon = (lat, lon) => {
-  const safeLat = Number(lat);
-  const safeLon = Number(lon);
-  if (
-    !Number.isFinite(safeLat) ||
-    !Number.isFinite(safeLon) ||
-    safeLat === 0 ||
-    safeLon === 0 ||
-    !isWithinUkBounds(safeLat, safeLon)
-  ) {
-    return null;
-  }
-  return [safeLat, safeLon];
-};
-
-const readinessBandFromScore = (score) => {
-  const s = Number(score) || 0;
-  if (s >= 80) return "Green";
-  if (s >= 50) return "Amber";
-  return "Red";
-};
-
-const readinessColor = (bandOrScore) => {
-  const b = String(bandOrScore ?? "").toLowerCase();
-  if (b.includes("green")) return "#22c55e";
-  if (b.includes("amber") || b.includes("yellow")) return "#f59e0b";
-  if (b.includes("red")) return "#ef4444";
-
-  const numeric = Number(bandOrScore);
-  if (Number.isFinite(numeric)) return readinessColor(readinessBandFromScore(numeric));
-  return "#64748b";
-};
-
-const getRiskBand = (entity) => {
-  const fra = entity?.latest_fra ?? entity?.fire_documents?.fra ?? null;
-  const fraew = entity?.latest_fraew ?? entity?.fire_documents?.fraew ?? null;
-  const fraRisk = String(fra?.risk_level ?? fra?.rag_status ?? fra?.raw_rating ?? "").toLowerCase();
-  const fraewRisk = String(fraew?.risk_level ?? fraew?.rag_status ?? fraew?.raw_rating ?? "").toLowerCase();
-  const combined = `${fraRisk} ${fraewRisk}`;
-
-  if (
-    combined.includes("red") ||
-    combined.includes("high") ||
-    combined.includes("not acceptable") ||
-    combined.includes("intolerable")
-  ) return "Red";
-
-  if (
-    combined.includes("amber") ||
-    combined.includes("medium") ||
-    combined.includes("moderate") ||
-    combined.includes("tolerable")
-  ) return "Amber";
-
-  if (
-    combined.includes("green") ||
-    combined.includes("low") ||
-    combined.includes("acceptable") ||
-    combined.includes("broadly acceptable")
-  ) return "Green";
-
-  return null;
-};
-
-const riskColor = (entity) => {
-  const band = getRiskBand(entity);
-  if (band === "Red") return "#ef4444";
-  if (band === "Amber") return "#f59e0b";
-  if (band === "Green") return "#22c55e";
-  return "#64748b";
-};
-
-const sameProperty = (a, b) => {
-  if (!a || !b) return false;
-  return (
-    (a.id && b.id && String(a.id) === String(b.id)) ||
-    (a.property_id && b.property_id && String(a.property_id) === String(b.property_id)) ||
-    (a.property_reference && b.property_reference && String(a.property_reference) === String(b.property_reference)) ||
-    (a.uprn && b.uprn && String(a.uprn) === String(b.uprn))
-  );
-};
-
-const sameBlock = (a, b) => {
-  if (!a || !b) return false;
-  return (
-    (a.id && b.id && String(a.id) === String(b.id)) ||
-    (a.block_id && b.block_id && String(a.block_id) === String(b.block_id)) ||
-    (a.label && b.label && String(a.label) === String(b.label)) ||
-    (a.name && b.name && String(a.name) === String(b.name)) ||
-    (a.parent_uprn && b.parent_uprn && String(a.parent_uprn) === String(b.parent_uprn))
-  );
-};
-
-const getPropertyLatLon = (row) => {
-  const directLat =
-    toNumberOrNull(row?.latitude) ??
-    toNumberOrNull(row?.lat) ??
-    toNumberOrNull(row?.location?.latitude) ??
-    toNumberOrNull(row?.__lat);
-
-  const directLon =
-    toNumberOrNull(row?.longitude) ??
-    toNumberOrNull(row?.lon) ??
-    toNumberOrNull(row?.lng) ??
-    toNumberOrNull(row?.location?.longitude) ??
-    toNumberOrNull(row?.__lon);
-
-  return normaliseLatLon(directLat, directLon);
-};
-
-const getBlockLatLon = (block) => {
-  const directLat =
-    toNumberOrNull(block?.lat) ??
-    toNumberOrNull(block?.latitude) ??
-    toNumberOrNull(block?.centroid_lat) ??
-    toNumberOrNull(block?.center_lat) ??
-    toNumberOrNull(block?.centre_lat) ??
-    toNumberOrNull(block?.__lat);
-
-  const directLon =
-    toNumberOrNull(block?.lon) ??
-    toNumberOrNull(block?.longitude) ??
-    toNumberOrNull(block?.lng) ??
-    toNumberOrNull(block?.centroid_lon) ??
-    toNumberOrNull(block?.centroid_lng) ??
-    toNumberOrNull(block?.center_lon) ??
-    toNumberOrNull(block?.centre_lon) ??
-    toNumberOrNull(block?.__lon);
-
-  return normaliseLatLon(directLat, directLon);
-};
-
-const getPropertyReadiness = (row) =>
-  toNumberOrNull(row?.readiness_score) ??
-  toNumberOrNull(row?.readinessScore) ??
-  toNumberOrNull(row?.score) ??
-  0;
-
-const getPropertyBand = (row) =>
-  row?.readiness_band ?? row?.readinessBand ?? readinessBandFromScore(getPropertyReadiness(row));
-
-const getPropertyId = (row, idx) =>
-  row?.id ?? row?.property_id ?? row?.propertyId ?? row?.property_reference ?? row?.uprn ?? `property-${idx + 1}`;
-
-const getPropertyLabel = (row, idx) =>
-  row?.address_line_1 ?? row?.address1 ?? row?.address ?? row?.property_reference ?? row?.block_reference ?? row?.uprn ?? `Property ${idx + 1}`;
-
-const getPropertyValue = (row) =>
-  toNumberOrNull(row?.sum_insured) ??
-  toNumberOrNull(row?.sumInsured) ??
-  toNumberOrNull(row?.total_sum_insured) ??
-  toNumberOrNull(row?.tiv) ??
-  0;
-
-const getBlockId = (block, idx) =>
-  block?.id ?? block?.block_id ?? block?.parent_uprn ?? block?.name ?? block?.label ?? `block-${idx + 1}`;
-
-const getBlockName = (block, idx) =>
-  block?.label ?? block?.name ?? block?.block_reference ?? block?.parent_uprn ?? `Block ${idx + 1}`;
-
-const getBlockUnits = (block) =>
-  toNumberOrNull(block?.count) ??
-  toNumberOrNull(block?.unit_count) ??
-  toNumberOrNull(block?.units) ??
-  toNumberOrNull(block?.property_count) ??
-  0;
-
-const getBlockValue = (block) =>
-  toNumberOrNull(block?.totalValue) ??
-  toNumberOrNull(block?.total_sum_insured) ??
-  toNumberOrNull(block?.total_si) ??
-  toNumberOrNull(block?.sum_insured) ??
-  0;
-
-const getBlockStoreys = (block) =>
-  toNumberOrNull(block?.maxHeight) ??
-  toNumberOrNull(block?.max_storeys) ??
-  toNumberOrNull(block?.storeys) ??
-  null;
-
-const getBlockPropertyCount = (block) =>
-  Array.isArray(block?.properties) ? block.properties.length : getBlockUnits(block);
-
-const inferPropertyCategory = (row) => {
-  const propertyType = String(row?.property_type ?? row?.propertyType ?? row?.type ?? "").toLowerCase();
-  const builtForm = String(row?.built_form ?? row?.builtForm ?? "").toLowerCase();
-  const occupancy = String(row?.occupancy_type ?? row?.occupancyType ?? row?.occupancy ?? "").toLowerCase();
-  const address = String(row?.address_line_1 ?? row?.address1 ?? row?.address ?? row?.property_reference ?? "").toLowerCase();
-  const combined = `${propertyType} ${builtForm} ${occupancy} ${address}`;
-
-  if (combined.includes("flat") || combined.includes("apartment") || combined.includes("maisonette")) return "flats";
-  if (combined.includes("house") || combined.includes("bungalow") || combined.includes("terrace") || combined.includes("semi") || combined.includes("detached")) return "houses";
-  if (combined.includes("retail") || combined.includes("shop") || combined.includes("office") || combined.includes("commercial") || combined.includes("industrial")) return "commercial";
-  if (combined.includes("mixed")) return "mixed";
-  return "other";
-};
-
-const getPropertyCategoryLabel = (row) => {
-  const category = inferPropertyCategory(row);
-  if (category === "flats") return "Flats";
-  if (category === "houses") return "Houses";
-  if (category === "commercial") return "Commercial";
-  if (category === "mixed") return "Mixed use";
-  return "Other";
-};
-
-const getPropertyDisplayColor = (row, isSelected) => {
-  if (isSelected) return "#1d4ed8";
-  return PROPERTY_TYPE_COLORS[inferPropertyCategory(row)] || PROPERTY_TYPE_COLORS.other;
-};
-
-const getBlockCircleSize = (units, zoom, isSelected) => {
-  const safeUnits = Math.max(1, Number(units) || 1);
-  if (zoom <= 7) return isSelected ? 54 : 44;
-  if (zoom <= 9) return Math.min(isSelected ? 64 : 58, 34 + Math.sqrt(safeUnits) * 5);
-  if (zoom <= 11) return Math.min(isSelected ? 72 : 64, 38 + Math.sqrt(safeUnits) * 6);
-  return Math.min(isSelected ? 78 : 70, 42 + Math.sqrt(safeUnits) * 6.5);
-};
-
-const formatCountLabel = (count) => {
-  const safe = Number(count) || 0;
-  if (safe >= 1000) {
-    const compact = safe / 1000;
-    return Number.isInteger(compact) ? `${compact}k` : `${compact.toFixed(1)}k`;
-  }
-  return String(safe);
-};
-
-const RISK_PRIORITY = { "#ef4444": 3, "#f59e0b": 2, "#22c55e": 1, "#64748b": 0 };
-
-const createClusterIcon = (cluster) => {
-  const markers = cluster.getAllChildMarkers();
-  const totalUnits = markers.reduce((sum, m) => sum + (m.options._units || 0), 0);
-  const ringColor = markers.reduce((best, m) => {
-    const c = m.options._ringColor || "#64748b";
-    return (RISK_PRIORITY[c] ?? 0) > (RISK_PRIORITY[best] ?? 0) ? c : best;
-  }, "#64748b");
-  const count = totalUnits || cluster.getChildCount();
-  const size = Math.min(72, 44 + Math.sqrt(count) * 2.2);
-  const fontSize = size >= 64 ? 15 : size >= 52 ? 14 : 13;
-  return L.divIcon({
-    className: "portfolio-block-count-icon",
-    iconSize: [size, size],
-    iconAnchor: [size / 2, size / 2],
-    html: `<div style="
-      width:${size}px;height:${size}px;border-radius:999px;
-      background:rgba(255,255,255,0.94);border:3px solid ${ringColor};
-      box-shadow:0 10px 24px rgba(15,23,42,0.14);
-      display:flex;align-items:center;justify-content:center;
-      font-weight:800;font-size:${fontSize}px;color:#0f172a;
-      backdrop-filter:blur(8px);
-    ">${formatCountLabel(count)}</div>`,
-  });
-};
-
-const createBlockCountIcon = (point, zoom, isSelected, opacity = 1, scale = 1) => {
-  const ringColor = isSelected ? "#1d4ed8" : riskColor(point.raw);
-  const size = Math.max(30, getBlockCircleSize(point.units, zoom, isSelected) * scale);
-  const fontSize = size >= 68 ? 15 : size >= 56 ? 14 : 13;
-
-  return L.divIcon({
-    className: "portfolio-block-count-icon",
-    iconSize: [size, size],
-    iconAnchor: [size / 2, size / 2],
-    html: `
-      <div style="
-        width:${size}px;
-        height:${size}px;
-        border-radius:999px;
-        background:rgba(255,255,255,0.94);
-        border:3px solid ${ringColor};
-        box-shadow:0 10px 24px rgba(15,23,42,0.14);
-        display:flex;
-        align-items:center;
-        justify-content:center;
-        font-weight:800;
-        font-size:${fontSize}px;
-        color:#0f172a;
-        backdrop-filter:blur(8px);
-        opacity:${opacity};
-        transform:scale(${scale});
-        transform-origin:center;
-        transition:opacity 80ms linear, transform 80ms linear;
-      ">${formatCountLabel(point.units)}</div>
-    `,
-  });
-};
-
-const getContextBlockVisibility = (zoom) => {
-  if (zoom >= CONTEXT_BLOCK_HIDE_ZOOM) return { visible: false, opacity: 0, scale: 0.72 };
-  if (zoom <= CONTEXT_BLOCK_ZOOM) return { visible: true, opacity: 0.92, scale: 1 };
-
-  const fadeRange = CONTEXT_BLOCK_FADE_START_ZOOM - CONTEXT_BLOCK_ZOOM;
-  const progress = Math.max(
-    0,
-    Math.min(1, (CONTEXT_BLOCK_FADE_START_ZOOM - zoom) / fadeRange)
-  );
-
-  return {
-    visible: progress > 0.02,
-    opacity: Math.max(0.18, progress * 0.9),
-    scale: 0.72 + progress * 0.28,
-  };
-};
-
-const getPropertyDotSize = (point, isSelected) => {
-  const base = Math.max(10, Math.min(22, 10 + Math.sqrt(Math.max(Number(point.sumInsured) || 0, 1)) / 900));
-  return isSelected ? base + 4 : base;
-};
-
-const createPropertyDotIcon = (point, isSelected) => {
-  const size = getPropertyDotSize(point, isSelected);
-  const fill = getPropertyDisplayColor(point.raw, isSelected);
-
-  return L.divIcon({
-    className: "portfolio-property-dot-wrap",
-    iconSize: [size, size],
-    iconAnchor: [size / 2, size / 2],
-    html: `
-      <div style="
-        width:${size}px;
-        height:${size}px;
-        border-radius:999px;
-        background:${fill};
-        border:2px solid white;
-        box-shadow:${
-          isSelected
-            ? "0 0 0 5px rgba(29,78,216,0.18), 0 10px 22px rgba(29,78,216,0.22)"
-            : "0 0 0 2px rgba(15,23,42,0.08), 0 6px 12px rgba(15,23,42,0.10)"
-        };
-      "></div>
-    `,
-  });
-};
-
-const getPropertyPopupHtml = (point) => {
-  const risk = getRiskBand(point.raw);
-  return `
-    <div style="min-width:220px;">
-      <div style="font-weight:700; margin-bottom:6px;">${point.label}</div>
-      <div>Type: ${getPropertyCategoryLabel(point.raw)}</div>
-      <div>Sum insured: ${fmtMoney(point.sumInsured)}</div>
-      <div>Readiness: ${point.readinessScore ?? "—"} (${point.readinessBand})</div>
-      <div>Fire risk: ${risk || "—"}</div>
-      <div>Lat: ${point.lat.toFixed(5)}</div>
-      <div>Lon: ${point.lon.toFixed(5)}</div>
-    </div>
-  `;
-};
-
-const buildFlatListPopupHtml = (point) => {
-  const flats = point.raw?.properties || [];
-  const rep = point.raw?.representativeProperty;
-  const rawAddr = rep?.address || rep?.address_line_1 || "";
-  const addr = rawAddr.replace(/^(flat|apartment|unit|apt)[^,]*,\s*/i, "").trim();
-  const postcode = rep?.post_code || rep?.postcode || "";
-  const addrLine = [addr, postcode].filter(Boolean).join(" ");
-  const items = flats.map((p, i) => {
-    const label = getPropertyLabel(p, i);
-    return `<div class="flat-row" data-idx="${i}" style="padding:7px 8px;cursor:pointer;border-radius:6px;font-size:13px;color:#0f172a;line-height:1.4">${label}</div>`;
-  }).join("");
-  return `
-    <div style="min-width:230px;max-width:300px">
-      <div style="margin-bottom:8px;padding-bottom:7px;border-bottom:1px solid #e2e8f0">
-        <div style="font-weight:700;font-size:13px;color:#0f172a">${addrLine || point.name}</div>
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-top:4px">
-          <span style="font-size:12px;color:#64748b">${flats.length} properties · Block ${point.name}</span>
-          <span class="block-view-btn" style="font-size:12px;color:#2563eb;cursor:pointer;font-weight:600">Block view</span>
-        </div>
-      </div>
-      <div style="max-height:220px;overflow-y:auto">${items}</div>
-    </div>`;
-};
-
-const attachFlatListPopupHandlers = (marker, point, onSelectProperty) => {
-  marker.on("popupopen", (e) => {
-    const container = e.popup.getElement();
-    if (!container) return;
-    container.querySelectorAll(".flat-row").forEach((el) => {
-      el.addEventListener("mouseenter", () => { el.style.background = "#f1f5f9"; });
-      el.addEventListener("mouseleave", () => { el.style.background = ""; });
-      el.addEventListener("click", () => {
-        const idx = parseInt(el.dataset.idx, 10);
-        const flats = point.raw?.properties || [];
-        if (flats[idx]) {
-          onSelectProperty?.(flats[idx]);
-          marker.closePopup();
-        }
-      });
-    });
-    const blockBtn = container.querySelector(".block-view-btn");
-    if (blockBtn) {
-      blockBtn.addEventListener("click", () => {
-        onSelectProperty?.(null);
-        marker.closePopup();
-      });
-    }
-  });
-};
-
-const flattenCoords = (coords, out = []) => {
-  if (!Array.isArray(coords)) return out;
-  if (coords.length >= 2 && typeof coords[0] === "number" && typeof coords[1] === "number") {
-    out.push([coords[1], coords[0]]);
-    return out;
-  }
-  coords.forEach((child) => flattenCoords(child, out));
-  return out;
-};
-
-const getFeatureLatLngBounds = (feature) => {
-  const latLngs = flattenCoords(feature?.geometry?.coordinates || []);
-  if (!latLngs.length) return null;
-  try {
-    const bounds = L.latLngBounds(latLngs);
-    return bounds.isValid() ? bounds : null;
-  } catch {
-    return null;
-  }
-};
-
-const getFeatureCenter = (feature) => {
-  const bounds = getFeatureLatLngBounds(feature);
-  if (!bounds) return null;
-  const center = bounds.getCenter();
-  return { lat: center.lat, lon: center.lng };
-};
-
-const getFeatureIdentifier = (feature, fallbackIndex = 0) =>
-  feature?.id ??
-  feature?.properties?.id ??
-  feature?.properties?.osm_id ??
-  feature?.properties?.osm_way_id ??
-  feature?.properties?.way_id ??
-  feature?.properties?.objectid ??
-  feature?.properties?.osm_uid ??
-  feature?.properties?.["@id"] ??
-  `feature-${fallbackIndex}`;
-
-const distanceBetweenLatLon = (a, b) => {
-  if (!a || !b) return Infinity;
-  const latA = Number(a.lat ?? a[0]);
-  const lonA = Number(a.lon ?? a.lng ?? a[1]);
-  const latB = Number(b.lat ?? b[0]);
-  const lonB = Number(b.lon ?? b.lng ?? b[1]);
-  return Math.hypot(latA - latB, lonA - lonB);
-};
-
-const getSelectedBlockPropertyPoints = (selectedBlock, propertyPoints) => {
-  if (!selectedBlock) return [];
-
-  if (Array.isArray(selectedBlock?.properties)) {
-    const explicit = propertyPoints.filter((point) =>
-      selectedBlock.properties.some((property) => sameProperty(property, point.raw))
-    );
-    if (explicit.length) return explicit;
-  }
-
-  const blockLatLon = getBlockLatLon(selectedBlock);
-  if (!blockLatLon) return [];
-  return propertyPoints.filter((point) => distanceBetweenLatLon(point, blockLatLon) <= 0.0025);
-};
-
-const getSelectedBlockBounds = (selectedBlock, propertyPoints) => {
-  if (!selectedBlock) return null;
-
-  const explicitPoints = getSelectedBlockPropertyPoints(selectedBlock, propertyPoints);
-  if (explicitPoints.length) {
-    return L.latLngBounds(explicitPoints.map((p) => [p.lat, p.lon])).pad(0.12);
-  }
-
-  const blockLatLon = getBlockLatLon(selectedBlock);
-  if (blockLatLon) return L.latLngBounds([blockLatLon, blockLatLon]).pad(0.006);
-  return null;
-};
-
-const getMainClusterPoints = (points) => {
-  if (!points.length) return [];
-  if (points.length === 1) return points;
-
-  const candidates = points.map((point) => {
-    const neighbours = points.filter((other) => distanceBetweenLatLon(point, other) <= 0.08);
-    const unitWeight = neighbours.reduce((sum, item) => sum + Math.max(1, Number(item.units) || 1), 0);
-    return { neighbours, score: neighbours.length * 1000 + unitWeight };
-  });
-
-  const best = candidates.sort((a, b) => b.score - a.score)[0];
-  const core = best?.neighbours?.length ? best.neighbours : points;
-
-  const center = core.reduce(
-    (acc, point) => ({ lat: acc.lat + point.lat / core.length, lon: acc.lon + point.lon / core.length }),
-    { lat: 0, lon: 0 }
-  );
-
-  const expanded = points.filter((point) => distanceBetweenLatLon(point, center) <= 0.16);
-  return expanded.length >= core.length ? expanded : core;
-};
-
-const getFitBoundsForMode = ({ activeMode, blockPoints, propertyPoints, selectedBlock, selectedProperty }) => {
-  if (activeMode === "properties") {
-    if (selectedProperty) {
-      const latLon = getPropertyLatLon(selectedProperty);
-      return latLon ? [latLon] : propertyPoints.map((point) => [point.lat, point.lon]);
-    }
-
-    const selectedBlockBounds = getSelectedBlockBounds(selectedBlock, propertyPoints);
-    if (selectedBlockBounds?.isValid()) {
-      return [selectedBlockBounds.getSouthWest(), selectedBlockBounds.getNorthEast()].map((p) => [p.lat, p.lng]);
-    }
-
-    return propertyPoints.map((point) => [point.lat, point.lon]);
-  }
-
-  if (selectedBlock) {
-    const latLon = getBlockLatLon(selectedBlock);
-    return latLon ? [latLon] : [];
-  }
-
-  return getMainClusterPoints(blockPoints).map((point) => [point.lat, point.lon]);
-};
-
-const buildPropertyFeatureAssignments = ({ sourceFeatures, targetPropertyPoints, selectedBounds }) => {
-  if (!sourceFeatures?.length || !targetPropertyPoints.length || !selectedBounds) {
-    return { features: [], assignments: new Map(), unmatchedPoints: targetPropertyPoints };
-  }
-
-  const expandedBounds = selectedBounds.pad(0.7);
-  const nearbyFeatures = sourceFeatures.filter((feature) => {
-    const bounds = getFeatureLatLngBounds(feature);
-    return bounds ? expandedBounds.intersects(bounds) : false;
-  });
-
-  const usedFeatureIds = new Set();
-  const assignments = new Map();
-  const selectedFeatures = [];
-  const unmatchedPoints = [];
-
-  targetPropertyPoints.forEach((propertyPoint) => {
-    let bestFeature = null;
-    let bestIndex = -1;
-    let bestDistance = Infinity;
-
-    nearbyFeatures.forEach((feature, index) => {
-      const featureId = getFeatureIdentifier(feature, index);
-      if (usedFeatureIds.has(featureId)) return;
-
-      const center = getFeatureCenter(feature);
-      if (!center) return;
-
-      const distance = distanceBetweenLatLon(propertyPoint, center);
-      if (distance < bestDistance) {
-        bestDistance = distance;
-        bestFeature = feature;
-        bestIndex = index;
-      }
-    });
-
-    if (bestFeature && bestDistance <= 0.0045) {
-      const featureId = getFeatureIdentifier(bestFeature, bestIndex);
-      usedFeatureIds.add(featureId);
-      assignments.set(featureId, propertyPoint);
-      selectedFeatures.push(bestFeature);
-    } else {
-      unmatchedPoints.push(propertyPoint);
-    }
-  });
-
-  return { features: selectedFeatures, assignments, unmatchedPoints };
-};
+import {
+  DEFAULT_CENTER,
+  DEFAULT_ZOOM,
+  CLUSTER_ZOOM,
+  BLOCK_ZOOM,
+  FOCUSED_ZOOM,
+  BUILDINGS_URL,
+  PROPERTY_TYPE_COLORS,
+} from "../constants/map.js";
+import {
+  toNumberOrNull,
+  readinessColor,
+  readinessBandFromScore,
+  riskColor,
+  sameProperty,
+  sameBlock,
+  getPropertyLatLon,
+  getBlockLatLon,
+  getPropertyReadiness,
+  getPropertyBand,
+  getPropertyId,
+  getPropertyLabel,
+  getPropertyValue,
+  getBlockId,
+  getBlockName,
+  getBlockUnits,
+  getBlockValue,
+  getBlockStoreys,
+  inferPropertyCategory,
+  getPropertyCategoryLabel,
+  getPropertyDisplayColor,
+  getFeatureIdentifier,
+  getSelectedBlockPropertyPoints,
+  getSelectedBlockBounds,
+  getFitBoundsForMode,
+  buildPropertyFeatureAssignments,
+  buildBlockTooltipHtml,
+} from "../utils/mapHelpers.js";
+import {
+  createClusterIcon,
+  createBlockCountIcon,
+  createPropertyDotIcon,
+  getContextBlockVisibility,
+} from "./map/markerIcons.js";
+import {
+  getPropertyPopupHtml,
+  buildFlatListPopupHtml,
+  attachFlatListPopupHandlers,
+} from "./map/popups.js";
 
 export default function PortfolioMap({
   properties = [],
@@ -823,18 +258,7 @@ export default function PortfolioMap({
           }
         });
         marker.bindTooltip(
-          (() => {
-            const rep = point.raw?.representativeProperty;
-            const rawAddr = rep?.address || rep?.address_line_1 || "";
-            const addr = rawAddr.replace(/^(flat|apartment|unit|apt)[^,]*,\s*/i, "").trim() || point.name;
-            const postcode = rep?.postcode ? ` ${rep.postcode}` : "";
-            const count = getBlockPropertyCount(point.raw) || 0;
-            const h = Number.isFinite(point.storeys) && point.storeys > 0 ? point.storeys : null;
-            const heightStr = h ? `${h.toFixed(1)} m` : "—";
-            const risk = h > 18 ? "High-risk" : h > 11 ? "Mid-risk" : "Low-risk";
-            const riskColor = h > 18 ? "rgba(225,29,72,0.75)" : h > 11 ? "rgba(245,158,11,0.85)" : "rgba(100,116,139,0.75)";
-            return `<div style="min-width:160px;line-height:1.6"><div style="font-weight:700;margin-bottom:2px">${addr}${postcode}</div><div style="color:#64748b">${count} properties · ${fmtMoney(point.totalValue)}</div><div style="color:#64748b">${heightStr} · <span style="color:${riskColor};font-weight:600">${h ? risk : "—"}</span></div><div style="margin-top:6px;padding-top:5px;border-top:1px solid #e2e8f0;display:flex;flex-direction:column;gap:1px"><span style="font-size:11px;color:#94a3b8">1× click → block summary</span><span style="font-size:11px;color:#94a3b8">2× click → flat list</span></div></div>`;
-          })(),
+          buildBlockTooltipHtml(point),
           { direction: "top", sticky: true, opacity: 0.97 }
         );
         marker.bindPopup(buildFlatListPopupHtml(point), { maxWidth: 320 });
@@ -965,18 +389,7 @@ export default function PortfolioMap({
         });
 
         marker.bindTooltip(
-          (() => {
-            const rep = point.raw?.representativeProperty;
-            const rawAddr = rep?.address || rep?.address_line_1 || "";
-            const addr = rawAddr.replace(/^(flat|apartment|unit|apt)[^,]*,\s*/i, "").trim() || point.name;
-            const postcode = rep?.postcode ? ` ${rep.postcode}` : "";
-            const count = getBlockPropertyCount(point.raw) || 0;
-            const h = Number.isFinite(point.storeys) && point.storeys > 0 ? point.storeys : null;
-            const heightStr = h ? `${h.toFixed(1)} m` : "—";
-            const risk = h > 18 ? "High-risk" : h > 11 ? "Mid-risk" : "Low-risk";
-            const riskColor = h > 18 ? "rgba(225,29,72,0.75)" : h > 11 ? "rgba(245,158,11,0.85)" : "rgba(100,116,139,0.75)";
-            return `<div style="min-width:160px;line-height:1.6"><div style="font-weight:700;margin-bottom:2px">${addr}${postcode}</div><div style="color:#64748b">${count} properties · ${fmtMoney(point.totalValue)}</div><div style="color:#64748b">${heightStr} · <span style="color:${riskColor};font-weight:600">${h ? risk : "—"}</span></div><div style="margin-top:6px;padding-top:5px;border-top:1px solid #e2e8f0;display:flex;flex-direction:column;gap:1px"><span style="font-size:11px;color:#94a3b8">1× click → block summary</span><span style="font-size:11px;color:#94a3b8">2× click → flat list</span></div></div>`;
-          })(),
+          buildBlockTooltipHtml(point),
           { direction: "top", sticky: true, opacity: 0.97 }
         );
 
