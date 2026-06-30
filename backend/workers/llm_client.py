@@ -338,10 +338,15 @@ class LLMClient:
     def _create_bedrock_client(cls) -> "LLMClient":
         try:
             import boto3
+            from botocore.config import Config
         except ImportError:
             raise ImportError("pip install boto3")
         region = os.getenv("AWS_REGION", "eu-west-1")
-        client = boto3.client("bedrock-runtime", region_name=region)
+        client = boto3.client(
+            "bedrock-runtime",
+            region_name=region,
+            config=Config(read_timeout=120, connect_timeout=10),
+        )
         logger.info("LLMClient: Bedrock model=%s region=%s", BEDROCK_MODEL_ID, region)
         return cls(provider="bedrock", bedrock_client=client)
 

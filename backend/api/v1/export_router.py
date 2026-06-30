@@ -145,8 +145,9 @@ async def export_doc_a(
 
         # Quick check — does this portfolio have any properties?
         count = await conn.fetchval(
-            "SELECT COUNT(*) FROM silver.properties WHERE ha_id = $1",
+            "SELECT COUNT(*) FROM silver.properties WHERE ha_id = $1 AND portfolio_id = $2::uuid",
             portfolio["ha_id"],
+            portfolio_id,
         )
 
     if count == 0:
@@ -206,8 +207,9 @@ async def export_doc_b(
         portfolio = await _get_portfolio(conn, portfolio_id, ha_id)
 
         count = await conn.fetchval(
-            "SELECT COUNT(*) FROM silver.properties WHERE ha_id = $1",
+            "SELECT COUNT(*) FROM silver.properties WHERE ha_id = $1 AND portfolio_id = $2::uuid",
             portfolio["ha_id"],
+            portfolio_id,
         )
 
     if count == 0:

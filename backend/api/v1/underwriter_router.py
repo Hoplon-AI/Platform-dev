@@ -24,6 +24,7 @@ Design notes:
 
 from __future__ import annotations
 
+import json
 import os
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -72,7 +73,13 @@ async def get_tenant_info(
 # Helper — resolve portfolio_id → {portfolio_id, ha_id, ha_name, ...}
 # ---------------------------------------------------------------------------
 
-async def _resolve_portfolio(conn, portfolio_id: str) -> Dict[str, Any]:
+async def _resolve_portfolio(conn, portfolio_id: str, ha_id: str) -> Dict[str, Any]:
+    """Fetch portfolio metadata, enforcing tenant ownership.
+
+    Raises 404 if the portfolio does not exist OR does not belong to ha_id,
+    intentionally indistinguishable so callers cannot enumerate other tenants'
+    portfolio UUIDs.
+    """
     row = await conn.fetchrow(
         """
         SELECT
@@ -85,8 +92,10 @@ async def _resolve_portfolio(conn, portfolio_id: str) -> Dict[str, Any]:
         FROM silver.portfolios po
         JOIN public.housing_associations ha ON ha.ha_id = po.ha_id
         WHERE po.portfolio_id = $1
+          AND po.ha_id        = $2
         """,
         portfolio_id,
+        ha_id,
     )
     if not row:
         raise HTTPException(
@@ -185,7 +194,9 @@ async def underwriter_home(
                 AND acc.renewal_year = po.renewal_year
                 AND ($2::text IS NULL OR acc.underwriter_id::text = $2)
 
-            LEFT JOIN silver.blocks b ON b.ha_id = po.ha_id
+            LEFT JOIN silver.blocks b
+                ON  b.ha_id        = po.ha_id
+                AND b.portfolio_id = po.portfolio_id
 
             LEFT JOIN LATERAL (
                 SELECT rag_status
@@ -294,7 +305,9 @@ async def list_portfolios(
 
             FROM silver.portfolios po
             JOIN public.housing_associations ha ON ha.ha_id = po.ha_id
-            LEFT JOIN silver.blocks b ON b.ha_id = po.ha_id
+            LEFT JOIN silver.blocks b
+                ON  b.ha_id        = po.ha_id
+                AND b.portfolio_id = po.portfolio_id
 
             -- Latest FRA per block (LATERAL)
             LEFT JOIN LATERAL (
@@ -342,7 +355,7 @@ async def portfolio_summary(
     """
     pool = DatabasePool.get_pool()
     async with pool.acquire() as conn:
-        portfolio = await _resolve_portfolio(conn, portfolio_id)
+        portfolio = await _resolve_portfolio(conn, portfolio_id, tenant[0])
         ha_id = portfolio["ha_id"]
 
         row = await conn.fetchrow(
@@ -357,14 +370,14 @@ async def portfolio_summary(
                 COALESCE(SUM(b.unit_count), 0)::bigint              AS total_units,
                 COALESCE(SUM(b.total_sum_insured), 0)               AS total_insured_value,
 
-                -- Property count (direct from silver.properties by ha_id)
-                (SELECT COUNT(*) FROM silver.properties WHERE ha_id = $2)::bigint
+                -- Property count (direct from silver.properties by ha_id + portfolio_id)
+                (SELECT COUNT(*) FROM silver.properties WHERE ha_id = $2 AND portfolio_id = $1::uuid)::bigint
                                                                     AS total_properties,
 
                 -- Enrichment
-                (SELECT COUNT(*) FROM silver.properties WHERE ha_id = $2 AND enrichment_status = 'enriched')::bigint
+                (SELECT COUNT(*) FROM silver.properties WHERE ha_id = $2 AND portfolio_id = $1::uuid AND enrichment_status = 'enriched')::bigint
                                                                     AS enriched_properties,
-                (SELECT COUNT(*) FROM silver.properties WHERE ha_id = $2 AND enrichment_status = 'pending')::bigint
+                (SELECT COUNT(*) FROM silver.properties WHERE ha_id = $2 AND portfolio_id = $1::uuid AND enrichment_status = 'pending')::bigint
                                                                     AS pending_properties,
 
                 -- FRA RAG distribution
@@ -461,7 +474,8 @@ async def portfolio_summary(
                 LIMIT 1
             ) fraew ON TRUE
 
-            WHERE b.ha_id = $2
+            WHERE b.ha_id        = $2
+              AND b.portfolio_id = $1::uuid
             """,
             portfolio_id,
             ha_id,
@@ -495,7 +509,7 @@ async def portfolio_composition(
     """
     pool = DatabasePool.get_pool()
     async with pool.acquire() as conn:
-        portfolio = await _resolve_portfolio(conn, portfolio_id)
+        portfolio = await _resolve_portfolio(conn, portfolio_id, tenant[0])
         ha_id = portfolio["ha_id"]
 
         # ── 1. BY TENANCY / OWNERSHIP ────────────────────────────────────────
@@ -505,7 +519,7 @@ async def portfolio_composition(
             WITH totals AS (
                 SELECT SUM(sum_insured) AS grand_total
                 FROM silver.properties
-                WHERE ha_id = $1
+                WHERE ha_id = $1 AND portfolio_id = $2::uuid
             )
             SELECT
                 COALESCE(occupancy_type, 'Not recorded')    AS type,
@@ -516,11 +530,12 @@ async def portfolio_composition(
                     ELSE 0
                 END                                         AS pct
             FROM silver.properties, totals t
-            WHERE ha_id = $1
+            WHERE ha_id = $1 AND portfolio_id = $2::uuid
             GROUP BY occupancy_type, t.grand_total
             ORDER BY sum_insured DESC
             """,
             ha_id,
+            portfolio_id,
         )
 
         # ── 2. BY BLOCK REFERENCE ────────────────────────────────────────────
@@ -545,9 +560,10 @@ async def portfolio_composition(
                 COALESCE(SUM(sum_insured) FILTER (WHERE block_reference IS NOT NULL), 0)
                                                             AS block_tiv
             FROM silver.properties
-            WHERE ha_id = $1
+            WHERE ha_id = $1 AND portfolio_id = $2::uuid
             """,
             ha_id,
+            portfolio_id,
         )
 
         # Individual blocks — for the >£5M count and the detail list
@@ -560,11 +576,13 @@ async def portfolio_composition(
                 (SUM(sum_insured) > 5000000)                AS over_5m
             FROM silver.properties
             WHERE ha_id = $1
+              AND portfolio_id = $2::uuid
               AND block_reference IS NOT NULL
             GROUP BY block_reference
             ORDER BY tiv DESC
             """,
             ha_id,
+            portfolio_id,
         )
         blocks_over_5m = sum(1 for r in block_rows if r["over_5m"])
 
@@ -576,7 +594,7 @@ async def portfolio_composition(
             WITH totals AS (
                 SELECT SUM(sum_insured) AS grand_total
                 FROM silver.properties
-                WHERE ha_id = $1
+                WHERE ha_id = $1 AND portfolio_id = $2::uuid
             )
             SELECT
                 COALESCE(avid_property_type, 'Not recorded') AS type,
@@ -587,11 +605,12 @@ async def portfolio_composition(
                     ELSE 0
                 END                                          AS pct
             FROM silver.properties, totals t
-            WHERE ha_id = $1
+            WHERE ha_id = $1 AND portfolio_id = $2::uuid
             GROUP BY avid_property_type, t.grand_total
             ORDER BY sum_insured DESC
             """,
             ha_id,
+            portfolio_id,
         )
 
         # ── 4. BY AGE BANDING ────────────────────────────────────────────────
@@ -601,7 +620,7 @@ async def portfolio_composition(
             WITH totals AS (
                 SELECT SUM(sum_insured) AS grand_total
                 FROM silver.properties
-                WHERE ha_id = $1
+                WHERE ha_id = $1 AND portfolio_id = $2::uuid
             )
             SELECT
                 COALESCE(age_banding, 'Unknown')            AS age_band,
@@ -612,7 +631,7 @@ async def portfolio_composition(
                     ELSE 0
                 END                                         AS pct
             FROM silver.properties, totals t
-            WHERE ha_id = $1
+            WHERE ha_id = $1 AND portfolio_id = $2::uuid
             GROUP BY age_banding, t.grand_total
             ORDER BY
                 CASE age_banding
@@ -626,6 +645,7 @@ async def portfolio_composition(
                 END
             """,
             ha_id,
+            portfolio_id,
         )
 
         # ── 5. Portfolio Composition widget — responsible_party split ────────
@@ -639,11 +659,12 @@ async def portfolio_composition(
                 COUNT(*)::integer                               AS units,
                 COALESCE(SUM(sum_insured), 0)                   AS sum_insured
             FROM silver.properties
-            WHERE ha_id = $1
+            WHERE ha_id = $1 AND portfolio_id = $2::uuid
             GROUP BY avid_property_type, responsible_party
             ORDER BY avid_property_type, responsible_party
             """,
             ha_id,
+            portfolio_id,
         )
 
         # Build the nested structure the frontend needs for the progress-bar card
@@ -672,9 +693,10 @@ async def portfolio_composition(
                 COUNT(*)::integer       AS total_units,
                 SUM(sum_insured)        AS total_sum_insured
             FROM silver.properties
-            WHERE ha_id = $1
+            WHERE ha_id = $1 AND portfolio_id = $2::uuid
             """,
             ha_id,
+            portfolio_id,
         )
 
         total_units = totals["total_units"] or 1  # avoid div/0
@@ -750,7 +772,7 @@ async def portfolio_map(
     """
     pool = DatabasePool.get_pool()
     async with pool.acquire() as conn:
-        portfolio = await _resolve_portfolio(conn, portfolio_id)
+        portfolio = await _resolve_portfolio(conn, portfolio_id, tenant[0])
         ha_id = portfolio["ha_id"]
 
         rows = await conn.fetch(
@@ -770,7 +792,8 @@ async def portfolio_map(
                     MIN(p.address)       AS sample_address,
                     MIN(p.postcode)      AS sample_postcode
                 FROM silver.properties p
-                WHERE p.ha_id = $1
+                WHERE p.ha_id        = $1
+                  AND p.portfolio_id = $2::uuid
                   AND (
                       p.latitude IS NOT NULL
                       OR p.x_coordinate IS NOT NULL
@@ -879,7 +902,8 @@ async def portfolio_map(
                 LIMIT 1
             ) fraew ON TRUE
 
-            WHERE b.ha_id = $1
+            WHERE b.ha_id        = $1
+              AND b.portfolio_id = $2::uuid
               AND (
                   coords.lat_direct IS NOT NULL
                   OR coords.avg_easting IS NOT NULL
@@ -894,6 +918,7 @@ async def portfolio_map(
                 b.name
             """,
             ha_id,
+            portfolio_id,
         )
 
         markers = [dict(r) for r in rows]
@@ -942,7 +967,7 @@ async def fra_blocks(
     """
     pool = DatabasePool.get_pool()
     async with pool.acquire() as conn:
-        portfolio = await _resolve_portfolio(conn, portfolio_id)
+        portfolio = await _resolve_portfolio(conn, portfolio_id, tenant[0])
         ha_id = portfolio["ha_id"]
 
         # Build optional RAG filter
@@ -1011,7 +1036,8 @@ async def fra_blocks(
                 LIMIT 1
             ) fraew ON TRUE
 
-            WHERE b.ha_id = $1
+            WHERE b.ha_id        = $1
+              AND b.portfolio_id = $2::uuid
               {rag_clause}
             ORDER BY
                 CASE fra.rag_status
@@ -1024,6 +1050,7 @@ async def fra_blocks(
                 b.name
             """,
             ha_id,
+            portfolio_id,
         )
 
         result_rows = [dict(r) for r in rows]
@@ -1073,10 +1100,10 @@ async def fraew_blocks(
     """
     pool = DatabasePool.get_pool()
     async with pool.acquire() as conn:
-        portfolio = await _resolve_portfolio(conn, portfolio_id)
+        portfolio = await _resolve_portfolio(conn, portfolio_id, tenant[0])
         ha_id = portfolio["ha_id"]
 
-        filters = ["b.ha_id = $1"]
+        filters = ["b.ha_id = $1", "b.portfolio_id = $2::uuid"]
         if rag_filter == "unassessed":
             filters.append("fraew.rag_status IS NULL")
         elif rag_filter in ("RED", "AMBER", "GREEN"):
@@ -1191,6 +1218,7 @@ async def fraew_blocks(
                 b.name
             """,
             ha_id,
+            portfolio_id,
         )
 
         result_rows = [dict(r) for r in rows]
@@ -1237,7 +1265,7 @@ async def risk_summary(
     """
     pool = DatabasePool.get_pool()
     async with pool.acquire() as conn:
-        portfolio = await _resolve_portfolio(conn, portfolio_id)
+        portfolio = await _resolve_portfolio(conn, portfolio_id, tenant[0])
         ha_id = portfolio["ha_id"]
 
         # FRA compliance stats
@@ -1270,9 +1298,11 @@ async def risk_summary(
                 ORDER BY assessment_date DESC NULLS LAST, created_at DESC
                 LIMIT 1
             ) fra ON TRUE
-            WHERE b.ha_id = $1
+            WHERE b.ha_id        = $1
+              AND b.portfolio_id = $2::uuid
             """,
             ha_id,
+            portfolio_id,
         )
 
         # FRAEW compliance stats
@@ -1312,9 +1342,11 @@ async def risk_summary(
                 ORDER BY created_at DESC
                 LIMIT 1
             ) fraew ON TRUE
-            WHERE b.ha_id = $1
+            WHERE b.ha_id        = $1
+              AND b.portfolio_id = $2::uuid
             """,
             ha_id,
+            portfolio_id,
         )
 
         # Blocks needing urgent attention (RED FRA or RED FRAEW, with overdue actions)
@@ -1347,7 +1379,8 @@ async def risk_summary(
                 ORDER BY created_at DESC
                 LIMIT 1
             ) fraew ON TRUE
-            WHERE b.ha_id = $1
+            WHERE b.ha_id        = $1
+              AND b.portfolio_id = $2::uuid
               AND (
                   fra.rag_status = 'RED'
                   OR fraew.rag_status = 'RED'
@@ -1359,6 +1392,7 @@ async def risk_summary(
                 b.height_max_m DESC NULLS LAST
             """,
             ha_id,
+            portfolio_id,
         )
 
         fra = dict(fra_stats)
@@ -1419,7 +1453,7 @@ async def doc_completeness(
     """
     pool = DatabasePool.get_pool()
     async with pool.acquire() as conn:
-        portfolio = await _resolve_portfolio(conn, portfolio_id)
+        portfolio = await _resolve_portfolio(conn, portfolio_id, tenant[0])
         ha_id = portfolio["ha_id"]
 
         # ── Doc A: per-property SoV field fill rates ─────────────────────────
@@ -1498,9 +1532,11 @@ async def doc_completeness(
                 LIMIT 1
             ) fraew ON TRUE
 
-            WHERE b.ha_id = $1
+            WHERE b.ha_id        = $1
+              AND b.portfolio_id = $2::uuid
             """,
             ha_id,
+            portfolio_id,
         )
 
         doc_b_field_keys = [
@@ -1656,7 +1692,7 @@ async def red_blocks(
     """
     pool = DatabasePool.get_pool()
     async with pool.acquire() as conn:
-        portfolio = await _resolve_portfolio(conn, portfolio_id)
+        portfolio = await _resolve_portfolio(conn, portfolio_id, tenant[0])
         ha_id = portfolio["ha_id"]
 
         rows = await conn.fetch(
@@ -1708,7 +1744,8 @@ async def red_blocks(
                 LIMIT 1
             ) fraew ON TRUE
 
-            WHERE b.ha_id = $1
+            WHERE b.ha_id        = $1
+              AND b.portfolio_id = $2::uuid
               AND (fra.rag_status = 'RED' OR fraew.rag_status = 'RED')
 
             ORDER BY
@@ -1717,6 +1754,7 @@ async def red_blocks(
                 b.total_sum_insured DESC NULLS LAST
             """,
             ha_id,
+            portfolio_id,
         )
 
         blocks = []
@@ -1754,3 +1792,213 @@ async def red_blocks(
             "total_high_priority_actions": sum(b["high_priority_actions"] for b in blocks),
             "blocks": blocks,
         }
+
+
+# ===========================================================================
+# 8. Fire Documents — flat list of every FRA / FRAEW in the portfolio
+# ===========================================================================
+
+@router.get("/portfolios/{portfolio_id}/fire-documents")
+async def fire_documents(
+    portfolio_id: str,
+    tenant: Tuple[str, str] = Depends(get_tenant_info),
+) -> Dict[str, Any]:
+    """
+    Every FRA / FRAEW evidence document stored for the portfolio's HA.
+
+    Used by the ingestion dashboard to restore the document library after a
+    page refresh (the SoV is restored via /portfolios/properties; this does
+    the same for fire-safety PDFs).
+
+    Queries silver.fra_features / silver.fraew_features DIRECTLY by ha_id —
+    NOT through silver.blocks — so documents uploaded without a matched
+    block_reference (block_id IS NULL) still surface instead of being orphaned.
+
+    Filenames are resolved through silver.document_features → upload_audit for
+    FRA, and directly via fraew_features.upload_id → upload_audit for FRAEW.
+
+    Response shape matches the frontend's mergeFireDocumentsIntoPortfolio():
+      { portfolio_id, ha_id, count, items: [ { document_type, fra|fraew, ... } ] }
+    """
+    def _iso(v):
+        return v.isoformat() if v is not None and hasattr(v, "isoformat") else v
+
+    pool = DatabasePool.get_pool()
+    async with pool.acquire() as conn:
+        portfolio = await _resolve_portfolio(conn, portfolio_id, tenant[0])
+        ha_id = portfolio["ha_id"]
+
+        fra_rows = await conn.fetch(
+            """
+            SELECT
+                f.fra_id::text          AS feature_id,
+                df.upload_id::text      AS upload_id,
+                f.block_id::text        AS block_id,
+                b.name                  AS block_name,
+                df.property_id::text    AS property_id,
+                df.address              AS address,
+                df.postcode             AS postcode,
+                ua.filename             AS filename,
+                ua.metadata->>'block_reference' AS typed_block_reference,
+                f.risk_rating,
+                f.rag_status,
+                f.assessment_date,
+                f.assessment_valid_until,
+                f.is_in_date,
+                f.fra_assessment_type,
+                f.assessor_company,
+                f.assessor_name,
+                f.evacuation_strategy,
+                f.bsa_2022_applicable,
+                f.mandatory_occurrence_noted,
+                f.has_sprinkler_system,
+                f.has_smoke_detection,
+                f.has_fire_alarm_system,
+                f.has_fire_doors,
+                f.has_compartmentation,
+                f.has_emergency_lighting,
+                f.has_dry_riser,
+                f.has_wet_riser,
+                COALESCE(f.total_action_count, 0)            AS total_action_count,
+                COALESCE(f.overdue_action_count, 0)          AS overdue_action_count,
+                COALESCE(f.outstanding_action_count, 0)      AS outstanding_action_count,
+                COALESCE(f.high_priority_action_count, 0)    AS high_priority_action_count,
+                COALESCE(f.no_date_action_count, 0)          AS no_date_action_count,
+                f.action_items
+            FROM silver.fra_features f
+            LEFT JOIN silver.document_features df ON df.feature_id = f.feature_id
+            LEFT JOIN public.upload_audit ua       ON ua.upload_id = df.upload_id
+            LEFT JOIN silver.blocks b              ON b.block_id = f.block_id
+            WHERE f.ha_id = $1
+            ORDER BY f.assessment_date DESC NULLS LAST, f.created_at DESC
+            """,
+            ha_id,
+        )
+
+        fraew_rows = await conn.fetch(
+            """
+            SELECT
+                w.fraew_id::text        AS feature_id,
+                w.upload_id::text       AS upload_id,
+                w.block_id::text        AS block_id,
+                b.name                  AS block_name,
+                df.property_id::text    AS property_id,
+                df.address              AS address,
+                df.postcode             AS postcode,
+                ua.filename             AS filename,
+                ua.metadata->>'block_reference' AS typed_block_reference,
+                w.building_risk_rating,
+                w.rag_status,
+                w.assessment_date,
+                w.assessment_valid_until,
+                w.is_in_date,
+                w.assessor_company,
+                w.has_combustible_cladding,
+                w.eps_insulation_present,
+                w.has_remedial_actions,
+                w.interim_measures_required,
+                w.interim_measures_detail,
+                w.remedial_actions,
+                w.pas_9980_compliant
+            FROM silver.fraew_features w
+            LEFT JOIN silver.document_features df ON df.feature_id = w.feature_id
+            LEFT JOIN public.upload_audit ua       ON ua.upload_id = w.upload_id
+            LEFT JOIN silver.blocks b              ON b.block_id = w.block_id
+            WHERE w.ha_id = $1
+            ORDER BY w.assessment_date DESC NULLS LAST, w.created_at DESC
+            """,
+            ha_id,
+        )
+
+    items: List[Dict[str, Any]] = []
+
+    for r in fra_rows:
+        # Prefer the resolved block name (from a real block_id); fall back to the
+        # reference the user typed at upload time (persisted in upload_audit metadata).
+        block_ref = r["block_name"] or r["typed_block_reference"] or ""
+        items.append({
+            "document_type":      "fra",
+            "upload_id":          r["upload_id"] or "",
+            "feature_id":         r["feature_id"] or "",
+            "block_id":           r["block_id"] or "",
+            "block_name":         block_ref,
+            "block_reference":    block_ref,
+            "property_id":        r["property_id"] or "",
+            "property_reference": "",
+            "address":            r["address"] or "",
+            "postcode":           r["postcode"] or "",
+            "filename":           r["filename"] or "Uploaded PDF",
+            "fra": {
+                "risk_rating":                  r["risk_rating"],
+                "rag_status":                   r["rag_status"],
+                "risk_level":                   r["rag_status"],
+                "raw_rating":                   r["risk_rating"],
+                "assessment_date":              _iso(r["assessment_date"]),
+                "assessment_valid_until":       _iso(r["assessment_valid_until"]),
+                "is_in_date":                   r["is_in_date"],
+                "fra_assessment_type":          r["fra_assessment_type"],
+                "assessor_company":             r["assessor_company"],
+                "assessor_name":                r["assessor_name"],
+                "evacuation_strategy":          r["evacuation_strategy"],
+                "bsa_2022_applicable":          r["bsa_2022_applicable"],
+                "mandatory_occurrence_noted":   r["mandatory_occurrence_noted"],
+                "has_sprinkler_system":         r["has_sprinkler_system"],
+                "has_smoke_detection":          r["has_smoke_detection"],
+                "has_fire_alarm_system":        r["has_fire_alarm_system"],
+                "has_fire_doors":               r["has_fire_doors"],
+                "has_compartmentation":         r["has_compartmentation"],
+                "has_emergency_lighting":       r["has_emergency_lighting"],
+                "has_dry_riser":                r["has_dry_riser"],
+                "has_wet_riser":                r["has_wet_riser"],
+                "total_action_count":           r["total_action_count"],
+                "overdue_action_count":         r["overdue_action_count"],
+                "outstanding_action_count":     r["outstanding_action_count"],
+                "high_priority_action_count":   r["high_priority_action_count"],
+                "no_date_action_count":         r["no_date_action_count"],
+                "action_items":                 (json.loads(r["action_items"]) if isinstance(r["action_items"], str) else r["action_items"]) if r["action_items"] else [],
+            },
+            "fraew": None,
+        })
+
+    for r in fraew_rows:
+        block_ref = r["block_name"] or r["typed_block_reference"] or ""
+        items.append({
+            "document_type":      "fraew",
+            "upload_id":          r["upload_id"] or "",
+            "feature_id":         r["feature_id"] or "",
+            "block_id":           r["block_id"] or "",
+            "block_name":         block_ref,
+            "block_reference":    block_ref,
+            "property_id":        r["property_id"] or "",
+            "property_reference": "",
+            "address":            r["address"] or "",
+            "postcode":           r["postcode"] or "",
+            "filename":           r["filename"] or "Uploaded PDF",
+            "fra": None,
+            "fraew": {
+                "building_risk_rating":      r["building_risk_rating"],
+                "rag_status":                r["rag_status"],
+                "risk_level":                r["rag_status"],
+                "raw_rating":                r["building_risk_rating"],
+                "assessment_date":           _iso(r["assessment_date"]),
+                "assessment_valid_until":    _iso(r["assessment_valid_until"]),
+                "is_in_date":                r["is_in_date"],
+                "assessor_company":          r["assessor_company"],
+                "has_combustible_cladding":  r["has_combustible_cladding"],
+                "eps_insulation_present":    r["eps_insulation_present"],
+                "has_remedial_actions":      r["has_remedial_actions"],
+                "remediation_required":      r["has_remedial_actions"],
+                "interim_measures_required": r["interim_measures_required"],
+                "interim_measures_detail":   r["interim_measures_detail"],
+                "pas_9980_compliant":        r["pas_9980_compliant"],
+                "remedial_actions":          (json.loads(r["remedial_actions"]) if isinstance(r["remedial_actions"], str) else r["remedial_actions"]) if r["remedial_actions"] else [],
+            },
+        })
+
+    return {
+        "portfolio_id":   portfolio_id,
+        "ha_id":          ha_id,
+        "portfolio_name": portfolio["portfolio_name"],
+        "count":          len(items),
+        "items":          items,
+    }

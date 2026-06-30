@@ -9,6 +9,16 @@ resolve coordinates once and share them across downstream lookups, cutting
 OS Places API calls from ~4N to ~N for N properties.
 """
 
+# Allow running this file directly (e.g. `py address_to_final.py`) in addition
+# to `py -m backend.geo.uprn_maps.address_to_final`. When run as a loose script
+# `__package__` is empty and the project root is not on sys.path, so the
+# absolute `backend.` imports below fail. Put the project root on the path.
+if not __package__:
+    import os, sys
+    _ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
+    if _ROOT not in sys.path:
+        sys.path.insert(0, _ROOT)
+
 from backend.geo.uprn_maps.os_datahub_functions import (
     get_uprn_from_address,
     get_coordinates_from_uprn,
@@ -18,6 +28,8 @@ from backend.geo.uprn_maps.os_datahub_functions import (
 from backend.geo.uprn_maps.uprn_to_epc import get_epc_from_uprn, get_epcs_from_uprns
 from backend.geo.uprn_maps.uprn_to_height import get_building_from_coords, get_buildings_from_coords_batch
 from backend.geo.uprn_maps.uprn_to_listed import get_listed_building_status, get_listed_building_statuses
+from backend.geo.uprn_maps.cross_reference import cross_reference, cross_reference_batch
+from backend.geo.uprn_maps.flood_risk import get_flood_risk_from_coords, get_flood_risks_from_coords_batch
 
 
 def get_final_info_from_address(address: str, email: str, places_key: str, ngd_key: str, epc_key: str) -> dict | str:
@@ -68,7 +80,22 @@ def get_final_info_from_address(address: str, email: str, places_key: str, ngd_k
     # Step 4: Listed building lookup
     listed_data = get_listed_building_status(uprn, places_key)
 
-    # Step 5: Merge — EPC preferred for construction fields
+    # Step 5: Cross-reference scoring — reuses the already-fetched place record,
+    # so no extra OS Places call (parent UPRN lookup only fires in AMBER cases).
+    cr = cross_reference(
+        address, place.get("ADDRESS", ""), float(place.get("MATCH") or 0), place, places_key,
+    )
+
+    # Step 6: Flood risk lookup (reuses coordinates already fetched in Step 1)
+    flood: dict = {}
+    country_code = place.get("COUNTRY_CODE")
+    postcode = place.get("POSTCODE")
+    if x is not None and y is not None and country_code:
+        flood_result = get_flood_risk_from_coords(float(x), float(y), country_code, postcode=postcode)
+        if isinstance(flood_result, dict):
+            flood = flood_result
+
+    # Step 7: Merge — EPC preferred for construction fields
     result = {
         # Identity
         "uprn": str(uprn),
@@ -77,8 +104,13 @@ def get_final_info_from_address(address: str, email: str, places_key: str, ngd_k
         "x_coordinate": x,
         "y_coordinate": y,
         "country_code": place.get("COUNTRY_CODE"),
-        "match_score": place.get("MATCH"),
-        "match_description": place.get("MATCH_DESCRIPTION"),
+        "match_score_OS": place.get("MATCH"),
+        "match_description_OS": place.get("MATCH_DESCRIPTION"),
+
+        # Cross-reference match quality
+        "match_level_via_metric": cr["level"],
+        "match_score_metric": cr["confidence"],
+        "match_reasons": cr["reasons"],
 
         # Height data (NGD only)
         "height_relativemax_m": ngd.get("height_relativemax_m"),
@@ -117,6 +149,11 @@ def get_final_info_from_address(address: str, email: str, places_key: str, ngd_k
         "listed_name": listed_data.get("name"),
         "listed_reference": listed_data.get("reference"),
 
+        # Flood risk
+        "flood_risk_band": flood.get("flood_risk_band"),
+        "flood_risk_source": flood.get("flood_risk_source"),
+        "flood_risk_note": flood.get("flood_risk_note"),
+
         # NGD identifiers
         "osid": ngd.get("osid"),
     }
@@ -148,6 +185,15 @@ def get_final_info_from_uprn(uprn: str | int, email: str, places_key: str, ngd_k
     # Listed
     listed_data = get_listed_building_status(uprn, places_key)
 
+    # Flood risk
+    flood: dict = {}
+    country_code = place.get("COUNTRY_CODE")
+    postcode = place.get("POSTCODE")
+    if x is not None and y is not None and country_code:
+        flood_result = get_flood_risk_from_coords(float(x), float(y), country_code, postcode=postcode)
+        if isinstance(flood_result, dict):
+            flood = flood_result
+
     result = {
         "uprn": str(uprn),
         "address": place.get("ADDRESS"),
@@ -155,8 +201,8 @@ def get_final_info_from_uprn(uprn: str | int, email: str, places_key: str, ngd_k
         "x_coordinate": x,
         "y_coordinate": y,
         "country_code": place.get("COUNTRY_CODE"),
-        "match_score": place.get("MATCH"),
-        "match_description": place.get("MATCH_DESCRIPTION"),
+        "match_score_OS": place.get("MATCH"),
+        "match_description_OS": place.get("MATCH_DESCRIPTION"),
 
         "height_relative_max_m": ngd.get("height_relativemax_m"),
         "height_relative_roofbase_m": ngd.get("height_relativeroofbase_m"),
@@ -191,6 +237,10 @@ def get_final_info_from_uprn(uprn: str | int, email: str, places_key: str, ngd_k
         "listed_name": listed_data.get("name"),
         "listed_reference": listed_data.get("reference"),
 
+        "flood_risk_band": flood.get("flood_risk_band"),
+        "flood_risk_source": flood.get("flood_risk_source"),
+        "flood_risk_note": flood.get("flood_risk_note"),
+
         "osid": ngd.get("osid"),
     }
 
@@ -203,6 +253,8 @@ def get_final_info_from_uprn(uprn: str | int, email: str, places_key: str, ngd_k
 def _merge_property_result(
     uprn: str, place: dict, epc_data, ngd_building, listed_data: dict,
     include_match_score: bool = False,
+    cross_ref: dict | None = None,
+    flood_data: dict | None = None,
 ) -> dict:
     """Merge data from all sources into a single property dict.
 
@@ -216,6 +268,9 @@ def _merge_property_result(
     if isinstance(ngd_building, dict):
         ngd = ngd_building.get("properties", {})
 
+    # Flood lookup may return an error string for some UPRNs — guard like EPC/NGD.
+    flood = flood_data if isinstance(flood_data, dict) else {}
+
     result = {
         # Identity
         "uprn": str(uprn),
@@ -228,8 +283,13 @@ def _merge_property_result(
         "classification_code": place.get("CLASSIFICATION_CODE"),
         "classification_description": place.get("CLASSIFICATION_CODE_DESCRIPTION"),
         "logical_status": place.get("LOGICAL_STATUS_CODE"),
-        "match_score": place.get("MATCH"),
-        "match_description": place.get("MATCH_DESCRIPTION"),
+        "match_score_OS": place.get("MATCH"),
+        "match_description_OS": place.get("MATCH_DESCRIPTION"),
+
+        # Cross-reference match quality (address-based lookups only; None for UPRN-based)
+        "match_level_via_metric": cross_ref["level"] if cross_ref else None,
+        "match_score_metric": cross_ref["confidence"] if cross_ref else None,
+        "match_reasons": cross_ref["reasons"] if cross_ref else None,
 
         # Height data (NGD only)
         "height_relativemax_m": ngd.get("height_relativemax_m"),
@@ -268,13 +328,18 @@ def _merge_property_result(
         "listed_name": listed_data.get("name"),
         "listed_reference": listed_data.get("reference"),
 
+        # Flood risk
+        "flood_risk_band": flood.get("flood_risk_band"),
+        "flood_risk_source": flood.get("flood_risk_source"),
+        "flood_risk_note": flood.get("flood_risk_note"),
+
         # NGD identifiers
         "osid": ngd.get("osid"),
     }
 
     if include_match_score:
-        result["match_score"] = place.get("MATCH")
-        result["match_description"] = place.get("MATCH_DESCRIPTION")
+        result["match_score_OS"] = place.get("MATCH")
+        result["match_description_OS"] = place.get("MATCH_DESCRIPTION")
 
     return result
 
@@ -310,8 +375,11 @@ def get_final_info_from_addresses(
     valid_places = {}  # uprn -> place record
     ngd_coords = []    # (uprn, x, y) for NGD batch
     listed_inputs = [] # (uprn, place) for listed batch
+    flood_coords = []  # (uprn, x, y, country_code, postcode) for flood batch
+    cr_entries = []    # (input_address, matched_address, os_match, matched_record) for cross-reference batch
+    cr_uprn_keys = []  # uprn_str for each cr_entry, to map results back
 
-    for place in places:
+    for addr, place in zip(addresses, places):
         if isinstance(place, str):
             continue
         uprn = place.get("UPRN")
@@ -326,6 +394,12 @@ def get_final_info_from_addresses(
         if x is not None and y is not None:
             ngd_coords.append((uprn_str, float(x), float(y)))
             listed_inputs.append((uprn_str, place))
+            country_code = place.get("COUNTRY_CODE")
+            if country_code:
+                flood_coords.append((uprn_str, float(x), float(y), country_code, place.get("POSTCODE")))
+
+        cr_entries.append((addr, place.get("ADDRESS", ""), float(place.get("MATCH") or 0), place))
+        cr_uprn_keys.append(uprn_str)
 
     # Step 2: Batch EPC lookup
     epc_results = get_epcs_from_uprns(valid_uprns, email, epc_key) if valid_uprns else {}
@@ -336,9 +410,17 @@ def get_final_info_from_addresses(
     # Step 4: Batch listed building lookup (using pre-resolved place records)
     listed_results = get_listed_building_statuses(listed_inputs, places_key) if listed_inputs else {}
 
-    # Step 5: Merge results per address
+    # Step 5: Cross-reference scoring — reuses already-fetched place records,
+    # so no extra OS Places calls (parent UPRN lookup only fires in AMBER cases).
+    cr_list = cross_reference_batch(cr_entries, places_key) if cr_entries else []
+    cr_results = dict(zip(cr_uprn_keys, cr_list))
+
+    # Step 6: Batch flood risk lookup (reuses coordinates already resolved in Step 1)
+    flood_results = get_flood_risks_from_coords_batch(flood_coords) if flood_coords else {}
+
+    # Step 7: Merge results per address
     output: list[dict | str] = []
-    for place in places:
+    for addr, place in zip(addresses, places):
         if isinstance(place, str):
             output.append(place)
             continue
@@ -356,6 +438,8 @@ def get_final_info_from_addresses(
         output.append(_merge_property_result(
             uprn_str, place, epc_data, ngd_building, listed_data,
             include_match_score=True,
+            cross_ref=cr_results.get(uprn_str),
+            flood_data=flood_results.get(uprn_str),
         ))
 
     return output
@@ -390,6 +474,7 @@ def get_final_info_from_uprns(
     valid_uprns = []
     ngd_coords = []
     listed_inputs = []
+    flood_coords = []
 
     for uprn in uprns:
         uprn_str = str(uprn)
@@ -403,13 +488,17 @@ def get_final_info_from_uprns(
         if x is not None and y is not None:
             ngd_coords.append((uprn_str, float(x), float(y)))
             listed_inputs.append((uprn_str, place))
+            country_code = place.get("COUNTRY_CODE")
+            if country_code:
+                flood_coords.append((uprn_str, float(x), float(y), country_code, place.get("POSTCODE")))
 
-    # Step 2-4: Batch downstream lookups
+    # Step 2-5: Batch downstream lookups
     epc_results = get_epcs_from_uprns(valid_uprns, email, epc_key) if valid_uprns else {}
     ngd_results = get_buildings_from_coords_batch(ngd_coords, ngd_key) if ngd_coords else {}
     listed_results = get_listed_building_statuses(listed_inputs, places_key) if listed_inputs else {}
+    flood_results = get_flood_risks_from_coords_batch(flood_coords) if flood_coords else {}
 
-    # Step 5: Merge results per UPRN
+    # Step 6: Merge results per UPRN
     output: list[dict | str] = []
     for uprn in uprns:
         uprn_str = str(uprn)
@@ -425,6 +514,7 @@ def get_final_info_from_uprns(
 
         output.append(_merge_property_result(
             uprn_str, place, epc_data, ngd_building, listed_data,
+            flood_data=flood_results.get(uprn_str),
         ))
 
     return output
@@ -432,18 +522,37 @@ def get_final_info_from_uprns(
 
 # ── Quick test ──────────────────────────────────────────────
 if __name__ == "__main__":
-    from block_detection import detect_block_properties
+    from backend.geo.uprn_maps.block_detection import detect_block_properties
 
-    PLACES_KEY = "1cNGEE0jL0R5pXlDpPd55wyEXnIBCF2J"
-    NGD_KEY = "1cNGEE0jL0R5pXlDpPd55wyEXnIBCF2J"
+    PLACES_KEY = "Y37a6atCtenY2mutDAtFzZenu5x45nVw"
+    NGD_KEY = "Y37a6atCtenY2mutDAtFzZenu5x45nVw"
     EPC_EMAIL = "igorshuvalov23@gmail.com"
     EPC_KEY = "9213b51f9af85ba4700865191700778f0cc7f3fc"
 
     test_addresses = ["Flat 1/1, 351 Holmlea Road, Cathcart, Glasgow, G44 4BP",
-                      "Flat 1/2, 351 Holmlea Road, Cathcart, Glasgow, G44 4BP",
-                      "Flat 1/3, 351 Holmlea Road, Cathcart, Glasgow, G44 4BP",
-                      "Flat 1/2, 60 Grange Road, Battlefield, Glasgow, G42 9LF",
                       "Flat 2/1, 60 Grange Road, Battlefield, Glasgow, G42 9LF"]
+
+    test_addresses = [
+        "Flat 1/1, 351 Holmlea Road, Cathcart, Glasgow, G44 4BP",  # Scotland,
+        # "61, WHITESANDS, DUMFRIES, DG1 2RS",
+        "76A, TAY STREET, PERTH, PH2 8NP P",
+        # "12, NORTH BRIDGE STREET, HAWICK, TD9 9QW",
+        # "40, SHORE ROAD, COVE, HELENSBURGH, G84 0LR",
+        # "47 Greens Road, Eynsham, Witney, OX29 4NQ",  # England
+        # "9 Flexneys Paddock, Stanton Harcourt, Witney, OX29 5RS",
+        # "32 Sycamore Drive, Carterton, OX18 3AT",
+        # "21 Heyford Close, Standlake, Witney, OX29 7SZ",
+        # "1 Mill Street, Tewkesbury, GL20 5RZ",
+        # "13, KINGS STAITH, YORK, YO1 9SN",
+        "11, FRANKWELL, SHREWSBURY, SY3 8JY",
+        "3, BRIDGE GATE, HEBDEN BRIDGE, HX7 8EX",
+        "1, OLD CARDIFF ROAD, NEWPORT, NP20 3AT",  # Wales
+        # "10, DOWNING STREET, LLANELLI, SA15 2UA",
+        # "4 Albert Street, Riverside, Cardiff, CF11 6BG",
+        # "110 Albert Street, Riverside, Cardiff, CF11 6JP",
+        # "4 Alexandra Court, Ethel Street, Canton, Cardiff, CF5 1EN",
+        # "107 Bartley Wilson Way, Canton, Cardiff, CF11 8EN"
+    ]
 
     # Batch lookup — resolves addresses once, correct match scores preserved
     results = get_final_info_from_addresses(test_addresses, EPC_EMAIL, PLACES_KEY, NGD_KEY, EPC_KEY)

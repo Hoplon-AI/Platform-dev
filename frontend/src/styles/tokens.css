@@ -1,0 +1,67 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Playfair+Display:ital,wght@0,500;0,600;0,700;1,600&display=swap');
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
+   EquiRisk design system — warm editorial palette (navy + terracotta),
+   ported from the marketing/holding page. Existing app token NAMES are kept
+   and simply remapped onto the warm system so every var(--x) consumer updates
+   via the cascade.
+   ───────────────────────────────────────────────────────────────────────── */
+:root {
+  /* Brand palette */
+  --navy: #1E3246;
+  --navy-deep: #16273A;
+  --navy-card: #1A2C40;
+  --terracotta: #B8564B;
+  --terracotta-2: #9A463D;
+  --terracotta-3: #C76A5F;
+  --warm-bg: #F9F7F3;
+  --warm-bg-2: #F3EFE8;
+  --blush: #F7E4D5;
+  --slate-warm: #6B6560;
+  --slate-light: #8A847D;
+  --border-line: #DED7CC;
+
+  --font-serif: 'Playfair Display', Georgia, 'Times New Roman', serif;
+  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --ease: cubic-bezier(0.22, 1, 0.36, 1);
+
+  /* App tokens remapped onto the warm system */
+  --bg: #F9F7F3;
+  --panel: #ffffff;
+  --panel-soft: #F3EFE8;
+  --muted: #6B6560;
+  --text: #1E3246;
+  --text-light: #5E5852;
+
+  --primary: #B8564B;
+  --primary-soft: #F7E4D5;
+
+  --accent: #4F8A6B;
+  --accent-soft: #E4EFE8;
+
+  --warning: #C8923E;
+  --warning-soft: #F7ECD6;
+
+  --danger: #B8564B;
+  --danger-soft: #F7E0DB;
+
+  --border: #EAE5DE;
+  --border-soft: #F1ECE4;
+  --shadow: 0 18px 48px -24px rgba(30, 50, 70, 0.18);
+  --shadow-soft: 0 2px 4px rgba(30, 50, 70, 0.03), 0 12px 30px -18px rgba(30, 50, 70, 0.10);
+  --shadow-hover: 0 28px 60px -28px rgba(30, 50, 70, 0.28);
+
+  --radius-sm: 10px;
+  --radius: 16px;
+  --radius-lg: 20px;
+
+  --map-ocean: #E4EAF0;
+  --map-land: #F9F7F3;
+  --map-road: #ffffff;
+  --map-park: #E8EFE7;
+  --map-building: #EAE5DE;
+}

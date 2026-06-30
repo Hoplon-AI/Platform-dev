@@ -302,3 +302,9 @@ check_gemini_models.py
 *.geojson
 frontend/public/*.geojson
 frontend/*.gpkg
+
+# Claude Design sync (regenerated build output + machine state)
+.ds-sync/
+ds-bundle/
+.design-sync/.cache/
+.design-sync/learnings/

@@ -194,14 +194,24 @@ async def _fetch_blocks(db_pool, ha_id: str, portfolio_id: Optional[str]) -> lis
             COALESCE(SUM(p.units), COUNT(*))                AS units,
             MAX(p.storeys)                                  AS storeys,
             MAX(p.height_max_m)                             AS height_max_m,
-            MAX(p.year_of_build)                            AS build_year,
-            MAX(p.wall_construction)                        AS wall_construction,
-            MAX(p.floor_construction)                       AS floor_construction,
-            MAX(p.roof_construction)                        AS roof_construction,
+            -- M: year_of_build is VARCHAR — cast to integer for numeric MIN so
+            --    "1920" < "2010" rather than alphabetical "2010" < "920".
+            --    MIN gives the earliest construction year (oldest part of block).
+            MIN(
+                CASE WHEN p.year_of_build ~ '^\d{4}$'
+                     THEN p.year_of_build::integer
+                END
+            )                                               AS build_year,
+            -- L: MODE() returns the most-common value rather than MAX() which
+            --    returns alphabetical last (e.g. "Timber Frame" > "Brick").
+            MODE() WITHIN GROUP (ORDER BY p.wall_construction)  AS wall_construction,
+            MODE() WITHIN GROUP (ORDER BY p.floor_construction) AS floor_construction,
+            MODE() WITHIN GROUP (ORDER BY p.roof_construction)  AS roof_construction,
             BOOL_OR(p.basement)                             AS basement,
             BOOL_OR(p.is_listed)                            AS is_listed
         FROM silver.properties p
         WHERE p.ha_id = $1
+          AND ($2::uuid IS NULL OR p.portfolio_id = $2::uuid)
         GROUP BY COALESCE(p.block_reference, p.address)
     ),
     -- Most common value per block, with alphabetical tiebreak (ASC) so ties
@@ -219,7 +229,9 @@ async def _fetch_blocks(db_pool, ha_id: str, portfolio_id: Optional[str]) -> lis
                     PARTITION BY COALESCE(p.block_reference, p.address),
                                  p.occupancy_type
                 ) AS cnt
-            FROM silver.properties p WHERE p.ha_id = $1
+            FROM silver.properties p
+            WHERE p.ha_id = $1
+              AND ($2::uuid IS NULL OR p.portfolio_id = $2::uuid)
         ) sub
         ORDER BY blk, cnt DESC, property_id ASC
     ),
@@ -234,7 +246,9 @@ async def _fetch_blocks(db_pool, ha_id: str, portfolio_id: Optional[str]) -> lis
                     PARTITION BY COALESCE(p.block_reference, p.address),
                                  p.postcode
                 ) AS cnt
-            FROM silver.properties p WHERE p.ha_id = $1
+            FROM silver.properties p
+            WHERE p.ha_id = $1
+              AND ($2::uuid IS NULL OR p.portfolio_id = $2::uuid)
         ) sub
         ORDER BY blk, cnt DESC, postcode ASC
     ),
@@ -249,7 +263,9 @@ async def _fetch_blocks(db_pool, ha_id: str, portfolio_id: Optional[str]) -> lis
                     PARTITION BY COALESCE(p.block_reference, p.address),
                                  p.property_type
                 ) AS cnt
-            FROM silver.properties p WHERE p.ha_id = $1
+            FROM silver.properties p
+            WHERE p.ha_id = $1
+              AND ($2::uuid IS NULL OR p.portfolio_id = $2::uuid)
         ) sub
         ORDER BY blk, cnt DESC, property_type ASC
     ),
@@ -262,6 +278,7 @@ async def _fetch_blocks(db_pool, ha_id: str, portfolio_id: Optional[str]) -> lis
             p.address_3 AS address_3
         FROM silver.properties p
         WHERE p.ha_id = $1
+          AND ($2::uuid IS NULL OR p.portfolio_id = $2::uuid)
         ORDER BY COALESCE(p.block_reference, p.address), p.property_id
     )
     SELECT
@@ -339,7 +356,7 @@ async def _fetch_blocks(db_pool, ha_id: str, portfolio_id: Optional[str]) -> lis
     ORDER BY a.block_reference
     """
     async with db_pool.acquire() as conn:
-        return await conn.fetch(sql, ha_id)
+        return await conn.fetch(sql, ha_id, portfolio_id)
 
 
 # ---------------------------------------------------------------------------

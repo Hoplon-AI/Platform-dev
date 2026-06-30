@@ -13,7 +13,7 @@ import requests
 import base64
 import csv
 import io
-from address_confidence import compare_addresses
+from backend.geo.uprn_maps.address_confidence import compare_addresses
 from backend.geo.uprn_maps.os_datahub_functions import get_coordinates_from_uprn
 
 
@@ -52,7 +52,7 @@ def get_epc_from_uprn(uprn, email, api_key):
     params = {"uprn": str(uprn), "size": 100}
 
     try:
-        response = requests.get(url, headers=headers, params=params)
+        response = requests.get(url, headers=headers, params=params, timeout=15)
         response.raise_for_status()
 
         reader = csv.DictReader(io.StringIO(response.text))

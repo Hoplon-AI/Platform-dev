@@ -228,14 +228,16 @@ async def get_properties(
         rows = await conn.fetch(
             """
             SELECT
-                property_id, property_reference, submission_id, block_reference,
+                property_id, portfolio_id, property_reference, submission_id, block_reference,
                 address, address_2, address_3, postcode, occupancy_type, sum_insured,
-                property_type, year_of_build, storeys, units, uprn, parent_uprn,
+                property_type, wall_construction, roof_construction,
+                year_of_build, storeys, units, uprn, parent_uprn,
                 x_coordinate, y_coordinate, country_code, uprn_match_score,
-                uprn_match_description, built_form, total_floor_area_m2, main_fuel,
+                uprn_match_description, uprn_confidence, built_form, total_floor_area_m2, main_fuel,
                 epc_rating, epc_potential_rating, epc_lodgement_date, height_max_m,
                 height_roofbase_m, height_confidence, building_footprint_m2,
                 is_listed, listed_grade, listed_name, listed_reference,
+                flood_risk_band, flood_risk_source,
                 enrichment_status, enrichment_source, enriched_at, metadata
             FROM silver.properties
             WHERE ha_id = $1

@@ -65,10 +65,14 @@ DOC_A_COLUMNS = [
     ("Storm insured",                           "storm_insured"),
     # ── Enrichment columns (from API data) ──
     ("UPRN",                                    "uprn"),
+    ("UPRN Confidence",                         "uprn_confidence"),
+    ("UPRN Confidence Reason",                  "uprn_confidence_reason"),
     ("Height (metres)",                         "height_max_m"),
     ("Building Footprint (m²)",                 "building_footprint_m2"),
     ("EPC Rating",                              "epc_rating"),
     ("Listed Grade",                            "listed_grade"),
+    ("Flood Risk Band",                         "flood_risk_band"),
+    ("Flood Risk Source",                       "flood_risk_source"),
     ("Enrichment Status",                       "enrichment_status"),
     ("Enrichment Source",                       "enrichment_source"),
 ]
@@ -178,18 +182,23 @@ async def _fetch_properties(db_pool, ha_id: str, portfolio_id: Optional[str]) ->
         p.flood_insured,
         p.storm_insured,
         p.uprn,
+        p.uprn_confidence,
+        p.uprn_confidence_reason,
         p.height_max_m,
         p.building_footprint_m2,
         p.epc_rating,
         p.listed_grade,
+        p.flood_risk_band,
+        p.flood_risk_source,
         p.enrichment_status,
         p.enrichment_source
     FROM silver.properties p
     WHERE p.ha_id = $1
+      AND ($2::uuid IS NULL OR p.portfolio_id = $2::uuid)
     ORDER BY p.block_reference NULLS LAST, p.address
     """
     async with db_pool.acquire() as conn:
-        return await conn.fetch(sql, ha_id)
+        return await conn.fetch(sql, ha_id, portfolio_id)
 
 
 # ---------------------------------------------------------------------------
@@ -209,11 +218,14 @@ def _write_header_row(ws, ha_name: str):
 
 def _write_data_rows(ws, rows, ha_name: str):
     from openpyxl.styles import PatternFill
-    AUTO_FILL = PatternFill(start_color="FFF2CC", end_color="FFF2CC", fill_type="solid")  # amber
+    AUTO_FILL    = PatternFill(start_color="FFF2CC", end_color="FFF2CC", fill_type="solid")  # amber
+    RED_CONF_FILL  = PatternFill(start_color="FFD7D7", end_color="FFD7D7", fill_type="solid")  # light red
+    LOW_CONF_FILL  = PatternFill(start_color="FFE8CC", end_color="FFE8CC", fill_type="solid")  # light orange
 
     for row_idx, db_row in enumerate(rows, start=2):
         is_auto = str(db_row.get("property_reference", "")).startswith("AUTO_")
         fill = ALT_ROW_FILL if row_idx % 2 == 0 else DATA_FILL
+        uprn_conf = db_row.get("uprn_confidence") if hasattr(db_row, "get") else None
 
         for col_idx, (header, db_field) in enumerate(DOC_A_COLUMNS, start=1):
             if db_field is None:
@@ -233,7 +245,22 @@ def _write_data_rows(ws, rows, ha_name: str):
 
             cell = ws.cell(row=row_idx, column=col_idx, value=value)
             cell.font = NORMAL_FONT
-            cell.fill = INSURER_FILL if (col_idx - 1) in INSURER_COLS else (AUTO_FILL if is_auto else fill)
+
+            # Colour-code UPRN confidence cells
+            if header in ("UPRN", "UPRN Confidence", "UPRN Confidence Reason"):
+                if uprn_conf == "RED":
+                    cell.fill = RED_CONF_FILL
+                elif uprn_conf == "LOW":
+                    cell.fill = LOW_CONF_FILL
+                else:
+                    cell.fill = fill
+            elif (col_idx - 1) in INSURER_COLS:
+                cell.fill = INSURER_FILL
+            elif is_auto:
+                cell.fill = AUTO_FILL
+            else:
+                cell.fill = fill
+
             cell.alignment = Alignment(vertical="center")
             cell.border = THIN_BORDER
 
