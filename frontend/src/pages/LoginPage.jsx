@@ -1,6 +1,22 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
+import "./LoginPage.css";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "";
+
+// Read the saved preference (shared with the holding page via the same
+// `equirisk-theme` key + origin), falling back to the OS setting.
+function getInitialTheme() {
+  try {
+    const saved = localStorage.getItem("equirisk-theme");
+    if (saved === "dark" || saved === "light") return saved;
+  } catch {
+    /* storage blocked — fall through to the OS preference */
+  }
+  if (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches) {
+    return "dark";
+  }
+  return "light";
+}
 
 export default function LoginPage({ onLogin }) {
   const [email, setEmail] = useState("");
@@ -9,6 +25,37 @@ export default function LoginPage({ onLogin }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [showPassword, setShowPassword] = useState(false);
+  const [capsOn, setCapsOn] = useState(false);
+  const [theme, setTheme] = useState(getInitialTheme);
+
+  // Keep the document attribute + saved preference in lock-step with state.
+  useEffect(() => {
+    document.documentElement.setAttribute("data-theme", theme);
+    try {
+      localStorage.setItem("equirisk-theme", theme);
+    } catch {
+      /* storage blocked — preference just won't persist this session */
+    }
+  }, [theme]);
+
+  // Same cross-fade the holding page uses: snapshot the page, swap the
+  // attribute, cross-fade between snapshots via the View Transitions API.
+  const toggleTheme = () => {
+    const next = theme === "dark" ? "light" : "dark";
+    // Flip the attribute synchronously so the transition snapshots the new
+    // theme; setTheme then keeps React state (and aria-checked) in sync.
+    const commit = () => {
+      document.documentElement.setAttribute("data-theme", next);
+      setTheme(next);
+    };
+    const reduce =
+      window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (reduce || typeof document.startViewTransition !== "function") {
+      commit();
+      return;
+    }
+    document.startViewTransition(commit);
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -53,121 +100,167 @@ export default function LoginPage({ onLogin }) {
     }
   };
 
-  return (
-    <div style={styles.page}>
-      {/* Background pattern */}
-      <div style={styles.bgAccent} />
+  const trackCaps = (e) => {
+    if (typeof e.getModifierState === "function") {
+      setCapsOn(e.getModifierState("CapsLock"));
+    }
+  };
 
-      <div style={styles.card}>
-        {/* Brand */}
-        <div style={styles.brandRow}>
-          <img src="/logo.png" alt="EquiRisk" style={{ height: 40, width: "auto", display: "block", marginBottom: 8 }} />
-          <span style={styles.brandBadge}>UNDERWRITER PORTAL</span>
+  return (
+    <div className="login-page">
+      {/* ── Theme switch — same design as the holding page, top-right ── */}
+      <button
+        type="button"
+        className="login-theme-switch"
+        onClick={toggleTheme}
+        role="switch"
+        aria-checked={theme === "dark"}
+        aria-label="Toggle dark mode"
+        title="Toggle dark mode"
+      >
+        <span className="ts-disc" aria-hidden="true" />
+        <SunIcon />
+        <MoonIcon />
+      </button>
+
+      {/* ── Brand / narrative panel: rose ground, photo anchored to the floor ── */}
+      <aside className="login-panel">
+        {/* Architectural ground — absolutely positioned so it can never add
+            height to the panel (this is what kept the page from scrolling). */}
+        <div className="login-photo" role="img" aria-label="A corten-clad social-housing block" />
+
+        <span className="login-brand-mark">
+          <img className="lbm-light" src="/logo.png" alt="EquiRisk" />
+          <img className="lbm-dark" src="/equirisk-dark.png" alt="EquiRisk" />
+        </span>
+
+        <div className="login-panel-center">
+          <span className="login-kicker">Social-housing risk intelligence</span>
+
+          <h1 className="login-headline">
+            Every block accounted for.<br />
+            Every risk <em>in view</em>.
+          </h1>
         </div>
 
-        <h1 style={styles.heading}>Sign in to your account</h1>
-        <p style={styles.subheading}>
-          Secure access to housing association risk portfolios
-        </p>
+        <span className="login-pi">
+          <span className="pi-p">Premium</span>
+          <span className="pi-i">Intelligence</span>
+        </span>
+      </aside>
 
-        <form onSubmit={handleSubmit} style={styles.form}>
-          {/* Email */}
-          <div style={styles.field}>
-            <label style={styles.label} htmlFor="email">
-              Email address
-            </label>
-            <input
-              id="email"
-              type="email"
-              autoComplete="email"
-              required
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              style={styles.input}
-              placeholder="you@organisation.com"
-              disabled={loading}
-            />
-          </div>
+      {/* ── Sign-in form ── */}
+      <main className="login-form-pane">
+        <div className="login-mid">
+          <span className="login-form-kicker">
+            <i className="login-tick" aria-hidden="true" />
+            Underwriter portal
+          </span>
+          <h2 className="login-heading">Sign in</h2>
+          <p className="login-subheading">
+            Secure access to housing association risk portfolios.
+          </p>
 
-          {/* Password */}
-          <div style={styles.field}>
-            <label style={styles.label} htmlFor="password">
-              Password
-            </label>
-            <div style={styles.passwordWrapper}>
+          <form onSubmit={handleSubmit} className="login-form" noValidate>
+            {/* Email */}
+            <div className="login-field">
+              <label className="login-label" htmlFor="email">Email address</label>
               <input
-                id="password"
-                type={showPassword ? "text" : "password"}
-                autoComplete="current-password"
+                id="email"
+                className="login-input"
+                type="email"
+                autoComplete="email"
+                autoFocus
                 required
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                style={{ ...styles.input, paddingRight: 44 }}
-                placeholder="••••••••"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="you@organisation.com"
                 disabled={loading}
               />
-              <button
-                type="button"
-                style={styles.eyeBtn}
-                onClick={() => setShowPassword((v) => !v)}
-                tabIndex={-1}
-                aria-label={showPassword ? "Hide password" : "Show password"}
-              >
-                {showPassword ? (
-                  <EyeOffIcon />
-                ) : (
-                  <EyeIcon />
-                )}
-              </button>
             </div>
-          </div>
 
-          {/* Remember me */}
-          <div style={styles.rememberRow}>
-            <label style={styles.checkLabel}>
-              <input
-                type="checkbox"
-                checked={rememberMe}
-                onChange={(e) => setRememberMe(e.target.checked)}
-                style={styles.checkbox}
-                disabled={loading}
-              />
-              Remember me for 8 hours
-            </label>
-          </div>
-
-          {/* Error */}
-          {error && (
-            <div style={styles.errorBox}>
-              <span style={styles.errorIcon}>&#9888;</span> {error}
+            {/* Password */}
+            <div className="login-field">
+              <label className="login-label" htmlFor="password">Password</label>
+              <div className="login-pass-wrap">
+                <input
+                  id="password"
+                  className="login-input"
+                  type={showPassword ? "text" : "password"}
+                  autoComplete="current-password"
+                  required
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  onKeyUp={trackCaps}
+                  onKeyDown={trackCaps}
+                  onBlur={() => setCapsOn(false)}
+                  placeholder="••••••••"
+                  disabled={loading}
+                />
+                <button
+                  type="button"
+                  className="login-eye"
+                  onClick={() => setShowPassword((v) => !v)}
+                  tabIndex={-1}
+                  aria-label={showPassword ? "Hide password" : "Show password"}
+                >
+                  {showPassword ? <EyeOffIcon /> : <EyeIcon />}
+                </button>
+              </div>
+              {capsOn && (
+                <span className="login-capslock">
+                  <WarnIcon /> Caps Lock is on
+                </span>
+              )}
             </div>
-          )}
 
-          {/* Submit */}
-          <button
-            type="submit"
-            disabled={loading || !email || !password}
-            style={{
-              ...styles.submitBtn,
-              ...(loading || !email || !password ? styles.submitBtnDisabled : {}),
-            }}
-          >
-            {loading ? (
-              <span style={styles.spinnerRow}>
-                <Spinner /> Signing in…
-              </span>
-            ) : (
-              "Sign in"
+            {/* Remember me */}
+            <div className="login-remember">
+              <label className="login-check">
+                <input
+                  type="checkbox"
+                  checked={rememberMe}
+                  onChange={(e) => setRememberMe(e.target.checked)}
+                  disabled={loading}
+                />
+                Remember me for 8 hours
+              </label>
+            </div>
+
+            {/* Error */}
+            {error && (
+              <div className="login-error" role="alert" aria-live="assertive">
+                <WarnIcon /> {error}
+              </div>
             )}
-          </button>
-        </form>
 
-        <p style={styles.footer}>
+            {/* Submit */}
+            <button
+              type="submit"
+              className="login-submit"
+              disabled={loading || !email || !password}
+              aria-busy={loading}
+            >
+              {loading ? (
+                <span className="login-spinner-row">
+                  <span className="login-spinner" /> Signing in…
+                </span>
+              ) : (
+                <>
+                  Sign in
+                  <ArrowIcon />
+                </>
+              )}
+            </button>
+          </form>
+        </div>
+
+        <p className="login-footer">
           Access is granted by your insurance broker or housing association contact.
           <br />
           Contact <strong>support@equirisk.ai</strong> for access requests.
         </p>
-      </div>
+      </main>
     </div>
   );
 }
@@ -193,198 +286,38 @@ function EyeOffIcon() {
   );
 }
 
-function Spinner() {
+function ArrowIcon() {
   return (
-    <span style={{
-      display: "inline-block",
-      width: 14,
-      height: 14,
-      border: "2px solid rgba(255,255,255,0.4)",
-      borderTopColor: "#fff",
-      borderRadius: "50%",
-      animation: "spin 0.7s linear infinite",
-      marginRight: 8,
-    }} />
+    <svg className="login-arrow" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <line x1="5" y1="12" x2="19" y2="12" />
+      <polyline points="12 5 19 12 12 19" />
+    </svg>
   );
 }
 
-// ── Styles ────────────────────────────────────────────────────────
+function SunIcon() {
+  return (
+    <svg className="ts-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <circle cx="12" cy="12" r="4" />
+      <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41" />
+    </svg>
+  );
+}
 
-const styles = {
-  page: {
-    minHeight: "100vh",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    background: "linear-gradient(135deg, #f0f6ff 0%, #f5f7fb 60%, #eef2f7 100%)",
-    padding: "24px 16px",
-    position: "relative",
-    overflow: "hidden",
-  },
-  bgAccent: {
-    position: "absolute",
-    top: -200,
-    right: -200,
-    width: 600,
-    height: 600,
-    borderRadius: "50%",
-    background: "radial-gradient(circle, rgba(37,99,235,0.06) 0%, transparent 70%)",
-    pointerEvents: "none",
-  },
-  card: {
-    background: "#ffffff",
-    borderRadius: 16,
-    boxShadow: "0 4px 32px rgba(15,23,42,0.10), 0 1px 4px rgba(15,23,42,0.06)",
-    padding: "40px 40px 32px",
-    width: "100%",
-    maxWidth: 440,
-    position: "relative",
-    zIndex: 1,
-  },
-  brandRow: {
-    display: "flex",
-    alignItems: "center",
-    gap: 10,
-    marginBottom: 28,
-  },
-  brandName: {
-    fontSize: 26,
-    fontWeight: 800,
-    letterSpacing: "-0.04em",
-    color: "#2563eb",
-    lineHeight: 1,
-  },
-  brandBadge: {
-    fontSize: 10,
-    fontWeight: 700,
-    letterSpacing: "0.08em",
-    color: "#2563eb",
-    background: "#dbeafe",
-    borderRadius: 4,
-    padding: "3px 7px",
-    lineHeight: 1.4,
-  },
-  heading: {
-    fontSize: 20,
-    fontWeight: 700,
-    color: "#0f172a",
-    margin: "0 0 6px",
-    letterSpacing: "-0.02em",
-  },
-  subheading: {
-    fontSize: 14,
-    color: "#64748b",
-    margin: "0 0 28px",
-    lineHeight: 1.5,
-  },
-  form: {
-    display: "flex",
-    flexDirection: "column",
-    gap: 18,
-  },
-  field: {
-    display: "flex",
-    flexDirection: "column",
-    gap: 6,
-  },
-  label: {
-    fontSize: 13,
-    fontWeight: 600,
-    color: "#374151",
-    letterSpacing: "0.01em",
-  },
-  input: {
-    width: "100%",
-    padding: "10px 14px",
-    fontSize: 14,
-    color: "#0f172a",
-    background: "#f8fafc",
-    border: "1.5px solid #e2e8f0",
-    borderRadius: 8,
-    outline: "none",
-    transition: "border-color 0.15s",
-    boxSizing: "border-box",
-  },
-  passwordWrapper: {
-    position: "relative",
-    display: "flex",
-    alignItems: "center",
-  },
-  eyeBtn: {
-    position: "absolute",
-    right: 12,
-    background: "none",
-    border: "none",
-    cursor: "pointer",
-    color: "#94a3b8",
-    padding: 2,
-    display: "flex",
-    alignItems: "center",
-  },
-  rememberRow: {
-    display: "flex",
-    alignItems: "center",
-  },
-  checkLabel: {
-    display: "flex",
-    alignItems: "center",
-    gap: 8,
-    fontSize: 13,
-    color: "#475569",
-    cursor: "pointer",
-    userSelect: "none",
-  },
-  checkbox: {
-    width: 15,
-    height: 15,
-    accentColor: "#2563eb",
-    cursor: "pointer",
-  },
-  errorBox: {
-    background: "#fee2e2",
-    border: "1px solid #fecaca",
-    borderRadius: 8,
-    padding: "10px 14px",
-    fontSize: 13,
-    color: "#b91c1c",
-    display: "flex",
-    alignItems: "center",
-    gap: 6,
-  },
-  errorIcon: {
-    fontSize: 14,
-  },
-  submitBtn: {
-    width: "100%",
-    padding: "12px 0",
-    fontSize: 15,
-    fontWeight: 700,
-    color: "#ffffff",
-    background: "#2563eb",
-    border: "none",
-    borderRadius: 8,
-    cursor: "pointer",
-    transition: "background 0.15s",
-    letterSpacing: "0.01em",
-    marginTop: 4,
-  },
-  submitBtnDisabled: {
-    background: "#93c5fd",
-    cursor: "not-allowed",
-  },
-  spinnerRow: {
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 0,
-  },
-  footer: {
-    marginTop: 24,
-    fontSize: 12,
-    color: "#94a3b8",
-    textAlign: "center",
-    lineHeight: 1.6,
-    borderTop: "1px solid #f1f5f9",
-    paddingTop: 20,
-  },
-};
+function MoonIcon() {
+  return (
+    <svg className="ts-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
+    </svg>
+  );
+}
+
+function WarnIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+      <line x1="12" y1="9" x2="12" y2="13" />
+      <line x1="12" y1="17" x2="12.01" y2="17" />
+    </svg>
+  );
+}

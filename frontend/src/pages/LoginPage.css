@@ -1,0 +1,519 @@
+/* ──────────────────────────────────────────────────────────────────────────
+   Login — EquiRisk Graphic Standard v1.1 (light). Full-bleed two-pane split.
+   Left  : rose break-band — logo top, narrative centred, the corten block
+           anchored to the floor as a confident architectural ground.
+   Right : off-white pane — form centred, footer pinned bottom.
+
+   Height contract (the fix for the "page scrolls / too tall" bug):
+   on desktop the whole page is locked to the viewport (height:100dvh,
+   overflow:hidden). The photo is ABSOLUTELY positioned inside the left pane,
+   so it can never stack on top of the narrative and push the page taller —
+   the previous `grid-template-rows: 1fr auto` did exactly that. The form pane
+   keeps `overflow-y:auto` as a safety valve for very short windows.
+   Palette scoped to .login-page so the rest of the app is untouched.
+   ────────────────────────────────────────────────────────────────────────── */
+
+.login-page {
+  --eq-offwhite: #FAF6EF;
+  --eq-rose:     #FDF1E6;
+  --eq-peach:    #F8E7D6;
+  --eq-white:    #FFFFFF;
+  --eq-navy:     #232540;
+  --eq-red:      #AE302B;
+  --eq-red-deep: #972924;
+  --eq-cream:    #FDF1E6;
+  --eq-ink-72:   rgba(35, 37, 64, 0.72);
+  --eq-ink-55:   rgba(35, 37, 64, 0.55);
+  --eq-ink-line: rgba(35, 37, 64, 0.13);
+
+  min-height: 100vh;
+  min-height: 100dvh;
+  position: relative;                /* positioning context for the theme switch */
+  display: grid;
+  grid-template-columns: 1fr;
+  background: var(--eq-offwhite);
+  color: var(--eq-navy);
+  font-family: var(--font-sans);
+  transition: background 0.3s var(--ease), color 0.3s var(--ease);
+}
+
+@media (min-width: 900px) {
+  .login-page {
+    grid-template-columns: 46% 54%;
+    height: 100vh;
+    height: 100dvh;          /* lock to the viewport — the page itself never scrolls */
+    overflow: hidden;
+  }
+}
+
+/* ── Left: rose band — logo / centred narrative / photo ground ────────────── */
+.login-panel {
+  position: relative;
+  z-index: 1;
+  overflow: hidden;
+  display: grid;
+  grid-template-rows: auto 1fr auto;     /* logo · narrative · Premium Intelligence */
+  gap: 1.25rem;
+  padding: clamp(2rem, 3.4vw, 3.4rem);
+  background: var(--eq-rose);
+  box-shadow: 30px 0 64px -44px rgba(35, 37, 64, 0.24);   /* layers the panel over the form ground */
+}
+
+/* the terracotta-clad block (Standard v1.1, Rule 6): anchored to the floor,
+   bleeding to both side edges, dissolving up into the rose over a long fade so
+   type never sits over the un-faded photo. Absolute => zero height contribution. */
+.login-photo {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 52%;
+  z-index: 0;
+  background-image: url("/BlockEquiRisk.jpg");
+  background-size: cover;
+  background-position: center 58%;       /* corten + brick + balconies, sky cropped out */
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0%, rgba(0, 0, 0, 0.45) 30%, #000 64%);
+          mask-image: linear-gradient(to bottom, transparent 0%, rgba(0, 0, 0, 0.45) 30%, #000 64%);
+}
+/* shallow navy footing at the very bottom so the cream "Premium Intelligence"
+   mark stays legible over the corten (Rule 4: dark elements shallow, cream on navy) */
+.login-photo::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to top, rgba(35, 37, 64, 0.62) 0%, rgba(35, 37, 64, 0.22) 18%, transparent 40%);
+}
+
+.login-brand-mark { position: relative; z-index: 1; align-self: start; }
+.login-brand-mark img { height: clamp(44px, 3.6vw, 58px); width: auto; display: block; }
+.login-brand-mark .lbm-dark { display: none; }   /* light logo by default; dark swap below */
+
+.login-panel-center {
+  position: relative;
+  z-index: 1;
+  align-self: start;                       /* sit in the upper third, not the middle */
+  display: flex;
+  flex-direction: column;
+  gap: clamp(1rem, 1.8vh, 1.5rem);
+  max-width: 42rem;
+  /* push it down from the logo into the first third, while staying clear of the
+     photo that fades in lower down (the photo tops out around 48% of the panel) */
+  margin-top: clamp(1.5rem, 8vh, 5rem);
+}
+
+.login-kicker {
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--eq-red);
+}
+
+/* sized so "Every block accounted for." holds one line — the <br/> then gives
+   exactly two lines (clamped under ~2.9vw so it can't wrap to three) */
+.login-headline {
+  font-family: var(--font-serif);
+  font-weight: 600;
+  font-size: clamp(2.1rem, 2.9vw, 3.2rem);
+  line-height: 1.08;
+  letter-spacing: -0.015em;
+  color: var(--eq-navy);
+  margin: 0;
+}
+.login-headline em { font-style: italic; color: var(--eq-red); }   /* red italic accent, light ground */
+
+/* "Premium Intelligence" — bottom-right, seated on the photo's navy footing */
+.login-pi {
+  position: relative;
+  z-index: 1;
+  align-self: end;
+  justify-self: end;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  display: inline-flex;
+  gap: 0.4em;
+}
+.login-pi .pi-p { color: var(--eq-cream); }
+.login-pi .pi-i { color: rgba(253, 241, 230, 0.62); }
+
+/* ── Right: off-white pane — form centred, footer pinned bottom ──────────── */
+.login-form-pane {
+  display: grid;
+  grid-template-rows: 1fr auto;
+  justify-items: center;
+  gap: 1.5rem;
+  padding: clamp(2rem, 4vw, 4rem) clamp(1.5rem, 5vw, 4rem);
+  background: var(--eq-offwhite);
+}
+@media (min-width: 900px) {
+  .login-form-pane { height: 100dvh; min-height: 0; overflow-y: auto; }   /* safety valve on short windows */
+}
+
+.login-mid { align-self: center; width: 100%; max-width: 392px; display: flex; flex-direction: column; }
+
+.login-form-kicker {
+  display: inline-flex;
+  align-items: center;
+  font-size: 0.74rem;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--eq-red);
+  margin-bottom: 14px;
+}
+/* small red tick — anchors the eyebrow so the form reads intentional, not adrift */
+.login-tick {
+  width: 18px;
+  height: 2px;
+  margin-right: 10px;
+  background: var(--eq-red);
+  border-radius: 2px;
+}
+
+.login-heading {
+  font-family: var(--font-serif);
+  font-size: clamp(1.85rem, 2.6vw, 2.3rem);
+  font-weight: 600;
+  color: var(--eq-navy);
+  letter-spacing: -0.01em;
+  margin: 0 0 6px;
+}
+.login-subheading {
+  font-size: 0.92rem;
+  line-height: 1.55;
+  color: var(--eq-ink-72);
+  margin: 0 0 28px;
+}
+
+.login-form { display: flex; flex-direction: column; gap: 16px; }
+.login-field { display: flex; flex-direction: column; gap: 7px; }
+.login-label { font-size: 0.8rem; font-weight: 600; color: var(--eq-navy); letter-spacing: 0.01em; }
+
+.login-input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 12px 14px;
+  font-family: var(--font-sans);
+  font-size: 0.92rem;
+  color: var(--eq-navy);
+  background: var(--eq-white);
+  border: 1.5px solid var(--eq-ink-line);
+  border-radius: 12px;
+  transition: border-color 0.18s var(--ease), box-shadow 0.18s var(--ease);
+}
+.login-input::placeholder { color: var(--eq-ink-55); }
+.login-input:hover:not(:focus):not(:disabled) { border-color: rgba(35, 37, 64, 0.28); }
+.login-input:focus,
+.login-input:focus-visible {
+  outline: none;
+  border-color: var(--eq-red);
+  box-shadow: 0 0 0 3px rgba(174, 48, 43, 0.16);
+}
+.login-input:disabled { opacity: 0.6; cursor: not-allowed; }
+/* keep the brand surface on browser autofill (no yellow box) */
+.login-input:-webkit-autofill,
+.login-input:-webkit-autofill:hover,
+.login-input:-webkit-autofill:focus {
+  -webkit-text-fill-color: var(--eq-navy);
+  -webkit-box-shadow: 0 0 0 1000px var(--eq-white) inset;
+  caret-color: var(--eq-navy);
+  transition: background-color 9999s ease-in-out 0s;
+}
+
+.login-pass-wrap { position: relative; display: flex; align-items: center; }
+.login-pass-wrap .login-input { padding-right: 44px; }
+.login-eye {
+  position: absolute;
+  right: 10px;
+  display: flex;
+  align-items: center;
+  padding: 4px;
+  border: none;
+  background: none;
+  color: var(--eq-ink-55);
+  cursor: pointer;
+  border-radius: 6px;
+}
+.login-eye:hover { color: var(--eq-red); }
+.login-eye:focus-visible { outline: 2px solid var(--eq-red); outline-offset: 1px; }
+
+.login-capslock { display: flex; align-items: center; gap: 5px; font-size: 0.75rem; color: var(--eq-red); margin-top: 2px; }
+
+.login-remember { display: flex; align-items: center; }
+.login-check {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 0.83rem; color: var(--eq-ink-72); cursor: pointer; user-select: none;
+}
+.login-check input { width: 15px; height: 15px; accent-color: var(--eq-red); cursor: pointer; }
+
+.login-error {
+  display: flex; align-items: center; gap: 8px;
+  background: rgba(174, 48, 43, 0.07);
+  border: 1px solid rgba(174, 48, 43, 0.28);
+  border-radius: 10px;
+  padding: 10px 13px;
+  font-size: 0.82rem;
+  color: var(--eq-red);
+}
+.login-error svg { flex-shrink: 0; }
+
+.login-submit {
+  width: 100%;
+  margin-top: 6px;
+  padding: 14px 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  font-family: var(--font-sans);
+  font-size: 0.97rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  color: #fff;
+  background: var(--eq-red);
+  border: none;
+  border-radius: 50px;
+  cursor: pointer;
+  box-shadow: 0 6px 18px rgba(174, 48, 43, 0.26);
+  transition: background 0.3s var(--ease), transform 0.3s var(--ease), box-shadow 0.3s var(--ease);
+}
+.login-arrow { transition: transform 0.3s var(--ease); }
+.login-submit:hover:not(:disabled) .login-arrow { transform: translateX(4px); }
+.login-submit:hover:not(:disabled) {
+  background: var(--eq-red-deep);
+  transform: translateY(-2px);
+  box-shadow: 0 12px 28px rgba(174, 48, 43, 0.32);
+}
+.login-submit:focus-visible { outline: 2px solid var(--eq-red); outline-offset: 2px; }
+.login-submit:disabled { background: #D6A8A4; cursor: not-allowed; box-shadow: none; }
+
+.login-spinner-row { display: flex; align-items: center; justify-content: center; }
+.login-spinner {
+  display: inline-block;
+  width: 14px; height: 14px; margin-right: 8px;
+  border: 2px solid rgba(255, 255, 255, 0.4);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;     /* keyframes in global.css */
+}
+
+.login-footer {
+  align-self: end;
+  width: 100%;
+  max-width: 392px;
+  font-size: 0.74rem;
+  line-height: 1.6;
+  color: var(--eq-ink-55);
+  text-align: center;
+}
+.login-footer strong { color: var(--eq-ink-72); }
+
+/* ── Mobile: panel becomes a compact top band; the page flows naturally ───── */
+@media (max-width: 899px) {
+  .login-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 0.9rem;
+    overflow: visible;
+    padding: 1.5rem clamp(1.25rem, 5vw, 2rem) 0;
+  }
+  .login-panel-center { max-width: none; gap: 0.7rem; margin-top: 0.25rem; }
+  .login-headline { font-size: 1.7rem; }
+  .login-pi { display: none; }
+  /* photo rejoins the flow as a slim bleed-edge band under the narrative */
+  .login-photo {
+    position: relative;
+    height: clamp(150px, 22vh, 210px);
+    margin: 0.5rem calc(-1 * clamp(1.25rem, 5vw, 2rem)) 0;
+    -webkit-mask-image: linear-gradient(to bottom, transparent 0%, #000 38%);
+            mask-image: linear-gradient(to bottom, transparent 0%, #000 38%);
+  }
+  .login-photo::after { display: none; }
+  .login-form-pane { padding-top: 2.25rem; }
+}
+
+/* ── Entrance: a calm, staggered fade-up on load ─────────────────────────── */
+@keyframes loginRise {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes loginFade { from { opacity: 0; } to { opacity: 1; } }
+@media (prefers-reduced-motion: no-preference) {
+  .login-photo { animation: loginFade 0.9s var(--ease) both; animation-delay: 0.25s; }
+  .login-brand-mark,
+  .login-panel-center > *,
+  .login-pi,
+  .login-mid > *,
+  .login-footer { animation: loginRise 0.55s var(--ease) both; }
+
+  .login-brand-mark { animation-delay: 0.02s; }
+  .login-panel-center > *:nth-child(1) { animation-delay: 0.10s; }
+  .login-panel-center > *:nth-child(2) { animation-delay: 0.16s; }
+  .login-panel-center > *:nth-child(3) { animation-delay: 0.22s; }
+  .login-pi { animation-delay: 0.30s; }
+
+  .login-mid > *:nth-child(1) { animation-delay: 0.16s; }
+  .login-mid > *:nth-child(2) { animation-delay: 0.22s; }
+  .login-mid > *:nth-child(3) { animation-delay: 0.28s; }
+  .login-mid > *:nth-child(4) { animation-delay: 0.34s; }
+  .login-footer { animation-delay: 0.42s; }
+}
+
+/* ── Reduced motion ──────────────────────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  .login-input, .login-submit { transition: none; }
+  .login-spinner { animation-duration: 1.4s; }
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
+   Theme switch — the holding page's design, re-themed to the login palette.
+   68×32 pill, both icons pinned in place, a disc slides onto the active side.
+   Sits top-right over the calm form pane in both layouts.
+   ────────────────────────────────────────────────────────────────────────── */
+.login-theme-switch {
+  position: absolute;
+  top: clamp(1.1rem, 2.4vh, 1.7rem);
+  right: clamp(1.1rem, 2.6vw, 2.1rem);
+  z-index: 6;
+  display: inline-flex;
+  align-items: center;
+  width: 68px;
+  height: 32px;
+  flex-shrink: 0;
+  padding: 0;
+  border-radius: 999px;
+  border: 1.5px solid var(--eq-ink-line);
+  background: var(--eq-peach);
+  cursor: pointer;
+  transition: border-color 0.3s var(--ease), background 0.3s var(--ease);
+}
+.login-theme-switch:hover { border-color: var(--eq-red); }
+.login-theme-switch:focus { outline: none; }
+.login-theme-switch:focus-visible { outline: 2px solid var(--eq-red); outline-offset: 2px; }
+
+/* sliding disc — sits UNDER the icons and highlights the active side */
+.login-theme-switch .ts-disc {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 24px;
+  height: 24px;
+  border-radius: 999px;
+  background: #fff;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.22);
+  z-index: 1;
+  view-transition-name: login-theme-disc;
+}
+/* both icons always visible, pinned to the two rest positions */
+.login-theme-switch .ts-sun,
+.login-theme-switch .ts-moon {
+  position: absolute;
+  top: 8px;
+  width: 14px;
+  height: 14px;
+  z-index: 2;
+}
+.login-theme-switch .ts-sun  { left: 8px;  color: var(--eq-red); opacity: 1; }
+.login-theme-switch .ts-moon { left: 44px; color: #1E3246;       opacity: 0.34; }
+
+/* The slide + page cross-fade ride the View Transitions API (see toggleTheme),
+   so the whole page swaps as one GPU-composited snapshot rather than repainting
+   every element per frame. */
+::view-transition-group(login-theme-disc) {
+  animation-duration: 0.45s;
+  animation-timing-function: cubic-bezier(0.65, 0, 0.35, 1);
+}
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: 0.45s;
+  animation-timing-function: cubic-bezier(0.45, 0, 0.2, 1);
+}
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-group(*),
+  ::view-transition-old(root),
+  ::view-transition-new(root) { animation: none !important; }
+  .login-theme-switch, .login-theme-switch * { transition-duration: 0.001s !important; }
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
+   Dark theme — grounds & surfaces from the holding page's dark palette; the
+   login's red accent is lifted for legibility on the dark navy. Scoped to
+   [data-theme="dark"] .login-page so the rest of the app is untouched.
+   ────────────────────────────────────────────────────────────────────────── */
+[data-theme="dark"] .login-page {
+  --eq-offwhite:  #131E2B;   /* form-pane ground (holding --warm-bg)   */
+  --eq-rose:      #1A2837;   /* left accent band  (holding --warm-bg-2) */
+  --eq-peach:     #243140;
+  --eq-white:     #16222F;   /* input surface */
+  --eq-navy:      #ECE7DF;   /* ink / primary text */
+  --eq-red:       #CD4B40;   /* accent — red lifted for dark */
+  --eq-red-deep:  #B83A33;   /* accent hover */
+  --eq-cream:     #F2EDE4;
+  --eq-ink-72:    rgba(236, 231, 223, 0.74);
+  --eq-ink-55:    rgba(236, 231, 223, 0.50);
+  --eq-ink-line:  rgba(255, 255, 255, 0.13);
+  --eq-red-bright: #E58276;  /* small accent text on the dark grounds */
+}
+
+/* Left band: a touch of vertical depth so it doesn't read as flat navy */
+[data-theme="dark"] .login-panel {
+  background: linear-gradient(165deg, #1E2E40 0%, #16222F 72%);
+  box-shadow: 24px 0 70px -40px rgba(0, 0, 0, 0.65);
+}
+
+/* Photo: dim + desaturate, and tint toward the panel navy via a luminosity
+   blend so the block reads as navy texture rather than a bright daylight
+   rectangle. The top mask-fade (base rule) still dissolves it into the panel. */
+/* Photo: just a slight dim and a very faint navy cast — the warm building
+   stays warm, only cooled and quieted a touch so it doesn't glare on the dark
+   panel. No monochrome blend. */
+[data-theme="dark"] .login-photo {
+  filter: brightness(0.9) saturate(0.96);
+}
+[data-theme="dark"] .login-photo::after {
+  background:
+    /* whole-photo navy wash — the "very slight" cool cast */
+    linear-gradient(rgba(26, 40, 55, 0.16), rgba(26, 40, 55, 0.16)),
+    /* gentle footing so the cream "Premium Intelligence" mark stays legible */
+    linear-gradient(to top, rgba(19, 30, 43, 0.62) 0%, rgba(19, 30, 43, 0.16) 18%, transparent 44%);
+}
+
+/* Accent text needs the brighter red to clear 4.5:1 on the dark grounds */
+[data-theme="dark"] .login-kicker,
+[data-theme="dark"] .login-form-kicker { color: var(--eq-red-bright); }
+[data-theme="dark"] .login-headline em { color: var(--eq-red-bright); }
+[data-theme="dark"] .login-tick { background: var(--eq-red-bright); }
+
+/* Inputs: hover/focus affordances retuned for the dark surface */
+[data-theme="dark"] .login-input:hover:not(:focus):not(:disabled) {
+  border-color: rgba(255, 255, 255, 0.26);
+}
+[data-theme="dark"] .login-input:focus,
+[data-theme="dark"] .login-input:focus-visible {
+  box-shadow: 0 0 0 3px rgba(205, 75, 64, 0.28);
+}
+
+/* Error block: lift the tint and text so it stays readable on dark */
+[data-theme="dark"] .login-error {
+  background: rgba(229, 130, 118, 0.10);
+  border-color: rgba(229, 130, 118, 0.40);
+  color: var(--eq-red-bright);
+}
+
+/* Disabled submit: a muted dark chip instead of the light-theme pink */
+[data-theme="dark"] .login-submit:disabled {
+  background: #3A2A28;
+  color: rgba(236, 231, 223, 0.42);
+}
+
+/* Logo swap — light wordmark on the dark band */
+[data-theme="dark"] .login-brand-mark .lbm-light { display: none; }
+[data-theme="dark"] .login-brand-mark .lbm-dark  { display: block; }
+
+/* Switch in the dark rest state — disc slides onto the moon */
+[data-theme="dark"] .login-theme-switch { background: #26384E; border-color: rgba(255, 255, 255, 0.16); }
+[data-theme="dark"] .login-theme-switch .ts-disc { left: 39px; background: #E7E2DB; }
+[data-theme="dark"] .login-theme-switch .ts-sun  { color: #E7E2DB; opacity: 0.42; }
+[data-theme="dark"] .login-theme-switch .ts-moon { color: #1E3246; opacity: 1; }

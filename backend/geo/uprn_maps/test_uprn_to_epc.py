@@ -1,4 +1,4 @@
-from uprn_to_epc import get_epc_from_uprn
+from backend.geo.uprn_maps.uprn_to_epc import get_epc_from_uprn
 
 MY_EMAIL = "igorshuvalov23@gmail.com"
 MY_API_KEY = "9213b51f9af85ba4700865191700778f0cc7f3fc"
