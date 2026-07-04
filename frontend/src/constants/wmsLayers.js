@@ -67,6 +67,10 @@ export const WMS_LAYERS = [
     layers: "BGS.50k.Bedrock",
     crs: "3857",
     oversample: 2,
+    // ponytail: BGS geology has NO GetLegendGraphic (verified July 2026) — its
+    // real key is hundreds of rock-unit classes. legendText → an instant static
+    // caption, no failed network round-trip. Radon (below) keeps its server legend.
+    legendText: "Each colour is a distinct bedrock unit (rock type & age) — full key at BGS.",
     attribution: "Contains British Geological Survey materials © UKRI 2026",
   },
   {
@@ -78,6 +82,7 @@ export const WMS_LAYERS = [
     layers: "BGS.50k.Superficial.deposits",
     crs: "3857",
     oversample: 2,
+    legendText: "Each colour is a superficial deposit type (e.g. till, alluvium, sand & gravel) — full key at BGS.",
     attribution: "Contains British Geological Survey materials © UKRI 2026",
   },
   {
@@ -95,6 +100,7 @@ export const WMS_LAYERS = [
     url: "https://map.bgs.ac.uk/arcgis/services/BGS_Detailed_Geology/MapServer/WMSServer",
     layers: "BGS.50k.Mass.movement",
     crs: "3857",
+    legendText: "Shaded areas are mapped landslide / mass-movement deposits (sparse — most of GB has none).",
     attribution: "Contains British Geological Survey materials © UKRI 2026",
   },
   {
@@ -107,4 +113,34 @@ export const WMS_LAYERS = [
     crs: "3857",
     attribution: "Contains British Geological Survey materials © UKRI 2026",
   },
+  // ponytail: SIMD is the deprivation index that covers the demo (Cathcart =
+  // Glasgow = Scotland). Like SEPA, this ArcGIS MapServer advertises ONLY
+  // CRS:84/4326/27700 — NO 3857 — so crs MUST be "4326" or tiles come back
+  // blank. Verified via GetCapabilities July 2026. LSOA/datazone polygons, so
+  // it renders across zoom (no oversample needed).
+  {
+    key: "simd-2020",
+    group: "Deprivation",
+    label: "SIMD 2020 — Scottish Index of Multiple Deprivation",
+    coverage: "Scotland",
+    url: "https://maps.gov.scot/server/services/ScotGov/PeopleSociety/MapServer/WMSServer",
+    layers: "SIMD2020",
+    crs: "4326",
+    attribution: "© Scottish Government / SIMD — OGL v3.0",
+  },
+  {
+    key: "wimd-2019",
+    group: "Deprivation",
+    label: "WIMD 2019 — Welsh Index of Multiple Deprivation (overall)",
+    coverage: "Wales",
+    url: "https://datamap.gov.wales/geoserver/inspire-wg/ows",
+    layers: "inspire-wg:wimd2019_overall",
+    crs: "3857",
+    attribution: "© Welsh Government / WIMD 2019 — OGL v3.0",
+  },
+  // ponytail: England IMD 2019 deliberately omitted — MHCLG/ONS publish it only
+  // as an ArcGIS FeatureServer (data-communities.opendata.arcgis.com), not a
+  // clean OGL WMS. Wiring it needs a vector/FeatureServer layer, not
+  // L.tileLayer.wms — different code path. Add when an English portfolio is
+  // demoed. See map_plan.md §4.
 ];

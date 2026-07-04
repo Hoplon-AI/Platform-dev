@@ -157,6 +157,7 @@ export default function PortfolioMap({
 
     if (overlays.length) {
       const overlayDict = {};
+      const legendEntries = [];
       overlays.forEach((cfg) => {
         const n = cfg.oversample || 0;
         const layer = L.tileLayer.wms(cfg.url, {
@@ -178,9 +179,52 @@ export default function PortfolioMap({
           : cfg.label;
         overlayDict[label] = layer;
         if (cfg.defaultOn) layer.addTo(map);
+        // ponytail: use the WMS server's own GetLegendGraphic image instead of
+        // hand-authoring a colour table per layer (SIMD deciles, flood bands,
+        // geology's hundreds of rock types...). Servers that don't support it
+        // (BGS geology) return no image → the row hides itself via onerror.
+        const sep = cfg.url.includes("?") ? "&" : "?";
+        legendEntries.push({
+          layer,
+          label: cfg.label,
+          legendText: cfg.legendText,
+          legendUrl: `${cfg.url}${sep}service=WMS&request=GetLegendGraphic&version=1.3.0&format=image/png&layer=${encodeURIComponent(cfg.layers.split(",")[0])}`,
+        });
       });
       L.control.layers({}, overlayDict, { collapsed: false, position: "topright" }).addTo(map);
       L.control.attribution().addTo(map);
+
+      // ponytail: warm the browser cache for every legend PNG at mount, so the
+      // first layer-toggle shows its legend instantly instead of paying a WMS
+      // round-trip. Tiny (1–3 KB) images; the render() below reuses the cache.
+      legendEntries.forEach((e) => { if (!e.legendText) new Image().src = e.legendUrl; });
+
+      // Legend for whichever overlays are switched on; stacks below the layer
+      // picker and re-renders on toggle.
+      const legend = L.control({ position: "topright" });
+      legend.onAdd = () => {
+        const div = L.DomUtil.create("div", "wms-legend");
+        div.style.cssText =
+          "background:rgba(255,255,255,0.95);border:1px solid #e2e8f0;border-radius:8px;padding:6px 8px;margin-top:6px;max-height:45vh;overflow:auto;box-shadow:0 1px 4px rgba(15,23,42,0.12);font-size:12px;max-width:230px;";
+        L.DomEvent.disableScrollPropagation(div);
+        L.DomEvent.disableClickPropagation(div);
+        const render = () => {
+          const active = legendEntries.filter((e) => map.hasLayer(e.layer));
+          div.style.display = active.length ? "block" : "none";
+          div.innerHTML = active
+            .map((e) => {
+              const body = e.legendText
+                ? `<div style="color:#475569;">${e.legendText}</div>`
+                : `<img src="${e.legendUrl}" alt="" style="max-width:100%;display:block;" onerror="this.parentNode.style.display='none'">`;
+              return `<div style="margin-bottom:6px;"><div style="font-weight:600;margin-bottom:2px;">${e.label}</div>${body}</div>`;
+            })
+            .join("");
+        };
+        render();
+        map.on("overlayadd overlayremove", render);
+        return div;
+      };
+      legend.addTo(map);
     }
 
     mapRef.current = map;
