@@ -408,6 +408,22 @@ export const buildPropertyFeatureAssignments = ({ sourceFeatures, targetProperty
   return { features: selectedFeatures, assignments, unmatchedPoints };
 };
 
+export function floodColor(band) {
+  switch ((band || "").toLowerCase()) {
+    case "high":     return "#ef4444";
+    case "medium":   return "#f59e0b";
+    case "low":      return "#fbbf24";
+    case "very low": return "#22c55e";
+    default:         return "#94a3b8";
+  }
+}
+
+export function colorForMode(raw, colorBy) {
+  if (colorBy === "flood")  return floodColor(raw?.flood_risk_band);
+  if (colorBy === "listed") return raw?.is_listed ? "#7c3aed" : "#94a3b8";
+  return readinessColor(getPropertyBand(raw));
+}
+
 // Block hover-tooltip HTML, shared by the main block layer and the context-block layer.
 export const buildBlockTooltipHtml = (point) => {
   const rep = point.raw?.representativeProperty;

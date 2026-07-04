@@ -35,13 +35,13 @@ import {
   getBlockStoreys,
   inferPropertyCategory,
   getPropertyCategoryLabel,
-  getPropertyDisplayColor,
   getFeatureIdentifier,
   getSelectedBlockPropertyPoints,
   getSelectedBlockBounds,
   getFitBoundsForMode,
   buildPropertyFeatureAssignments,
   buildBlockTooltipHtml,
+  colorForMode,
 } from "../utils/mapHelpers.js";
 import {
   createClusterIcon,
@@ -64,6 +64,9 @@ export default function PortfolioMap({
   onSelectBlock,
   viewMode = "blocks",
   suppressFit = false,
+  overlays = [],
+  colorBy = "readiness",
+  canvasStyle = {},
 }) {
   const mapDivRef = useRef(null);
   const mapRef = useRef(null);
@@ -94,7 +97,7 @@ export default function PortfolioMap({
           lon: latLon[1],
           readinessScore,
           readinessBand,
-          color: readinessColor(readinessBand),
+          color: colorForMode(property, colorBy),
           propertyCategory: inferPropertyCategory(property),
           propertyCategoryLabel: getPropertyCategoryLabel(property),
           sumInsured: getPropertyValue(property),
@@ -102,7 +105,7 @@ export default function PortfolioMap({
         };
       })
       .filter(Boolean);
-  }, [properties]);
+  }, [properties, colorBy]);
 
   const blockPoints = useMemo(() => {
     return (blocks || [])
@@ -152,6 +155,34 @@ export default function PortfolioMap({
       attribution: "&copy; OpenStreetMap &copy; CARTO",
     }).addTo(map);
 
+    if (overlays.length) {
+      const overlayDict = {};
+      overlays.forEach((cfg) => {
+        const n = cfg.oversample || 0;
+        const layer = L.tileLayer.wms(cfg.url, {
+          layers: cfg.layers,
+          format: "image/png",
+          transparent: true,
+          crs: cfg.crs === "4326" ? L.CRS.EPSG4326 : L.CRS.EPSG3857,
+          opacity: cfg.opacity ?? 0.55,
+          attribution: cfg.attribution,
+        });
+        // ponytail: BGS scale-gates 1:50k layers (~26 m/px). Requesting a
+        // 2^n-larger image for the same tile bbox makes the server compute a
+        // finer scale and render n zoom levels earlier; the browser downscales
+        // into the 256px slot. Same tile count, just heavier images.
+        if (n) layer.wmsParams.width = layer.wmsParams.height = 256 * 2 ** n;
+        // Leaflet layer-control labels accept HTML — append coverage badge
+        const label = cfg.coverage
+          ? `${cfg.label} <span style="font-size:11px;color:#94a3b8;">— ${cfg.coverage}</span>`
+          : cfg.label;
+        overlayDict[label] = layer;
+        if (cfg.defaultOn) layer.addTo(map);
+      });
+      L.control.layers({}, overlayDict, { collapsed: false, position: "topright" }).addTo(map);
+      L.control.attribution().addTo(map);
+    }
+
     mapRef.current = map;
     buildingsLayerRef.current = L.layerGroup().addTo(map);
     overviewBlockLayerRef.current = L.layerGroup().addTo(map);
@@ -170,6 +201,7 @@ export default function PortfolioMap({
       overviewBlockLayerRef.current = null;
       pointLayerRef.current = null;
     };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -458,7 +490,7 @@ export default function PortfolioMap({
                 const assignedPoint = assignments.get(featureId) || null;
                 const isSelected = assignedPoint && selectedProperty ? sameProperty(assignedPoint.raw, selectedProperty) : false;
                 const fillColor = assignedPoint
-                  ? getPropertyDisplayColor(assignedPoint.raw, isSelected)
+                  ? colorForMode(assignedPoint.raw, colorBy)
                   : PROPERTY_TYPE_COLORS.other;
 
                 return {
@@ -503,9 +535,9 @@ export default function PortfolioMap({
           const isSelected = selectedProperty ? sameProperty(point.raw, selectedProperty) : false;
           const circle = L.circleMarker([point.lat, point.lon], {
             radius: isSelected ? 7 : 5,
-            color: isSelected ? "#1d4ed8" : getPropertyDisplayColor(point.raw, false),
+            color: isSelected ? "#1d4ed8" : colorForMode(point.raw, colorBy),
             weight: isSelected ? 3 : 2,
-            fillColor: getPropertyDisplayColor(point.raw, isSelected),
+            fillColor: isSelected ? "#1d4ed8" : colorForMode(point.raw, colorBy),
             fillOpacity: 0.8,
           });
 
@@ -528,7 +560,7 @@ export default function PortfolioMap({
     return () => {
       isCancelled = true;
     };
-  }, [activeMode, onSelectProperty, propertyPoints, selectedBlock, selectedProperty]);
+  }, [activeMode, colorBy, onSelectProperty, propertyPoints, selectedBlock, selectedProperty]);
 
   useEffect(() => {
     const map = mapRef.current;
@@ -571,6 +603,7 @@ export default function PortfolioMap({
         overflow: "hidden",
         background: "#eef3f8",
         border: "1px solid rgba(15,23,42,0.08)",
+        ...canvasStyle,
       }}
     />
   );
