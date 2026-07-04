@@ -156,7 +156,6 @@ export default function PortfolioMap({
     }).addTo(map);
 
     if (overlays.length) {
-      const overlayDict = {};
       const legendEntries = [];
       overlays.forEach((cfg) => {
         const n = cfg.oversample || 0;
@@ -177,7 +176,6 @@ export default function PortfolioMap({
         const label = cfg.coverage
           ? `${cfg.label} <span style="font-size:11px;color:#94a3b8;">— ${cfg.coverage}</span>`
           : cfg.label;
-        overlayDict[label] = layer;
         if (cfg.defaultOn) layer.addTo(map);
         // ponytail: use the WMS server's own GetLegendGraphic image instead of
         // hand-authoring a colour table per layer (SIMD deciles, flood bands,
@@ -187,11 +185,48 @@ export default function PortfolioMap({
         legendEntries.push({
           layer,
           label: cfg.label,
+          labelHtml: label,
+          group: cfg.group || "Layers",
           legendText: cfg.legendText,
           legendUrl: `${cfg.url}${sep}service=WMS&request=GetLegendGraphic&version=1.3.0&format=image/png&layer=${encodeURIComponent(cfg.layers.split(",")[0])}`,
         });
       });
-      L.control.layers({}, overlayDict, { collapsed: false, position: "topright" }).addTo(map);
+      // ponytail: L.control.layers renders a flat always-open list — 18 overlays
+      // swamp the viewport. Native <details>/<summary> gives collapsible per-group
+      // sections (grouped by cfg.group → SEPA/EA/BGS/etc.) with zero JS and zero
+      // deps. Checkboxes toggle the WMS layer + fire the same overlayadd/remove
+      // events the legend below already listens on, so the legend needs no change.
+      const picker = L.control({ position: "topright" });
+      picker.onAdd = () => {
+        const div = L.DomUtil.create("div", "wms-picker");
+        div.style.cssText =
+          "background:rgba(255,255,255,0.95);border:1px solid #e2e8f0;border-radius:8px;padding:6px 8px;max-height:45vh;overflow:auto;box-shadow:0 1px 4px rgba(15,23,42,0.12);font-size:12px;max-width:480px;white-space:nowrap;";
+        L.DomEvent.disableScrollPropagation(div);
+        L.DomEvent.disableClickPropagation(div);
+        const groups = [...new Set(legendEntries.map((e) => e.group))];
+        div.innerHTML = groups
+          .map((g) => {
+            const rows = legendEntries
+              .map((e, i) => ({ e, i }))
+              .filter((x) => x.e.group === g)
+              .map(({ e, i }) =>
+                `<label style="display:flex;gap:6px;align-items:flex-start;padding:2px 0;cursor:pointer;"><input type="checkbox" data-idx="${i}"${map.hasLayer(e.layer) ? " checked" : ""} style="margin-top:2px;"><span>${e.labelHtml}</span></label>`
+              )
+              .join("");
+            const open = legendEntries.some((e) => e.group === g && map.hasLayer(e.layer));
+            return `<details${open ? " open" : ""} style="margin-bottom:4px;"><summary style="font-weight:600;cursor:pointer;">${g}</summary>${rows}</details>`;
+          })
+          .join("");
+        div.querySelectorAll("input[type=checkbox]").forEach((cb) => {
+          cb.addEventListener("change", () => {
+            const { layer } = legendEntries[+cb.dataset.idx];
+            if (cb.checked) { map.addLayer(layer); map.fire("overlayadd"); }
+            else { map.removeLayer(layer); map.fire("overlayremove"); }
+          });
+        });
+        return div;
+      };
+      picker.addTo(map);
       L.control.attribution().addTo(map);
 
       // ponytail: warm the browser cache for every legend PNG at mount, so the

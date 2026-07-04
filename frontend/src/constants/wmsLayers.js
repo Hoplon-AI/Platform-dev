@@ -34,6 +34,91 @@ export const WMS_LAYERS = [
     oversample: 3,
     attribution: "© SEPA — OGL v3.0",
   },
+  // ponytail: surface-water is the biggest flood gap — most UK flood claims are
+  // pluvial, not fluvial. Same SEPA MapServer/CRS/scale-gating as river, so it
+  // inherits crs 4326 + oversample 3. Layer names verified via GetCapabilities
+  // July 2026. High+Med only, mirroring the river pair (Low adds little signal).
+  {
+    key: "sepa-flood-surface-high",
+    group: "Flood (Scotland)",
+    label: "SEPA Surface Water Flood — High likelihood",
+    coverage: "Scotland",
+    url: "https://map.sepa.org.uk/server/services/Open/Flood_Maps/MapServer/WMSServer",
+    layers: "Surface_Water_and_Small_Watercourses_Flooding_High_Likelihood39344",
+    crs: "4326",
+    oversample: 3,
+    attribution: "© SEPA — OGL v3.0",
+  },
+  {
+    key: "sepa-flood-surface-med",
+    group: "Flood (Scotland)",
+    label: "SEPA Surface Water Flood — Medium likelihood",
+    coverage: "Scotland",
+    url: "https://map.sepa.org.uk/server/services/Open/Flood_Maps/MapServer/WMSServer",
+    layers: "Surface_Water_and_Small_Watercourses_Flooding_Medium_Likelihood29035",
+    crs: "4326",
+    oversample: 3,
+    attribution: "© SEPA — OGL v3.0",
+  },
+  {
+    key: "sepa-flood-coastal-high",
+    group: "Flood (Scotland)",
+    label: "SEPA Coastal Flood — High likelihood",
+    coverage: "Scotland",
+    url: "https://map.sepa.org.uk/server/services/Open/Flood_Maps/MapServer/WMSServer",
+    layers: "Coastal_Flooding_High_Likelihood21000",
+    crs: "4326",
+    oversample: 3,
+    attribution: "© SEPA — OGL v3.0",
+  },
+  {
+    key: "sepa-flood-coastal-med",
+    group: "Flood (Scotland)",
+    label: "SEPA Coastal Flood — Medium likelihood",
+    coverage: "Scotland",
+    url: "https://map.sepa.org.uk/server/services/Open/Flood_Maps/MapServer/WMSServer",
+    layers: "Coastal_Flooding_Medium_Likelihood21859",
+    crs: "4326",
+    oversample: 3,
+    attribution: "© SEPA — OGL v3.0",
+  },
+  // ponytail: SEPA "Future_*" layers are the climate-change projection (uplift
+  // applied) — the present-day-vs-future story underwriters care about. Only
+  // Medium likelihood is published for the future scenario. Same endpoint/CRS/
+  // scale-gating as present-day SEPA. Names verified via GetCapabilities Jul 2026.
+  {
+    key: "sepa-flood-river-future",
+    group: "Flood (Scotland)",
+    label: "SEPA River Flood — Medium (climate change)",
+    coverage: "Scotland",
+    url: "https://map.sepa.org.uk/server/services/Open/Flood_Maps/MapServer/WMSServer",
+    layers: "Future_Flood_Maps_River_Medium_Likelihood63924",
+    crs: "4326",
+    oversample: 3,
+    attribution: "© SEPA — OGL v3.0",
+  },
+  {
+    key: "sepa-flood-surface-future",
+    group: "Flood (Scotland)",
+    label: "SEPA Surface Water Flood — Medium (climate change)",
+    coverage: "Scotland",
+    url: "https://map.sepa.org.uk/server/services/Open/Flood_Maps/MapServer/WMSServer",
+    layers: "Future_Surface_Water_and_Small_Watercourses_Medium_Likelihood58784",
+    crs: "4326",
+    oversample: 3,
+    attribution: "© SEPA — OGL v3.0",
+  },
+  {
+    key: "sepa-flood-coastal-future",
+    group: "Flood (Scotland)",
+    label: "SEPA Coastal Flood — Medium (climate change)",
+    coverage: "Scotland",
+    url: "https://map.sepa.org.uk/server/services/Open/Flood_Maps/MapServer/WMSServer",
+    layers: "Future_Flood_Maps_Coastal_Medium_Likelihood10441",
+    crs: "4326",
+    oversample: 3,
+    attribution: "© SEPA — OGL v3.0",
+  },
   {
     key: "ea-flood-rofrs",
     group: "Flood (England)",
@@ -41,6 +126,44 @@ export const WMS_LAYERS = [
     coverage: "England",
     url: "https://environment.data.gov.uk/spatialdata/nafra2-risk-of-flooding-from-rivers-and-sea/wms",
     layers: "rofrs_4band",
+    crs: "3857",
+    oversample: 4,
+    attribution: "© Environment Agency — OGL v3.0",
+  },
+  // ponytail: EA NaFRA2 surface-water — no "_4band" variant exists for surface
+  // water (unlike rivers/sea), so the renderable likelihood layer is bare
+  // "rofsw". Same CRS/oversample as the river layer above. Verified Jul 2026.
+  {
+    key: "ea-flood-rofsw",
+    group: "Flood (England)",
+    label: "EA Risk of Flooding from Surface Water",
+    coverage: "England",
+    url: "https://environment.data.gov.uk/spatialdata/nafra2-risk-of-flooding-from-surface-water/wms",
+    layers: "rofsw",
+    crs: "3857",
+    oversample: 4,
+    attribution: "© Environment Agency — OGL v3.0",
+  },
+  // ponytail: EA climate-change scenario = the "cc01" suffix (upper-end epsilon
+  // uplift). River keeps its 4band; surface water is bare "rofsw_cc01".
+  {
+    key: "ea-flood-rofrs-cc",
+    group: "Flood (England)",
+    label: "EA Rivers & Sea — climate change",
+    coverage: "England",
+    url: "https://environment.data.gov.uk/spatialdata/nafra2-risk-of-flooding-from-rivers-and-sea-climate-change/wms",
+    layers: "rofrs_cc01_4band",
+    crs: "3857",
+    oversample: 4,
+    attribution: "© Environment Agency — OGL v3.0",
+  },
+  {
+    key: "ea-flood-rofsw-cc",
+    group: "Flood (England)",
+    label: "EA Surface Water — climate change",
+    coverage: "England",
+    url: "https://environment.data.gov.uk/spatialdata/nafra2-risk-of-flooding-from-surface-water-climate-change/wms",
+    layers: "rofsw_cc01",
     crs: "3857",
     oversample: 4,
     attribution: "© Environment Agency — OGL v3.0",
@@ -55,6 +178,20 @@ export const WMS_LAYERS = [
     coverage: "Wales",
     url: "https://datamap.gov.wales/geoserver/inspire-nrw/wms",
     layers: "inspire-nrw:NRW_FLOOD_RISK_FROM_RIVERS,inspire-nrw:NRW_FLOOD_RISK_FROM_SEA",
+    crs: "3857",
+    attribution: "© Natural Resources Wales — OGL v3.0",
+  },
+  // ponytail: NRW surface-water FRAW — same national-overview scale-gating as
+  // the rivers/sea layer above, so no oversample. NRW publishes NO climate-
+  // change flood WMS (checked GetCapabilities Jul 2026) — hence Wales has
+  // present-day only, unlike Scotland/England.
+  {
+    key: "nrw-fraw-surface",
+    group: "Flood (Wales)",
+    label: "NRW Flood Risk — Surface Water (national view)",
+    coverage: "Wales",
+    url: "https://datamap.gov.wales/geoserver/inspire-nrw/wms",
+    layers: "inspire-nrw:NRW_FLOOD_RISK_FROM_SURFACE_WATER_SMALL_WATERCOURSES",
     crs: "3857",
     attribution: "© Natural Resources Wales — OGL v3.0",
   },
