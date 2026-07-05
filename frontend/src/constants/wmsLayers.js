@@ -17,6 +17,13 @@ export const WMS_LAYERS = [
     url: "https://map.sepa.org.uk/server/services/Open/Flood_Maps/MapServer/WMSServer",
     layers: "River_Flooding_High_Likelihood5469",
     crs: "4326",
+    // ponytail: SEPA is ArcGIS (not GeoServer) so LEGEND_OPTIONS font-scaling is
+    // ignored — its GetLegendGraphic PNG bakes in tiny text. Each flood layer is
+    // one colour + one sentence, so a static legendText/legendColor (like BGS
+    // above) renders crisp at any size. Colours read off the server PNG, wording
+    // is SEPA's own. Verified Jul 2026.
+    legendText: "Each year this area has a 10% chance of flooding.",
+    legendColor: "#005ce6",
     // ponytail: 3, not 4 — SEPA throttles concurrent requests (per-tile latency
     // triples under viewport load), so 4096px tiles made Scotland crawl.
     // 2048px halves wall time; costs one zoom level (visible ~z11 vs z10).
@@ -31,6 +38,8 @@ export const WMS_LAYERS = [
     url: "https://map.sepa.org.uk/server/services/Open/Flood_Maps/MapServer/WMSServer",
     layers: "River_Flooding_Medium_Likelihood22646",
     crs: "4326",
+    legendText: "Each year this area has a 0.5% chance of flooding.",
+    legendColor: "#00c5ff",
     oversample: 3,
     attribution: "© SEPA — OGL v3.0",
   },
@@ -46,6 +55,8 @@ export const WMS_LAYERS = [
     url: "https://map.sepa.org.uk/server/services/Open/Flood_Maps/MapServer/WMSServer",
     layers: "Surface_Water_and_Small_Watercourses_Flooding_High_Likelihood39344",
     crs: "4326",
+    legendText: "Each year this area has a 10% chance of flooding.",
+    legendColor: "#8400a8",
     oversample: 3,
     attribution: "© SEPA — OGL v3.0",
   },
@@ -57,6 +68,8 @@ export const WMS_LAYERS = [
     url: "https://map.sepa.org.uk/server/services/Open/Flood_Maps/MapServer/WMSServer",
     layers: "Surface_Water_and_Small_Watercourses_Flooding_Medium_Likelihood29035",
     crs: "4326",
+    legendText: "Each year this area has a 0.5% chance of flooding.",
+    legendColor: "#c500ff",
     oversample: 3,
     attribution: "© SEPA — OGL v3.0",
   },
@@ -68,6 +81,8 @@ export const WMS_LAYERS = [
     url: "https://map.sepa.org.uk/server/services/Open/Flood_Maps/MapServer/WMSServer",
     layers: "Coastal_Flooding_High_Likelihood21000",
     crs: "4326",
+    legendText: "Each year this area has a 10% chance of flooding.",
+    legendColor: "#2b9e0f",
     oversample: 3,
     attribution: "© SEPA — OGL v3.0",
   },
@@ -79,6 +94,8 @@ export const WMS_LAYERS = [
     url: "https://map.sepa.org.uk/server/services/Open/Flood_Maps/MapServer/WMSServer",
     layers: "Coastal_Flooding_Medium_Likelihood21859",
     crs: "4326",
+    legendText: "Each year this area has a 0.5% chance of flooding.",
+    legendColor: "#4cc900",
     oversample: 3,
     attribution: "© SEPA — OGL v3.0",
   },
@@ -94,6 +111,8 @@ export const WMS_LAYERS = [
     url: "https://map.sepa.org.uk/server/services/Open/Flood_Maps/MapServer/WMSServer",
     layers: "Future_Flood_Maps_River_Medium_Likelihood63924",
     crs: "4326",
+    legendText: "By the 2080s, each year this area may have a 0.5% chance of flooding.",
+    legendColor: "#33518f",
     oversample: 3,
     attribution: "© SEPA — OGL v3.0",
   },
@@ -105,6 +124,8 @@ export const WMS_LAYERS = [
     url: "https://map.sepa.org.uk/server/services/Open/Flood_Maps/MapServer/WMSServer",
     layers: "Future_Surface_Water_and_Small_Watercourses_Medium_Likelihood58784",
     crs: "4326",
+    legendText: "By the 2070s, each year this area may have a 0.5% chance of flooding.",
+    legendColor: "#4c0073",
     oversample: 3,
     attribution: "© SEPA — OGL v3.0",
   },
@@ -116,6 +137,8 @@ export const WMS_LAYERS = [
     url: "https://map.sepa.org.uk/server/services/Open/Flood_Maps/MapServer/WMSServer",
     layers: "Future_Flood_Maps_Coastal_Medium_Likelihood10441",
     crs: "4326",
+    legendText: "By the 2080s, each year this area may have a 0.5% chance of flooding.",
+    legendColor: "#00734c",
     oversample: 3,
     attribution: "© SEPA — OGL v3.0",
   },
@@ -263,6 +286,18 @@ export const WMS_LAYERS = [
     url: "https://maps.gov.scot/server/services/ScotGov/PeopleSociety/MapServer/WMSServer",
     layers: "SIMD2020",
     crs: "4326",
+    // ponytail: ArcGIS again (tiny baked-in legend). SIMD is a 5-class quintile
+    // ramp, so it gets legendItems (swatch + label per class) instead of a single
+    // legendColor. Colours read off the server PNG. Quintile 1 = 20% most deprived
+    // datazones in Scotland, 5 = least. Verified Jul 2026.
+    legendText: "Quintile of the 2020 ranking (datazones):",
+    legendItems: [
+      { color: "#0766ab", label: "1 — most deprived" },
+      { color: "#42a1ca", label: "2" },
+      { color: "#7ccec4", label: "3" },
+      { color: "#bae3bc", label: "4" },
+      { color: "#f1fae8", label: "5 — least deprived" },
+    ],
     attribution: "© Scottish Government / SIMD — OGL v3.0",
   },
   {

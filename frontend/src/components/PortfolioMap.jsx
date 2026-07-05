@@ -188,6 +188,8 @@ export default function PortfolioMap({
           labelHtml: label,
           group: cfg.group || "Layers",
           legendText: cfg.legendText,
+          legendColor: cfg.legendColor,
+          legendItems: cfg.legendItems,
           legendUrl: `${cfg.url}${sep}service=WMS&request=GetLegendGraphic&version=1.3.0&format=image/png&layer=${encodeURIComponent(cfg.layers.split(",")[0])}`,
         });
       });
@@ -240,7 +242,7 @@ export default function PortfolioMap({
       legend.onAdd = () => {
         const div = L.DomUtil.create("div", "wms-legend");
         div.style.cssText =
-          "background:rgba(255,255,255,0.95);border:1px solid #e2e8f0;border-radius:8px;padding:6px 8px;margin-top:6px;max-height:45vh;overflow:auto;box-shadow:0 1px 4px rgba(15,23,42,0.12);font-size:12px;max-width:230px;";
+          "background:rgba(255,255,255,0.95);border:1px solid #e2e8f0;border-radius:8px;padding:10px 12px;margin-top:6px;max-height:45vh;overflow:auto;box-shadow:0 1px 4px rgba(15,23,42,0.12);font-size:14px;max-width:280px;";
         L.DomEvent.disableScrollPropagation(div);
         L.DomEvent.disableClickPropagation(div);
         const render = () => {
@@ -248,10 +250,21 @@ export default function PortfolioMap({
           div.style.display = active.length ? "block" : "none";
           div.innerHTML = active
             .map((e) => {
-              const body = e.legendText
-                ? `<div style="color:#475569;">${e.legendText}</div>`
-                : `<img src="${e.legendUrl}" alt="" style="max-width:100%;display:block;" onerror="this.parentNode.style.display='none'">`;
-              return `<div style="margin-bottom:6px;"><div style="font-weight:600;margin-bottom:2px;">${e.label}</div>${body}</div>`;
+              const dot = (c) =>
+                `<span style="display:inline-block;width:15px;height:15px;border-radius:3px;background:${c};border:1px solid rgba(15,23,42,0.15);margin-right:7px;vertical-align:-3px;flex:0 0 auto;"></span>`;
+              let body;
+              if (e.legendItems) {
+                const cap = e.legendText ? `<div style="color:#475569;line-height:1.4;margin-bottom:3px;">${e.legendText}</div>` : "";
+                const rows = e.legendItems
+                  .map((it) => `<div style="display:flex;align-items:center;margin-top:3px;color:#475569;">${dot(it.color)}<span>${it.label}</span></div>`)
+                  .join("");
+                body = cap + rows;
+              } else if (e.legendText) {
+                body = `<div style="color:#475569;line-height:1.4;">${e.legendColor ? dot(e.legendColor) : ""}${e.legendText}</div>`;
+              } else {
+                body = `<img src="${e.legendUrl}" alt="" style="max-width:100%;display:block;" onerror="this.parentNode.style.display='none'">`;
+              }
+              return `<div style="margin-bottom:10px;"><div style="font-weight:600;margin-bottom:3px;">${e.label}</div>${body}</div>`;
             })
             .join("");
         };
