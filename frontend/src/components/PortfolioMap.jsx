@@ -42,6 +42,7 @@ import {
   buildPropertyFeatureAssignments,
   buildBlockTooltipHtml,
   colorForMode,
+  blockRingColor,
 } from "../utils/mapHelpers.js";
 import {
   createClusterIcon,
@@ -66,10 +67,9 @@ export default function PortfolioMap({
   suppressFit = false,
   overlays = [],
   colorBy = "readiness",
-  neutralMarkers = false,
+  riskColorBy = null,
   canvasStyle = {},
 }) {
-  const NEUTRAL_RING = "#64748b";
   const mapDivRef = useRef(null);
   const mapRef = useRef(null);
   const pointLayerRef = useRef(null);
@@ -369,12 +369,13 @@ export default function PortfolioMap({
       blockPoints.forEach((point) => {
         const isSelected = sameBlock(selectedBlock, point.raw);
         const baseZ = isSelected ? 1000 : 0;
+        const ring = riskColorBy ? blockRingColor(point.raw, riskColorBy) : null;
         const marker = L.marker([point.lat, point.lon], {
-          icon: createBlockCountIcon(point, currentZoom, isSelected, 1, 1, neutralMarkers ? NEUTRAL_RING : null),
+          icon: createBlockCountIcon(point, currentZoom, isSelected, 1, 1, ring),
           keyboard: false,
           zIndexOffset: baseZ,
           _units: point.units,
-          _ringColor: neutralMarkers ? NEUTRAL_RING : riskColor(point.raw),
+          _ringColor: ring || riskColor(point.raw),
         });
 
         marker.on("mouseover", () => marker.setZIndexOffset(10000));
@@ -386,10 +387,10 @@ export default function PortfolioMap({
           }
         });
         marker.bindTooltip(
-          buildBlockTooltipHtml(point),
+          buildBlockTooltipHtml(point, Boolean(riskColorBy)),
           { direction: "top", sticky: true, opacity: 0.97 }
         );
-        marker.bindPopup(buildFlatListPopupHtml(point), { maxWidth: 320 });
+        marker.bindPopup(buildFlatListPopupHtml(point, Boolean(riskColorBy)), { maxWidth: 320 });
         attachFlatListPopupHandlers(marker, point, onSelectProperty);
         clusterGroup.addLayer(marker);
         if (isSelected) selectedMarkerRef.current = marker;
@@ -475,7 +476,7 @@ export default function PortfolioMap({
     selectedBlock,
     selectedProperty,
     visiblePoints.length,
-    neutralMarkers,
+    riskColorBy,
   ]);
 
   useEffect(() => {
