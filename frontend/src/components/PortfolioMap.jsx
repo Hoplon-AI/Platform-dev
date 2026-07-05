@@ -66,8 +66,10 @@ export default function PortfolioMap({
   suppressFit = false,
   overlays = [],
   colorBy = "readiness",
+  neutralMarkers = false,
   canvasStyle = {},
 }) {
+  const NEUTRAL_RING = "#64748b";
   const mapDivRef = useRef(null);
   const mapRef = useRef(null);
   const pointLayerRef = useRef(null);
@@ -145,11 +147,13 @@ export default function PortfolioMap({
       scrollWheelZoom: true,
       zoomControl: true,
       attributionControl: false,
+      minZoom: 4, // stop zooming out far enough to see repeated globe copies
     }).setView(DEFAULT_CENTER, DEFAULT_ZOOM);
 
     L.tileLayer("https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png", {
       subdomains: "abcd",
       maxZoom: 20,
+      noWrap: true,
       crossOrigin: "anonymous",
       keepBuffer: 4,
       attribution: "&copy; OpenStreetMap &copy; CARTO",
@@ -229,7 +233,7 @@ export default function PortfolioMap({
         return div;
       };
       picker.addTo(map);
-      L.control.attribution().addTo(map);
+      L.control.attribution({ prefix: false }).addTo(map);
 
       // ponytail: warm the browser cache for every legend PNG at mount, so the
       // first layer-toggle shows its legend instantly instead of paying a WMS
@@ -366,11 +370,11 @@ export default function PortfolioMap({
         const isSelected = sameBlock(selectedBlock, point.raw);
         const baseZ = isSelected ? 1000 : 0;
         const marker = L.marker([point.lat, point.lon], {
-          icon: createBlockCountIcon(point, currentZoom, isSelected),
+          icon: createBlockCountIcon(point, currentZoom, isSelected, 1, 1, neutralMarkers ? NEUTRAL_RING : null),
           keyboard: false,
           zIndexOffset: baseZ,
           _units: point.units,
-          _ringColor: riskColor(point.raw),
+          _ringColor: neutralMarkers ? NEUTRAL_RING : riskColor(point.raw),
         });
 
         marker.on("mouseover", () => marker.setZIndexOffset(10000));
@@ -471,6 +475,7 @@ export default function PortfolioMap({
     selectedBlock,
     selectedProperty,
     visiblePoints.length,
+    neutralMarkers,
   ]);
 
   useEffect(() => {
