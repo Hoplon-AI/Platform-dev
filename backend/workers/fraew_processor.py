@@ -14,16 +14,35 @@ Two-pass LLM extraction (mirrors fra_processor.py):
   Groq free tier hard limit: 6,000 tokens per request (~18,000 chars)
   Pass 1 → first 18K chars: metadata, building info, fire safety features
   Pass 2 → last 18K chars:  wall types, remedial actions, conclusions
-  Merged → single FRAEWExtractedFeatures object → written to DB
+  Merged → single FRAEWExtraction (Pydantic) object → written to DB
 """
 
 import json
 import logging
 import re
 import uuid
-from dataclasses import dataclass, field
 from datetime import date, datetime
-from typing import Any, Optional
+from typing import Any, Literal, Optional
+
+from pydantic import BaseModel, Field, ValidationError, ValidationInfo, field_validator, model_validator
+
+from backend.workers.extraction_common import (
+    WARN_WEIGHT_DROPPED,
+    Citation,
+    _date_to_str,
+    _to_bool,
+    _to_date,
+    _to_float,
+    _to_str,
+    citations_to_json,
+    composite_confidence,
+    coverage_score,
+    ctx_warn,
+    make_warning,
+    parse_citations,
+    verify_citations,
+    verify_item_sources,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -36,72 +55,193 @@ _ADDR_STOP_WORDS = frozenset({
 })
 
 
-def _to_date(value) -> Optional[date]:
-    """Convert YYYY-MM-DD string (or date/None) to date object for asyncpg."""
-    if value is None:
-        return None
-    if isinstance(value, date) and not isinstance(value, datetime):
-        return value
-    if isinstance(value, datetime):
-        return value.date()
-    if isinstance(value, str):
-        s = value.strip()
-        if not s or s.lower() in ("null", "n/a", "unknown", "tbc", "tbd", "none"):
-            return None
-        try:
-            return date.fromisoformat(s[:10])
-        except ValueError:
-            logger.warning("Could not parse date: %r", value)
-    return None
-
-
 # ──────────────────────────────────────────────────────────────────────
-# Data classes
+# Pydantic models — all coercion happens in validators
 # ──────────────────────────────────────────────────────────────────────
 
-@dataclass
-class WallTypeAssessment:
+RiskLevel = Literal["low", "medium", "high"]
+
+_VALID_INSULATION = ("eps", "mineral_wool", "pir", "phenolic", "unknown")
+_VALID_RENDER     = ("cement", "acrylic", "silicone", "unknown")
+
+
+class WallTypeAssessment(BaseModel):
     """
     PAS 9980 risk assessment for one external wall type.
     Elizabeth Court example: Wall Type 1 (EPS), Wall Type 2 (mineral wool), Balconies.
     """
-    type_ref:               str                 # "Wall Type 1", "Balconies", etc.
-    description:            Optional[str]        # "Render to EPS insulation with masonry"
-    coverage_percent:       Optional[float]      # 80.0 (% of total external wall)
+    type_ref:               str = "Wall Type"
+    description:            Optional[str] = None    # "Render to EPS insulation with masonry"
+    coverage_percent:       Optional[float] = None  # 80.0 (% of total external wall)
 
-    insulation_type:        Optional[str]        # eps | mineral_wool | pir | phenolic | unknown
-    insulation_combustible: Optional[bool]
-    render_type:            Optional[str]        # cement | acrylic | silicone | unknown
-    render_combustible:     Optional[bool]
+    insulation_type:        Optional[str] = None    # eps | mineral_wool | pir | phenolic | unknown
+    insulation_combustible: Optional[bool] = None
+    render_type:            Optional[str] = None    # cement | acrylic | silicone | unknown
+    render_combustible:     Optional[bool] = None
 
     # PAS 9980 Step 5 risk scores
-    spread_risk:    Optional[str]                # low | medium | high
-    entry_risk:     Optional[str]                # low | medium | high
-    occupant_risk:  Optional[str]                # low | medium | high
-    overall_risk:   Optional[str]                # low | medium | high
+    spread_risk:    Optional[RiskLevel] = None
+    entry_risk:     Optional[RiskLevel] = None
+    occupant_risk:  Optional[RiskLevel] = None
+    overall_risk:   Optional[RiskLevel] = None
 
     remedial_required: bool = False
     remedial_detail:   Optional[str] = None
 
+    @field_validator("type_ref", mode="before")
+    @classmethod
+    def _norm_type_ref(cls, v: Any) -> str:
+        return _to_str(v) or "Wall Type"
 
-@dataclass
-class FRAEWExtractedFeatures:
+    @field_validator("description", "remedial_detail", mode="before")
+    @classmethod
+    def _clean_str(cls, v: Any) -> Optional[str]:
+        return _to_str(v)
+
+    @field_validator("coverage_percent", mode="before")
+    @classmethod
+    def _norm_coverage(cls, v: Any, info: ValidationInfo) -> Optional[float]:
+        if v is None:
+            return None
+        try:
+            pct = float(v)
+        except (TypeError, ValueError):
+            ctx_warn(info.context, "wall_types.coverage_percent", v, "not a number, nulled")
+            return None
+        if not 0 <= pct <= 100:
+            ctx_warn(info.context, "wall_types.coverage_percent", v, "outside 0-100, nulled")
+            return None
+        return pct
+
+    @field_validator("insulation_type", mode="before")
+    @classmethod
+    def _norm_insulation(cls, v: Any, info: ValidationInfo) -> Optional[str]:
+        s = _to_str(v)
+        if s is None:
+            return None
+        s = s.lower()
+        if s not in _VALID_INSULATION:
+            ctx_warn(info.context, "wall_types.insulation_type", v,
+                     "not a valid insulation enum, set to unknown")
+            return "unknown"
+        return s
+
+    @field_validator("render_type", mode="before")
+    @classmethod
+    def _norm_render(cls, v: Any, info: ValidationInfo) -> Optional[str]:
+        s = _to_str(v)
+        if s is None:
+            return None
+        s = s.lower()
+        if s not in _VALID_RENDER:
+            ctx_warn(info.context, "wall_types.render_type", v,
+                     "not a valid render enum, set to unknown")
+            return "unknown"
+        return s
+
+    @field_validator("spread_risk", "entry_risk", "occupant_risk", "overall_risk", mode="before")
+    @classmethod
+    def _norm_risk(cls, v: Any, info: ValidationInfo) -> Optional[str]:
+        s = _to_str(v)
+        if s is None:
+            return None
+        s = s.lower()
+        if s not in ("low", "medium", "high"):
+            ctx_warn(info.context, f"wall_types.{info.field_name}", v,
+                     "not a valid risk level, nulled")
+            return None
+        return s
+
+    @field_validator("insulation_combustible", "render_combustible", mode="before")
+    @classmethod
+    def _norm_bool(cls, v: Any) -> Optional[bool]:
+        return _to_bool(v)
+
+    @field_validator("remedial_required", mode="before")
+    @classmethod
+    def _norm_flag(cls, v: Any) -> bool:
+        return bool(_to_bool(v) or False)
+
+
+class FRAEWRemedialAction(BaseModel):
+    """One remedial action on the external wall system."""
+    action:      str
+    priority:    Literal["advisory", "low", "medium", "high"] = "low"
+    due_date:    Optional[date] = None
+    responsible: Optional[str] = None
+    status:      Literal["outstanding", "completed"] = "outstanding"
+    # citation: page the LLM found this action on; verification set by Python
+    pg:              Optional[int] = None
+    source_verified: Optional[bool] = None
+    source_page:     Optional[int] = None
+
+    @field_validator("action", mode="before")
+    @classmethod
+    def _require_action(cls, v: Any) -> str:
+        s = _to_str(v)
+        if not s:
+            raise ValueError("remedial action text is empty")
+        return s
+
+    @field_validator("pg", mode="before")
+    @classmethod
+    def _pg_to_int(cls, v: Any) -> Optional[int]:
+        try:
+            return int(v) if v is not None else None
+        except (TypeError, ValueError):
+            return None
+
+    @field_validator("responsible", mode="before")
+    @classmethod
+    def _clean_str(cls, v: Any) -> Optional[str]:
+        return _to_str(v)
+
+    @field_validator("due_date", mode="before")
+    @classmethod
+    def _parse_date(cls, v: Any, info: ValidationInfo) -> Optional[date]:
+        d = _to_date(v)
+        if d is None and _to_str(v) is not None:
+            ctx_warn(info.context, "remedial_actions.due_date", v, "unparseable date, nulled")
+        return d
+
+    @field_validator("priority", mode="before")
+    @classmethod
+    def _norm_priority(cls, v: Any) -> str:
+        s = (_to_str(v) or "").lower()
+        return s if s in ("advisory", "low", "medium", "high") else "low"
+
+    @field_validator("status", mode="before")
+    @classmethod
+    def _norm_status(cls, v: Any) -> str:
+        s = (_to_str(v) or "").lower()
+        return "completed" if any(k in s for k in ("complet", "done", "closed", "resolved")) \
+            else "outstanding"
+
+
+class FRAEWExtraction(BaseModel):
+    """Validated, normalised output of one FRAEW LLM extraction call."""
+
     # Report metadata
-    report_reference:       Optional[str]
-    assessment_date:        Optional[str]       # site investigation date
-    report_date:            Optional[str]       # date report issued
-    assessment_valid_until: Optional[str]
+    report_reference:       Optional[str] = None
+    assessment_date:        Optional[date] = None   # site investigation date
+    report_date:            Optional[date] = None   # date report issued
+    assessment_valid_until: Optional[date] = None
 
     # Assessor (report writer)
-    assessor_name:          Optional[str]
-    assessor_company:       Optional[str]
-    assessor_qualification: Optional[str]
+    assessor_name:          Optional[str] = None
+    assessor_company:       Optional[str] = None
+    assessor_qualification: Optional[str] = None
 
     # Fire engineer (Clause 14)
-    fire_engineer_name:           Optional[str]
-    fire_engineer_company:        Optional[str]
-    fire_engineer_qualification:  Optional[str]
-    clause_14_applied:            bool = False
+    fire_engineer_name:          Optional[str] = None
+    fire_engineer_company:       Optional[str] = None
+    fire_engineer_qualification: Optional[str] = None
+    clause_14_applied:           bool = False
+
+    # Building identity (single-pass prompt only)
+    block_reference:  Optional[str] = None
+    building_name:    Optional[str] = None
+    building_address: Optional[str] = None
 
     # Building description
     building_height_m:               Optional[float] = None
@@ -114,18 +254,18 @@ class FRAEWExtractedFeatures:
     retrofit_year:                   Optional[int]   = None
 
     # PAS 9980
-    pas_9980_version:    str           = "2022"
-    pas_9980_compliant:  Optional[bool] = None
-    building_risk_rating: Optional[str] = None      # raw text from document
+    pas_9980_version:     str            = "2022"
+    pas_9980_compliant:   Optional[bool] = None
+    building_risk_rating: Optional[str]  = None     # raw text from document
 
     # Interim and remedial
     interim_measures_required: bool = False
     interim_measures_detail:   Optional[str] = None
     has_remedial_actions:      bool = False
-    remedial_actions:          list = field(default_factory=list)
+    remedial_actions:          list[FRAEWRemedialAction] = Field(default_factory=list)
 
     # Wall types — core FRAEW data
-    wall_types: list = field(default_factory=list)  # list[WallTypeAssessment]
+    wall_types: list[WallTypeAssessment] = Field(default_factory=list)
 
     # Fire safety features
     cavity_barriers_present: Optional[bool] = None
@@ -140,7 +280,7 @@ class FRAEWExtractedFeatures:
     # Compliance
     bs8414_test_evidence: Optional[bool] = None
     br135_criteria_met:   Optional[bool] = None
-    adb_compliant:        Optional[str]  = None     # compliant | non_compliant | uncertain
+    adb_compliant:        Optional[str]  = None     # compliant | non_compliant | uncertain | not_applicable
 
     # Recommended actions
     height_survey_recommended:           bool = False
@@ -148,7 +288,209 @@ class FRAEWExtractedFeatures:
     intrusive_investigation_recommended: bool = False
     asbestos_suspected:                  bool = False
 
-    extraction_confidence: float = 0.5
+    # per-field citations — enriched with verification results in
+    # _parse_llm_response (verified/found_page/snippet never trusted from LLM)
+    citations:               dict[str, Citation] = Field(default_factory=dict)
+    # confidence — extraction_confidence holds the composite after
+    # _parse_llm_response; the raw LLM self-report is kept alongside
+    extraction_confidence:   float = 0.5
+    llm_reported_confidence: Optional[float] = None
+    # repair/skip events harvested during validation (never LLM-supplied)
+    validation_warnings:     list[dict] = Field(default_factory=list)
+
+    # ── string fields ──────────────────────────────────────────────────
+    @field_validator(
+        "report_reference", "assessor_name", "assessor_company", "assessor_qualification",
+        "fire_engineer_name", "fire_engineer_company", "fire_engineer_qualification",
+        "block_reference", "building_name", "building_address",
+        "construction_frame_type", "external_wall_base_construction",
+        "building_risk_rating", "interim_measures_detail",
+        mode="before",
+    )
+    @classmethod
+    def _clean_str(cls, v: Any) -> Optional[str]:
+        return _to_str(v)
+
+    # ── date fields ────────────────────────────────────────────────────
+    @field_validator("assessment_date", "report_date", "assessment_valid_until", mode="before")
+    @classmethod
+    def _parse_date(cls, v: Any, info: ValidationInfo) -> Optional[date]:
+        d = _to_date(v)
+        if d is None and _to_str(v) is not None:
+            ctx_warn(info.context, info.field_name, v, "unparseable date, nulled")
+        return d
+
+    # ── enums ──────────────────────────────────────────────────────────
+    @field_validator("evacuation_strategy", mode="before")
+    @classmethod
+    def _norm_evac(cls, v: Any, info: ValidationInfo) -> Optional[str]:
+        VALID = ("stay_put", "simultaneous", "phased", "temporary_evacuation")
+        s = _to_str(v)
+        if s is not None and s not in VALID:
+            ctx_warn(info.context, "evacuation_strategy", v, "not a valid strategy enum, nulled")
+            return None
+        return s
+
+    @field_validator("adb_compliant", mode="before")
+    @classmethod
+    def _norm_adb(cls, v: Any, info: ValidationInfo) -> Optional[str]:
+        VALID = ("compliant", "non_compliant", "uncertain", "not_applicable")
+        s = _to_str(v)
+        if s is None:
+            return None
+        s = s.lower()
+        if s not in VALID:
+            ctx_warn(info.context, "adb_compliant", v, "not a valid ADB enum, nulled")
+            return None
+        return s
+
+    @field_validator("building_height_category", mode="before")
+    @classmethod
+    def _norm_height_cat(cls, v: Any, info: ValidationInfo) -> Optional[str]:
+        VALID = ("under_11m", "11_to_18m", "18_to_30m", "over_30m")
+        s = _to_str(v)
+        if s is not None and s not in VALID:
+            ctx_warn(info.context, "building_height_category", v,
+                     "not a valid height category, nulled (re-derived from height if possible)")
+            return None
+        return s
+
+    @field_validator("pas_9980_version", mode="before")
+    @classmethod
+    def _norm_pas_version(cls, v: Any) -> str:
+        return _to_str(v) or "2022"
+
+    # ── numeric fields ─────────────────────────────────────────────────
+    @field_validator("building_height_m", mode="before")
+    @classmethod
+    def _norm_height(cls, v: Any, info: ValidationInfo) -> Optional[float]:
+        if v is None:
+            return None
+        try:
+            return float(v)
+        except (TypeError, ValueError):
+            ctx_warn(info.context, "building_height_m", v, "not a number, nulled")
+            return None
+
+    @field_validator("num_storeys", "num_units", "build_year", "retrofit_year", mode="before")
+    @classmethod
+    def _to_int(cls, v: Any, info: ValidationInfo) -> Optional[int]:
+        if v is None:
+            return None
+        try:
+            return int(v)
+        except (TypeError, ValueError):
+            ctx_warn(info.context, info.field_name, v, "not an integer, nulled")
+            return None
+
+    # ── Optional[bool] fields ──────────────────────────────────────────
+    @field_validator(
+        "pas_9980_compliant",
+        "cavity_barriers_present", "cavity_barriers_windows", "cavity_barriers_floors",
+        "fire_breaks_floor_level", "fire_breaks_party_walls",
+        "dry_riser_present", "wet_riser_present",
+        "bs8414_test_evidence", "br135_criteria_met",
+        mode="before",
+    )
+    @classmethod
+    def _to_optional_bool(cls, v: Any, info: ValidationInfo) -> Optional[bool]:
+        b = _to_bool(v)
+        if b is None and v is not None:
+            ctx_warn(info.context, info.field_name, v, "unrecognised boolean, nulled")
+        return b
+
+    # ── required-bool flags ────────────────────────────────────────────
+    @field_validator(
+        "clause_14_applied", "interim_measures_required", "has_remedial_actions",
+        "height_survey_recommended", "fire_door_survey_recommended",
+        "intrusive_investigation_recommended", "asbestos_suspected",
+        mode="before",
+    )
+    @classmethod
+    def _to_bool_flag(cls, v: Any) -> bool:
+        return bool(_to_bool(v) or False)
+
+    # ── confidence clamp ───────────────────────────────────────────────
+    @field_validator("extraction_confidence", mode="before")
+    @classmethod
+    def _clamp_confidence(cls, v: Any, info: ValidationInfo) -> float:
+        try:
+            float(v)
+        except (TypeError, ValueError):
+            ctx_warn(info.context, "extraction_confidence", v,
+                     "self-reported confidence unparseable, defaulted to 0.5")
+        return _to_float(v, default=0.5)
+
+    # ── citations block ────────────────────────────────────────────────
+    @field_validator("citations", mode="before")
+    @classmethod
+    def _parse_citations(cls, v: Any, info: ValidationInfo) -> dict:
+        return parse_citations(v, info.context)
+
+    # ── wall types — validate each; skipped items become warnings ─────
+    @field_validator("wall_types", mode="before")
+    @classmethod
+    def _parse_wall_types(cls, v: Any, info: ValidationInfo) -> list:
+        if v is None:
+            return []
+        if not isinstance(v, list):
+            ctx_warn(info.context, "wall_types", type(v).__name__,
+                     "not a list, dropped", weight=WARN_WEIGHT_DROPPED)
+            return []
+        result = []
+        for i, wt in enumerate(v):
+            if not isinstance(wt, dict):
+                ctx_warn(info.context, f"wall_types[{i}]", wt,
+                         "not an object, dropped", weight=WARN_WEIGHT_DROPPED)
+                continue
+            try:
+                result.append(WallTypeAssessment.model_validate(wt, context=info.context))
+            except ValidationError as exc:
+                ctx_warn(info.context, f"wall_types[{i}]", wt.get("type_ref"),
+                         f"invalid wall type dropped: {exc.errors()[0].get('msg', 'validation error')}",
+                         weight=WARN_WEIGHT_DROPPED)
+                logger.warning("Dropped invalid wall type %d: %s", i, exc)
+        return result
+
+    # ── remedial actions ───────────────────────────────────────────────
+    @field_validator("remedial_actions", mode="before")
+    @classmethod
+    def _parse_remedials(cls, v: Any, info: ValidationInfo) -> list:
+        if v is None:
+            return []
+        if not isinstance(v, list):
+            ctx_warn(info.context, "remedial_actions", type(v).__name__,
+                     "not a list, dropped", weight=WARN_WEIGHT_DROPPED)
+            return []
+        result = []
+        for i, item in enumerate(v):
+            if not isinstance(item, dict):
+                ctx_warn(info.context, f"remedial_actions[{i}]", item,
+                         "not an object, dropped", weight=WARN_WEIGHT_DROPPED)
+                continue
+            try:
+                parsed = FRAEWRemedialAction.model_validate(item, context=info.context)
+                # never trust verification fields from the LLM
+                parsed.source_verified = None
+                parsed.source_page = None
+                result.append(parsed)
+            except ValidationError as exc:
+                ctx_warn(info.context, f"remedial_actions[{i}]", item.get("action"),
+                         f"invalid remedial action dropped: {exc.errors()[0].get('msg', 'validation error')}",
+                         weight=WARN_WEIGHT_DROPPED)
+                logger.warning("Dropped invalid remedial action %d: %s", i, exc)
+        return result
+
+    # ── derive height category from numeric height when enum missing ──
+    @model_validator(mode="after")
+    def _derive_height_category_from_height(self):
+        if self.building_height_category is None and self.building_height_m is not None:
+            h = self.building_height_m
+            if h < 11:    self.building_height_category = "under_11m"
+            elif h <= 18: self.building_height_category = "11_to_18m"
+            elif h <= 30: self.building_height_category = "18_to_30m"
+            else:         self.building_height_category = "over_30m"
+        return self
 
 
 # ──────────────────────────────────────────────────────────────────────
@@ -186,6 +528,14 @@ Risk levels: low | medium | high
   BS 8414 test → bs8414_test_evidence
   BRE 135 criteria → br135_criteria_met
   ADB (Approved Document B) → adb_compliant: compliant | non_compliant | uncertain | not_applicable
+
+━━━ CITATIONS ━━━
+The document text contains [Page N] markers. For each field in the "citations" object, cite the evidence:
+  pg = the [Page N] number where you found the value
+  q  = the FIRST 6-8 WORDS of the source sentence or table row, copied VERBATIM (exact characters)
+  c  = your confidence: "H" (stated explicitly) | "M" (inferred from context) | "L" (uncertain)
+Omit a field from "citations" when its value is null. Do NOT paraphrase q — it is matched
+character-for-character against the document.
 
 Return ONLY this JSON:
 {{
@@ -241,11 +591,12 @@ Return ONLY this JSON:
   "has_remedial_actions": true or false,
   "remedial_actions": [
     {{
-      "action": "what needs to be done",
+      "action": "what needs to be done — copy the document wording verbatim",
       "priority": "advisory or low or medium or high",
       "due_date": "YYYY-MM-DD or null",
       "responsible": "landlord or contractor or null",
-      "status": "outstanding or completed"
+      "status": "outstanding or completed",
+      "pg": page number where this action appears
     }}
   ],
 
@@ -266,6 +617,17 @@ Return ONLY this JSON:
       "remedial_detail": "description or null"
     }}
   ],
+
+  "citations": {{
+    "building_risk_rating": {{"pg": page number, "q": "first 6-8 words verbatim", "c": "H or M or L"}},
+    "assessment_date":      {{"pg": ..., "q": "...", "c": "..."}},
+    "report_date":          {{"pg": ..., "q": "...", "c": "..."}},
+    "building_height_m":    {{"pg": ..., "q": "...", "c": "..."}},
+    "num_storeys":          {{"pg": ..., "q": "...", "c": "..."}},
+    "evacuation_strategy":  {{"pg": ..., "q": "...", "c": "..."}},
+    "pas_9980_compliant":   {{"pg": ..., "q": "...", "c": "..."}},
+    "adb_compliant":        {{"pg": ..., "q": "...", "c": "..."}}
+  }},
 
   "extraction_confidence": 0.0 to 1.0
 }}
@@ -371,11 +733,12 @@ Return ONLY this JSON:
   "has_remedial_actions": true or false,
   "remedial_actions": [
     {{
-      "action": "what needs to be done",
+      "action": "what needs to be done — copy the document wording verbatim",
       "priority": "advisory or low or medium or high",
       "due_date": "YYYY-MM-DD or null",
       "responsible": "landlord or contractor or null",
-      "status": "outstanding or completed"
+      "status": "outstanding or completed",
+      "pg": page number where this action appears
     }}
   ],
 
@@ -434,20 +797,19 @@ class FRAEWProcessor:
         logger.info("FRAEWProcessor.process() block_id=%s ha_id=%s", block_id, ha_id)
 
         raw_json   = await self._call_llm(text)
-        features   = self._parse_llm_response(raw_json)
+        features   = self._parse_llm_response(raw_json, source_text=text)
         rag_status = self._normalise_rag_status(features.building_risk_rating)
         is_in_date      = self._compute_is_in_date(features.assessment_valid_until)
         height_category = self._derive_height_category(features)
         material_flags  = self._derive_material_flags(features.wall_types)
 
-        # Auto-resolve block_id from LLM-extracted building name/address if not provided
+        # Auto-resolve block_id from Pydantic-validated building fields
         if not block_id:
-            llm_data = self._extract_json(raw_json) or {}
             block_id = await self._resolve_block_id(
                 ha_id,
-                llm_data.get("building_name"),
-                llm_data.get("building_address"),
-                llm_data.get("block_reference"),
+                features.building_name,
+                features.building_address,
+                features.block_reference,
             )
 
         logger.info(
@@ -661,7 +1023,7 @@ class FRAEWProcessor:
           - building_risk_rating: prefer whichever pass found a non-null value;
             if both found one, prefer pass 2 (from Conclusion section)
           - remedial_actions from pass 2
-          - extraction_confidence = average of both passes
+          - extraction_confidence = min of both passes
         """
         meta = self._extract_json(meta_raw) or {}
         wall = self._extract_json(wall_raw) or {}
@@ -703,10 +1065,10 @@ class FRAEWProcessor:
         if wall.get("building_risk_rating"):
             merged["building_risk_rating"] = wall["building_risk_rating"]
 
-        # Average confidence
+        # Min confidence — a failed pass must not be masked by a good one
         c1 = float(meta.get("extraction_confidence") or 0.5)
         c2 = float(wall.get("extraction_confidence") or 0.5)
-        merged["extraction_confidence"] = round((c1 + c2) / 2, 3)
+        merged["extraction_confidence"] = round(min(c1, c2), 3)
 
         logger.info(
             "Merged FRAEW: risk=%s wall_types=%d remedial=%d confidence=%.3f",
@@ -767,115 +1129,112 @@ class FRAEWProcessor:
 
     # ── Parse LLM response ────────────────────────────────────────────
 
-    def _parse_llm_response(self, raw_json: str) -> FRAEWExtractedFeatures:
+    # Fields whose absence almost always means the extraction failed, not
+    # that the document is silent — used for the coverage component.
+    # (Height/storeys count as one slot: PAS 9980 is height-driven, but
+    # documents state one or the other.)
+    def _critical_values(self, features: "FRAEWExtraction") -> list:
+        return [
+            features.building_risk_rating,
+            features.assessment_date or features.report_date,
+            features.assessor_name,
+            features.wall_types,
+            features.building_height_m if features.building_height_m is not None
+            else features.num_storeys,
+        ]
+
+    def _parse_llm_response(self, raw_json: str, source_text: Optional[str] = None) -> FRAEWExtraction:
         data = self._extract_json(raw_json)
         if data is None:
             logger.error("Could not parse FRAEW LLM response")
-            return self._empty_features(confidence=0.1)
+            empty = FRAEWExtraction(extraction_confidence=0.1)
+            empty.validation_warnings = [make_warning(
+                "_document", None, "LLM response was not parseable JSON", weight=0.5)]
+            return empty
 
-        # Parse wall types
-        VALID_INSULATION = ("eps", "mineral_wool", "pir", "phenolic", "unknown")
-        VALID_RISK       = ("low", "medium", "high")
+        # These are computed here, never accepted from the LLM
+        data.pop("validation_warnings", None)
+        data.pop("llm_reported_confidence", None)
 
-        wall_types = []
-        for wt in data.get("wall_types") or []:
-            if not isinstance(wt, dict):
-                continue
-            insulation = wt.get("insulation_type")
-            if insulation not in VALID_INSULATION:
-                insulation = "unknown" if insulation else None
+        warnings: list[dict] = []
+        try:
+            features = FRAEWExtraction.model_validate(data, context={"warnings": warnings})
+        except ValidationError as exc:
+            logger.error("FRAEWExtraction model_validate failed: %s", exc)
+            empty = FRAEWExtraction(extraction_confidence=0.1)
+            empty.validation_warnings = [make_warning(
+                "_document", None, f"model validation failed: {exc.errors()[0].get('msg', '')}",
+                weight=0.5)]
+            return empty
 
-            wall_types.append(WallTypeAssessment(
-                type_ref               = wt.get("type_ref", "Wall Type"),
-                description            = wt.get("description"),
-                coverage_percent       = wt.get("coverage_percent"),
-                insulation_type        = insulation,
-                insulation_combustible = wt.get("insulation_combustible"),
-                render_type            = wt.get("render_type"),
-                render_combustible     = wt.get("render_combustible"),
-                spread_risk   = wt.get("spread_risk")   if wt.get("spread_risk")   in VALID_RISK else None,
-                entry_risk    = wt.get("entry_risk")    if wt.get("entry_risk")    in VALID_RISK else None,
-                occupant_risk = wt.get("occupant_risk") if wt.get("occupant_risk") in VALID_RISK else None,
-                overall_risk  = wt.get("overall_risk")  if wt.get("overall_risk")  in VALID_RISK else None,
-                remedial_required = bool(wt.get("remedial_required", False)),
-                remedial_detail   = wt.get("remedial_detail"),
-            ))
+        # Consistency checks first — their warnings feed per-field citation scores
+        warnings.extend(self._consistency_warnings(features))
 
-        # Validate enums
-        evac = data.get("evacuation_strategy")
-        if evac not in ("stay_put", "simultaneous", "phased", "temporary_evacuation"):
-            evac = None
+        # Ground each cited value in the source text; unverifiable quotes
+        # and self-reported "L" fields append to warnings
+        verify_citations(features.citations, source_text, warnings)
+        verify_item_sources(features.remedial_actions, source_text, warnings,
+                            "remedial_actions", text_attr="action")
 
-        adb = data.get("adb_compliant")
-        if adb not in ("compliant", "non_compliant", "uncertain", "not_applicable"):
-            adb = None
+        features.llm_reported_confidence = features.extraction_confidence
+        features.validation_warnings = warnings
+        coverage = coverage_score(self._critical_values(features))
+        features.extraction_confidence = composite_confidence(
+            features.llm_reported_confidence, coverage, warnings)
 
-        height_cat = data.get("building_height_category")
-        if height_cat not in ("under_11m", "11_to_18m", "18_to_30m", "over_30m"):
-            height_cat = None
-        # Derive from numeric height if LLM returned wrong enum value (e.g. "over_18m")
-        if height_cat is None:
-            h = data.get("building_height_m")
-            if isinstance(h, (int, float)):
-                if h < 11:    height_cat = "under_11m"
-                elif h <= 18: height_cat = "11_to_18m"
-                elif h <= 30: height_cat = "18_to_30m"
-                else:         height_cat = "over_30m"
+        if warnings:
+            logger.warning(
+                "FRAEWProcessor: %d validation warning(s): %s",
+                len(warnings),
+                "; ".join(f"{w['field']}: {w['reason']}" for w in warnings[:10]),
+            )
+        if features.extraction_confidence < 0.3:
+            logger.warning(
+                "FRAEWProcessor: low extraction confidence %.2f (self=%.2f coverage=%.2f "
+                "warnings=%d risk=%s wall_types=%d)",
+                features.extraction_confidence, features.llm_reported_confidence,
+                coverage, len(warnings),
+                features.building_risk_rating, len(features.wall_types),
+            )
+        return features
 
-        return FRAEWExtractedFeatures(
-            report_reference        = data.get("report_reference"),
-            assessment_date         = data.get("assessment_date"),
-            report_date             = data.get("report_date"),
-            assessment_valid_until  = data.get("assessment_valid_until"),
-            assessor_name           = data.get("assessor_name"),
-            assessor_company        = data.get("assessor_company"),
-            assessor_qualification  = data.get("assessor_qualification"),
-            fire_engineer_name      = data.get("fire_engineer_name"),
-            fire_engineer_company   = data.get("fire_engineer_company"),
-            fire_engineer_qualification = data.get("fire_engineer_qualification"),
-            clause_14_applied       = bool(data.get("clause_14_applied", False)),
-            building_height_m       = data.get("building_height_m"),
-            building_height_category= height_cat,
-            num_storeys             = data.get("num_storeys"),
-            num_units               = data.get("num_units"),
-            build_year              = data.get("build_year"),
-            construction_frame_type = data.get("construction_frame_type"),
-            external_wall_base_construction = data.get("external_wall_base_construction"),
-            retrofit_year           = data.get("retrofit_year"),
-            pas_9980_version        = data.get("pas_9980_version", "2022"),
-            pas_9980_compliant      = data.get("pas_9980_compliant"),
-            building_risk_rating    = data.get("building_risk_rating"),
-            interim_measures_required = bool(data.get("interim_measures_required", False)),
-            interim_measures_detail = data.get("interim_measures_detail"),
-            has_remedial_actions    = bool(data.get("has_remedial_actions", False)),
-            remedial_actions        = data.get("remedial_actions") or [],
-            wall_types              = wall_types,
-            cavity_barriers_present = data.get("cavity_barriers_present"),
-            cavity_barriers_windows = data.get("cavity_barriers_windows"),
-            cavity_barriers_floors  = data.get("cavity_barriers_floors"),
-            fire_breaks_floor_level = data.get("fire_breaks_floor_level"),
-            fire_breaks_party_walls = data.get("fire_breaks_party_walls"),
-            dry_riser_present       = data.get("dry_riser_present"),
-            wet_riser_present       = data.get("wet_riser_present"),
-            evacuation_strategy     = evac,
-            bs8414_test_evidence    = data.get("bs8414_test_evidence"),
-            br135_criteria_met      = data.get("br135_criteria_met"),
-            adb_compliant           = adb,
-            height_survey_recommended           = bool(data.get("height_survey_recommended", False)),
-            fire_door_survey_recommended        = bool(data.get("fire_door_survey_recommended", False)),
-            intrusive_investigation_recommended = bool(data.get("intrusive_investigation_recommended", False)),
-            asbestos_suspected      = bool(data.get("asbestos_suspected", False)),
-            extraction_confidence   = float(data.get("extraction_confidence", 0.5)),
+    def _consistency_warnings(self, features: FRAEWExtraction) -> list[dict]:
+        """Cross-field sanity checks — each failure is a confidence penalty."""
+        out: list[dict] = []
+        today = date.today()
+
+        if (features.assessment_date and features.report_date
+                and features.assessment_date > features.report_date):
+            out.append(make_warning(
+                "assessment_date", _date_to_str(features.assessment_date),
+                "site investigation after report_date"))
+        if (features.report_date and features.assessment_valid_until
+                and features.assessment_valid_until < features.report_date):
+            out.append(make_warning(
+                "assessment_valid_until", _date_to_str(features.assessment_valid_until),
+                "before report_date"))
+        if features.build_year is not None and not (1600 <= features.build_year <= today.year):
+            out.append(make_warning(
+                "build_year", features.build_year, "outside plausible range"))
+        if (features.retrofit_year is not None and features.build_year is not None
+                and features.retrofit_year < features.build_year):
+            out.append(make_warning(
+                "retrofit_year", features.retrofit_year, "before build_year"))
+        if features.building_height_m is not None and not (2 <= features.building_height_m <= 150):
+            out.append(make_warning(
+                "building_height_m", features.building_height_m, "outside plausible range"))
+        if features.num_storeys is not None and not (1 <= features.num_storeys <= 70):
+            out.append(make_warning(
+                "num_storeys", features.num_storeys, "outside plausible range"))
+        coverage_total = sum(
+            wt.coverage_percent for wt in features.wall_types
+            if wt.coverage_percent is not None
         )
-
-    def _empty_features(self, confidence: float = 0.1) -> FRAEWExtractedFeatures:
-        return FRAEWExtractedFeatures(
-            report_reference=None, assessment_date=None, report_date=None,
-            assessment_valid_until=None, assessor_name=None, assessor_company=None,
-            assessor_qualification=None, fire_engineer_name=None,
-            fire_engineer_company=None, fire_engineer_qualification=None,
-            extraction_confidence=confidence,
-        )
+        if coverage_total > 120:
+            out.append(make_warning(
+                "wall_types.coverage_percent", coverage_total,
+                "wall type coverage percentages sum to >120%"))
+        return out
 
     # ── Derived fields ────────────────────────────────────────────────
 
@@ -917,15 +1276,12 @@ class FRAEWProcessor:
         logger.warning("FRAEW: unknown risk rating '%s' → defaulting to AMBER", building_risk_rating)
         return "AMBER"
 
-    def _compute_is_in_date(self, valid_until_str: Optional[str]) -> Optional[bool]:
-        if not valid_until_str:
+    def _compute_is_in_date(self, valid_until: Optional[date]) -> Optional[bool]:
+        if valid_until is None:
             return None
-        try:
-            return date.fromisoformat(valid_until_str[:10]) >= date.today()
-        except ValueError:
-            return None
+        return valid_until >= date.today()
 
-    def _derive_height_category(self, features: FRAEWExtractedFeatures) -> Optional[str]:
+    def _derive_height_category(self, features: FRAEWExtraction) -> Optional[str]:
         if features.building_height_category:
             valid = ("under_11m", "11_to_18m", "18_to_30m", "over_30m", "unknown")
             if features.building_height_category in valid:
@@ -979,7 +1335,7 @@ class FRAEWProcessor:
 
     async def _write_to_db(
         self,
-        features:        FRAEWExtractedFeatures,
+        features:        FRAEWExtraction,
         rag_status:      Optional[str],
         is_in_date:      Optional[bool],
         height_category: Optional[str],
@@ -993,10 +1349,10 @@ class FRAEWProcessor:
         fraew_id   = str(uuid.uuid4())
         now        = datetime.utcnow()
 
-        # Convert string dates → Python date objects for asyncpg
-        assessment_date_obj    = _to_date(features.assessment_date)
-        report_date_obj        = _to_date(features.report_date)
-        valid_until_obj        = _to_date(features.assessment_valid_until)
+        # Pydantic model holds date objects already
+        assessment_date_obj = features.assessment_date
+        report_date_obj     = features.report_date
+        valid_until_obj     = features.assessment_valid_until
 
         wall_types_json = json.dumps([
             {
@@ -1017,7 +1373,19 @@ class FRAEWProcessor:
             for wt in features.wall_types
         ])
 
-        remedial_actions_json = json.dumps(features.remedial_actions)
+        remedial_actions_json = json.dumps([
+            {
+                "action":          ra.action,
+                "priority":        ra.priority,
+                "due_date":        _date_to_str(ra.due_date),
+                "responsible":     ra.responsible,
+                "status":          ra.status,
+                "pg":              ra.pg,
+                "source_verified": ra.source_verified,
+                "source_page":     ra.source_page,
+            }
+            for ra in features.remedial_actions
+        ])
 
         raw_json = json.dumps({
             "report_reference":     features.report_reference,
@@ -1026,7 +1394,13 @@ class FRAEWProcessor:
             "bs8414_test_evidence": features.bs8414_test_evidence,
             "adb_compliant":        features.adb_compliant,
             "wall_type_count":      len(features.wall_types),
+            # raw LLM self-report — extraction_confidence column holds the composite
+            "llm_reported_confidence":  features.llm_reported_confidence,
+            "validation_warning_count": len(features.validation_warnings),
         })
+
+        validation_warnings_json = json.dumps(features.validation_warnings)
+        citations_json = json.dumps(citations_to_json(features.citations))
 
         async with self.db.transaction():
 
@@ -1076,7 +1450,7 @@ class FRAEWProcessor:
                     bs8414_test_evidence, br135_criteria_met, adb_compliant,
                     height_survey_recommended, fire_door_survey_recommended,
                     intrusive_investigation_recommended, asbestos_suspected,
-                    extraction_confidence, fraew_features_json,
+                    extraction_confidence, fraew_features_json, validation_warnings, citations,
                     created_at, updated_at
                 )
                 VALUES (
@@ -1106,8 +1480,8 @@ class FRAEWProcessor:
                     $53,$54,$55,
                     $56,$57,
                     $58,$59,
-                    $60,$61::jsonb,
-                    $62,$63
+                    $60,$61::jsonb,$62::jsonb,$63::jsonb,
+                    $64,$65
                 )
             """,
                 fraew_id, feature_id, block_id, ha_id, upload_id,
@@ -1150,7 +1524,7 @@ class FRAEWProcessor:
                 features.intrusive_investigation_recommended,
                 features.asbestos_suspected,
                 features.extraction_confidence,
-                raw_json,
+                raw_json, validation_warnings_json, citations_json,
                 now, now,
             )
 

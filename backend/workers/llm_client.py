@@ -396,16 +396,22 @@ class LLMClient:
             model       = GROQ_MODEL,
             max_tokens  = max_tokens,
             messages    = [{"role": "user", "content": prompt}],
-            temperature = 0.1,
+            temperature = 0,
         )
         return completion.choices[0].message.content
 
     async def _call_anthropic(self, prompt: str, max_tokens: int) -> str:
         message = await self._anthropic.messages.create(
-            model      = ANTHROPIC_MODEL,
-            max_tokens = max_tokens,
-            messages   = [{"role": "user", "content": prompt}],
+            model       = ANTHROPIC_MODEL,
+            max_tokens  = max_tokens,
+            temperature = 0,
+            messages    = [{"role": "user", "content": prompt}],
         )
+        if message.stop_reason == "max_tokens":
+            raise RuntimeError(
+                f"Anthropic response truncated (stop_reason=max_tokens, max_tokens={max_tokens}). "
+                "Increase max_tokens or reduce input."
+            )
         return message.content[0].text
 
     async def _call_bedrock(self, prompt: str, max_tokens: int) -> str:
@@ -413,6 +419,7 @@ class LLMClient:
         body = _json.dumps({
             "anthropic_version": "bedrock-2023-05-31",
             "max_tokens": max_tokens,
+            "temperature": 0,
             "messages": [{"role": "user", "content": prompt}],
         })
         loop = asyncio.get_event_loop()
@@ -423,6 +430,11 @@ class LLMClient:
             )
             return _json.loads(response["body"].read())
         result = await loop.run_in_executor(None, _invoke)
+        if result.get("stop_reason") == "max_tokens":
+            raise RuntimeError(
+                f"Bedrock response truncated (stop_reason=max_tokens, max_tokens={max_tokens}). "
+                "Increase max_tokens or reduce input."
+            )
         return result["content"][0]["text"]
 
     async def _call_gemini(self, prompt: str, max_tokens: int) -> str:
@@ -437,7 +449,7 @@ class LLMClient:
                 contents=prompt,
                 config=types.GenerateContentConfig(
                     max_output_tokens=16384,
-                    temperature=0.1,
+                    temperature=0,
                     thinking_config=types.ThinkingConfig(thinking_budget=0),
                 ),
             )

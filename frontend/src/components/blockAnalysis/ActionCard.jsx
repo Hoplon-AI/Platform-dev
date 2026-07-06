@@ -1,6 +1,7 @@
 import { useState } from "react";
+import { ActionSource } from "./Citations";
 
-export function ActionCard({ a, index }) {
+export function ActionCard({ a }) {
   const [open, setOpen] = useState(false);
   const today = new Date();
   today.setHours(0, 0, 0, 0);
@@ -50,10 +51,15 @@ export function ActionCard({ a, index }) {
 
         {/* Issue ref + preview */}
         <span style={{ flex: 1, minWidth: 0 }}>
-          {a.issue_ref && (
+          {(a.issue_ref || a.source_verified === true) && (
             <span style={{ fontSize: 11, fontWeight: 700, color: "var(--muted)", display: "block", marginBottom: 2 }}>
               {a.issue_ref}
               {a.hazard_type ? ` · ${a.hazard_type}` : ""}
+              {a.source_verified === true && (
+                <span style={{ color: "#166534" }} title={`Verified verbatim in source PDF (page ${a.source_page ?? a.pg ?? "?"})`}>
+                  {a.issue_ref || a.hazard_type ? " · " : ""}✓ p.{a.source_page ?? a.pg}
+                </span>
+              )}
             </span>
           )}
           <span style={{ fontSize: 13, color: "var(--text)", lineHeight: 1.5 }}>
@@ -115,6 +121,7 @@ export function ActionCard({ a, index }) {
               </div>
             )}
           </div>
+          <ActionSource a={a} />
         </div>
       )}
     </div>
@@ -126,7 +133,7 @@ export function ActionList({ items, max = 8 }) {
   return (
     <div style={{ marginTop: 10, display: "flex", flexDirection: "column", gap: 8 }}>
       {items.slice(0, max).map((a, i) => (
-        <ActionCard key={i} a={a} index={i} />
+        <ActionCard key={i} a={a} />
       ))}
       {items.length > max && (
         <div style={{ fontSize: 12, color: "var(--muted)", padding: "4px 0" }}>

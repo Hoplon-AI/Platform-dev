@@ -1823,6 +1823,16 @@ async def fire_documents(
     def _iso(v):
         return v.isoformat() if v is not None and hasattr(v, "isoformat") else v
 
+    def _load_jsonb(v, default):
+        if v is None:
+            return default
+        if isinstance(v, str):
+            try:
+                return json.loads(v)
+            except (ValueError, TypeError):
+                return default
+        return v
+
     pool = DatabasePool.get_pool()
     async with pool.acquire() as conn:
         portfolio = await _resolve_portfolio(conn, portfolio_id, tenant[0])
@@ -1864,7 +1874,11 @@ async def fire_documents(
                 COALESCE(f.outstanding_action_count, 0)      AS outstanding_action_count,
                 COALESCE(f.high_priority_action_count, 0)    AS high_priority_action_count,
                 COALESCE(f.no_date_action_count, 0)          AS no_date_action_count,
-                f.action_items
+                f.action_items,
+                f.extraction_confidence,
+                (f.raw_features->>'llm_reported_confidence')::float AS llm_reported_confidence,
+                f.validation_warnings,
+                f.citations
             FROM silver.fra_features f
             LEFT JOIN silver.document_features df ON df.feature_id = f.feature_id
             LEFT JOIN public.upload_audit ua       ON ua.upload_id = df.upload_id
@@ -1899,7 +1913,11 @@ async def fire_documents(
                 w.interim_measures_required,
                 w.interim_measures_detail,
                 w.remedial_actions,
-                w.pas_9980_compliant
+                w.pas_9980_compliant,
+                w.extraction_confidence,
+                (w.fraew_features_json->>'llm_reported_confidence')::float AS llm_reported_confidence,
+                w.validation_warnings,
+                w.citations
             FROM silver.fraew_features w
             LEFT JOIN silver.document_features df ON df.feature_id = w.feature_id
             LEFT JOIN public.upload_audit ua       ON ua.upload_id = w.upload_id
@@ -1956,6 +1974,12 @@ async def fire_documents(
                 "high_priority_action_count":   r["high_priority_action_count"],
                 "no_date_action_count":         r["no_date_action_count"],
                 "action_items":                 (json.loads(r["action_items"]) if isinstance(r["action_items"], str) else r["action_items"]) if r["action_items"] else [],
+                # validation_warnings stays null for rows processed before the
+                # grounding pipeline — the UI uses that to mark legacy scores
+                "extraction_confidence":        r["extraction_confidence"],
+                "llm_reported_confidence":      r["llm_reported_confidence"],
+                "validation_warnings":          _load_jsonb(r["validation_warnings"], None),
+                "citations":                    _load_jsonb(r["citations"], {}),
             },
             "fraew": None,
         })
@@ -1992,6 +2016,10 @@ async def fire_documents(
                 "interim_measures_detail":   r["interim_measures_detail"],
                 "pas_9980_compliant":        r["pas_9980_compliant"],
                 "remedial_actions":          (json.loads(r["remedial_actions"]) if isinstance(r["remedial_actions"], str) else r["remedial_actions"]) if r["remedial_actions"] else [],
+                "extraction_confidence":     r["extraction_confidence"],
+                "llm_reported_confidence":   r["llm_reported_confidence"],
+                "validation_warnings":       _load_jsonb(r["validation_warnings"], None),
+                "citations":                 _load_jsonb(r["citations"], {}),
             },
         })
 

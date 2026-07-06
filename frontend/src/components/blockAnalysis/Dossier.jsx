@@ -32,6 +32,31 @@ import {
 } from "./primitives";
 import ProvenanceCard from "./ProvenanceCard";
 import { ActionList } from "./ActionCard";
+import { ConfidenceBadge, WarningsPanel, SourceMark } from "./Citations";
+import { isLowConfidence } from "./citationsModel";
+
+// Wrap a KV value with its source mark; value untouched when there is
+// nothing to cite, so KV's own "—" placeholder behaviour is preserved.
+// Low-confidence fields (< 70% or unverifiable) are highlighted red.
+const withCite = (value, cite) => {
+  if (value === null || value === undefined || value === "" || !cite) return value;
+  const low = isLowConfidence(cite);
+  return (
+    <>
+      {low ? (
+        <span style={{
+          color: "#991b1b", background: "#fef2f2", border: "1px solid #fecaca",
+          borderRadius: 6, padding: "1px 6px",
+        }}>
+          {value}
+        </span>
+      ) : (
+        value
+      )}
+      <SourceMark cite={cite} />
+    </>
+  );
+};
 
 export default function Dossier({ block }) {
   const fra = block.latest_fra;
@@ -136,23 +161,34 @@ export default function Dossier({ block }) {
       </Section>
 
       {/* FRA */}
-      <Section title="Fire Risk Assessment (FRA)" subtitle="Internal / common-parts fire safety" defaultOpen accessory={<span className={`pill ${bandClass(fraBand)}`}>{fra ? fraBand : "None"}</span>}>
+      <Section
+        title="Fire Risk Assessment (FRA)"
+        subtitle="Internal / common-parts fire safety"
+        defaultOpen
+        accessory={
+          <>
+            <ConfidenceBadge doc={fra} />
+            <span className={`pill ${bandClass(fraBand)}`}>{fra ? fraBand : "None"}</span>
+          </>
+        }
+      >
         {!fra ? (
           <div className="muted">No FRA linked to this block.</div>
         ) : (
           <>
+            <WarningsPanel warnings={fra.validation_warnings} />
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: "0 24px" }}>
               <div>
-                <KV label="Risk rating" value={getFireDocumentRisk(fra)} />
+                <KV label="Risk rating" value={withCite(getFireDocumentRisk(fra), fra.citations?.risk_rating)} />
                 <KV label="Assessment type" value={fra.fra_assessment_type} tip={G.assessmentType} />
-                <KV label="Assessment date" value={fra.assessment_date} />
-                <KV label="Valid until" value={fra.assessment_valid_until} />
+                <KV label="Assessment date" value={withCite(fra.assessment_date, fra.citations?.assessment_date)} />
+                <KV label="Valid until" value={withCite(fra.assessment_valid_until, fra.citations?.assessment_valid_until)} />
                 <KV label="In date" value={<InDateBadge status={fraStatus} />} tip={inDateTip(fraStatus)} />
               </div>
               <div>
-                <KV label="Assessor" value={fra.assessor_name} />
+                <KV label="Assessor" value={withCite(fra.assessor_name, fra.citations?.assessor_name)} />
                 <KV label="Company" value={fra.assessor_company} />
-                <KV label="Evacuation strategy" value={fra.evacuation_strategy ? titleCase(fra.evacuation_strategy) : null} tip={G.evacuation} />
+                <KV label="Evacuation strategy" value={withCite(fra.evacuation_strategy ? titleCase(fra.evacuation_strategy) : null, fra.citations?.evacuation_strategy)} tip={G.evacuation} />
                 <KV label="BSA 2022 applicable" value={boolLabel(fra.bsa_2022_applicable)} tip={G.bsa2022} />
                 <KV label="MOR event noted" value={boolLabel(fra.mandatory_occurrence_noted)} tip={G.mor} />
               </div>
@@ -184,22 +220,33 @@ export default function Dossier({ block }) {
       </Section>
 
       {/* FRAEW */}
-      <Section title="External Wall System (FRAEW)" subtitle="Cladding, insulation & PAS 9980 appraisal" defaultOpen accessory={<span className={`pill ${bandClass(fraewBand)}`}>{fraew ? fraewBand : "None"}</span>}>
+      <Section
+        title="External Wall System (FRAEW)"
+        subtitle="Cladding, insulation & PAS 9980 appraisal"
+        defaultOpen
+        accessory={
+          <>
+            <ConfidenceBadge doc={fraew} />
+            <span className={`pill ${bandClass(fraewBand)}`}>{fraew ? fraewBand : "None"}</span>
+          </>
+        }
+      >
         {!fraew ? (
           <div className="muted">No FRAEW linked to this block.</div>
         ) : (
           <>
+            <WarningsPanel warnings={fraew.validation_warnings} />
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: "0 24px" }}>
               <div>
-                <KV label="Building risk rating" value={fraew.building_risk_rating ?? getFireDocumentRisk(fraew)} />
-                <KV label="PAS 9980 compliant" value={boolLabel(fraew.pas_9980_compliant)} tip={G.pas9980} />
+                <KV label="Building risk rating" value={withCite(fraew.building_risk_rating ?? getFireDocumentRisk(fraew), fraew.citations?.building_risk_rating)} />
+                <KV label="PAS 9980 compliant" value={withCite(boolLabel(fraew.pas_9980_compliant), fraew.citations?.pas_9980_compliant)} tip={G.pas9980} />
                 <KV label="Clause 14 applied" value={boolLabel(fraew.clause_14_applied)} tip={G.clause14} />
-                <KV label="Assessment date" value={fraew.assessment_date} />
+                <KV label="Assessment date" value={withCite(fraew.assessment_date, fraew.citations?.assessment_date)} />
                 <KV label="Valid until" value={fraew.assessment_valid_until} />
                 <KV label="In date" value={<InDateBadge status={fraewStatus} />} tip={inDateTip(fraewStatus)} />
               </div>
               <div>
-                <KV label="Building height" value={fraew.building_height_m ? `${fmt(fraew.building_height_m, 1)} m` : null} />
+                <KV label="Building height" value={withCite(fraew.building_height_m ? `${fmt(fraew.building_height_m, 1)} m` : null, fraew.citations?.building_height_m)} />
                 <KV label="Construction frame" value={fraew.construction_frame_type} />
                 <KV label="Retrofit year" value={fraew.retrofit_year} />
                 <KV label="Remediation required" value={boolLabel(fraew.has_remedial_actions ?? fraew.remediation_required)} />

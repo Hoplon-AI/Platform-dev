@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { fmt, isPresent } from "../../utils/blockModel";
+import { isPresent } from "../../utils/blockModel";
 import { PdfThumbnail } from "./primitives";
 import { openSourceDocument } from "./openSourceDocument";
 
@@ -8,8 +8,18 @@ import { openSourceDocument } from "./openSourceDocument";
 export default function ProvenanceCard({ doc }) {
   const [hover, setHover] = useState(false);
   const uploadId = doc.upload_id || doc.raw?.upload_id;
-  const conf = isPresent(doc.raw?.extraction_confidence)
-    ? `Confidence ${fmt(doc.raw.extraction_confidence, 2)}`
+  const features = doc.fra || doc.fraew || doc.raw || {};
+  const confidence = features.extraction_confidence ?? doc.raw?.extraction_confidence;
+  const legacy = features.validation_warnings === null || features.validation_warnings === undefined;
+  const citations = features.citations || {};
+  const citeList = Object.values(citations);
+  const verifiedCount = citeList.filter((c) => c?.verified === true).length;
+  const conf = isPresent(confidence)
+    ? legacy
+      ? "Extraction unverified — re-upload to verify against the source"
+      : confidence >= 0.85
+      ? `Extraction verified${citeList.length ? ` · ${verifiedCount}/${citeList.length} citations checked against the PDF` : ""}`
+      : "Extraction needs review — see warnings in the FRA/FRAEW section"
     : null;
   const typeLabel = doc.document_type === "FRA"
     ? "Fire Risk Assessment"
