@@ -300,6 +300,38 @@ export const WMS_LAYERS = [
     ],
     attribution: "© Scottish Government / SIMD — OGL v3.0",
   },
+  // ponytail: Scotland has NO crime-rate WMS (checked maps.gov.scot
+  // CrimeJusticeSafety = police-division boundaries only, PeopleSociety = SIMD
+  // aggregate only — Jul 2026). But the SIMD2020 FeatureServer layer exposes a
+  // per-datazone `crimerank` (1 = worst) — the SIMD crime domain, i.e. relative
+  // crime rate. So this is NOT a WMS tile layer: type "arcgis" fetches datazone
+  // polygons by viewport bbox (f=geojson, no key, OGL) and PortfolioMap renders
+  // a client-side quintile choropleth. Gated to zoom ≥ 11 to stay under the
+  // 1000-feature query cap. Reuses SIMD's blue→green ramp for on-brand
+  // consistency (red choropleth would breach the graphic standard).
+  {
+    key: "simd-crime-2020",
+    group: "Deprivation",
+    label: "SIMD 2020 — Crime domain (relative crime rate)",
+    coverage: "Scotland",
+    type: "arcgis",
+    url: "https://maps.gov.scot/server/rest/services/ScotGov/PeopleSociety/MapServer/7/query",
+    field: "crimerank", // 1 = most deprived (highest crime) … 6976 = least
+    rankMax: 6976, // SIMD2020 datazone count — quintile buckets = rankMax/5
+    nameField: "dzname",
+    rateField: "crimerate", // recorded SIMD crimes per 10,000 people
+    rateUnit: "crimes per 10,000 people",
+    minZoom: 11,
+    legendText: "Recorded SIMD crimes.Quintile of the 2020 ranking:",
+    legendItems: [
+      { color: "#0766ab", label: "1 — highest crime" },
+      { color: "#42a1ca", label: "2" },
+      { color: "#7ccec4", label: "3" },
+      { color: "#bae3bc", label: "4" },
+      { color: "#f1fae8", label: "5 — lowest crime" },
+    ],
+    attribution: "© Scottish Government / SIMD — OGL v3.0",
+  },
   {
     key: "wimd-2019",
     group: "Deprivation",
@@ -310,9 +342,76 @@ export const WMS_LAYERS = [
     crs: "3857",
     attribution: "© Welsh Government / WIMD 2019 — OGL v3.0",
   },
-  // ponytail: England IMD 2019 deliberately omitted — MHCLG/ONS publish it only
-  // as an ArcGIS FeatureServer (data-communities.opendata.arcgis.com), not a
-  // clean OGL WMS. Wiring it needs a vector/FeatureServer layer, not
-  // L.tileLayer.wms — different code path. Add when an English portfolio is
-  // demoed. See map_plan.md §4.
+  // ponytail: Wales crime = the WIMD Community Safety domain. Rendered as a WFS
+  // choropleth (type "wfs") rather than the flat WMS tile, so it gets the same
+  // matching legend + hover as Scotland/England. GeoServer ships a ready 1–5
+  // `quintile` field (no rank-bucketing needed). Like England, it's rank-based:
+  // NO per-area crime rate exists — only rank/decile/quintile.
+  {
+    key: "wimd-crime-2019",
+    group: "Deprivation",
+    label: "WIMD 2019 — Community Safety (crime domain)",
+    coverage: "Wales",
+    type: "wfs",
+    url: "https://datamap.gov.wales/geoserver/inspire-wg/ows",
+    typeName: "inspire-wg:wimd2019_community_safety",
+    quintileField: "quintile", // 1 = worst community safety … 5 = best
+    nameField: "lsoa_name_en",
+    minZoom: 11,
+    legendText: "WIMD 2019 community-safety domain by LSOA. Each quintile = 20% of Wales's 1,909 LSOAs, ranked:",
+    legendItems: [
+      { color: "#0766ab", label: "1 — least safe 20%" },
+      { color: "#42a1ca", label: "2 — 20–40%" },
+      { color: "#7ccec4", label: "3 — middle 20%" },
+      { color: "#bae3bc", label: "4 — 60–80%" },
+      { color: "#f1fae8", label: "5 — safest 20%" },
+    ],
+    attribution: "© Welsh Government / WIMD 2019 — OGL v3.0",
+  },
+  // ponytail: England IMD 2019 — now wired via the same type "arcgis" choropleth
+  // path as Scotland (the FeatureServer that closes the old "no clean WMS" TODO).
+  // One FeatureServer, two domains: overall (IMD_Rank) + crime (CriRank), both
+  // 1 = most deprived / highest crime over 32,844 LSOAs. No API key, OGL.
+  {
+    key: "imd-overall-2019",
+    group: "Deprivation",
+    label: "IMD 2019 — Index of Multiple Deprivation (overall)",
+    coverage: "England",
+    type: "arcgis",
+    url: "https://services-eu1.arcgis.com/EbKcOS6EXZroSyoi/arcgis/rest/services/Indices_of_Multiple_Deprivation_(IMD)_2019/FeatureServer/0/query",
+    field: "IMD_Rank", // 1 = most deprived … 32844 = least
+    rankMax: 32844, // England LSOA count — quintile buckets = rankMax/5
+    nameField: "lsoa11nm",
+    minZoom: 11,
+    legendText: "IMD 2019 overall deprivation. Each quintile = 20% of England's 32,844 LSOAs, ranked:",
+    legendItems: [
+      { color: "#0766ab", label: "1 — most deprived 20%" },
+      { color: "#42a1ca", label: "2 — 20–40%" },
+      { color: "#7ccec4", label: "3 — middle 20%" },
+      { color: "#bae3bc", label: "4 — 60–80%" },
+      { color: "#f1fae8", label: "5 — least deprived 20%" },
+    ],
+    attribution: "© MHCLG / IoD2019 — OGL v3.0",
+  },
+  {
+    key: "imd-crime-2019",
+    group: "Deprivation",
+    label: "IMD 2019 — Crime domain (relative crime rate)",
+    coverage: "England",
+    type: "arcgis",
+    url: "https://services-eu1.arcgis.com/EbKcOS6EXZroSyoi/arcgis/rest/services/Indices_of_Multiple_Deprivation_(IMD)_2019/FeatureServer/0/query",
+    field: "CriRank", // 1 = highest crime … 32844 = lowest
+    rankMax: 32844,
+    nameField: "lsoa11nm",
+    minZoom: 11,
+    legendText: "IMD 2019 crime domain — recorded-crime risk. Each quintile = 20% of England's 32,844 LSOAs, ranked:",
+    legendItems: [
+      { color: "#0766ab", label: "1 — highest-crime 20%" },
+      { color: "#42a1ca", label: "2 — 20–40%" },
+      { color: "#7ccec4", label: "3 — middle 20%" },
+      { color: "#bae3bc", label: "4 — 60–80%" },
+      { color: "#f1fae8", label: "5 — lowest-crime 20%" },
+    ],
+    attribution: "© MHCLG / IoD2019 — OGL v3.0",
+  },
 ];

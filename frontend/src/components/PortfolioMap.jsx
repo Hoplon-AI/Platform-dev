@@ -162,6 +162,81 @@ export default function PortfolioMap({
     if (overlays.length) {
       const legendEntries = [];
       overlays.forEach((cfg) => {
+        // Leaflet layer-control labels accept HTML — append coverage badge
+        const label = cfg.coverage
+          ? `${cfg.label} <span style="font-size:11px;color:#94a3b8;">— ${cfg.coverage}</span>`
+          : cfg.label;
+
+        // ponytail: non-WMS overlay. Neither the ArcGIS FeatureServer (Scotland/
+        // England) nor the GeoServer WFS (Wales) has a tile service, so we fetch
+        // polygons for the current viewport and render a quintile choropleth
+        // client-side. It's an L.layerGroup, which the picker/legend below treat
+        // identically to a WMS layer (map.hasLayer/addLayer + overlayadd).
+        if (cfg.type === "arcgis" || cfg.type === "wfs") {
+          const group = L.layerGroup();
+          const colors = cfg.legendItems.map((it) => it.color);
+          const bucket = cfg.rankMax ? cfg.rankMax / 5 : null;
+          // Wales ships a ready 1–5 quintile field; Scotland/England bucket a rank.
+          const quintileOf = (p) =>
+            Math.min(5, Math.max(1, cfg.quintileField ? p[cfg.quintileField] : Math.ceil(p[cfg.field] / bucket)));
+          const refresh = () => {
+            if (!map.hasLayer(group)) return;
+            if (map.getZoom() < (cfg.minZoom ?? 11)) { group.clearLayers(); return; }
+            const b = map.getBounds();
+            let url;
+            if (cfg.type === "wfs") {
+              // WFS 2.0.0 + EPSG:4326 → bbox is lat,lon (miny,minx,maxy,maxx); the
+              // output GeoJSON is standard lon,lat which L.geoJSON reads directly.
+              const bbox = `${b.getSouth()},${b.getWest()},${b.getNorth()},${b.getEast()},urn:ogc:def:crs:EPSG::4326`;
+              url =
+                `${cfg.url}?service=WFS&version=2.0.0&request=GetFeature` +
+                `&typeName=${cfg.typeName}&outputFormat=application/json&srsName=EPSG:4326&bbox=${bbox}`;
+            } else {
+              const bbox = `${b.getWest()},${b.getSouth()},${b.getEast()},${b.getNorth()}`;
+              const outFields = [cfg.field, cfg.nameField, cfg.rateField].filter(Boolean).join(",");
+              url =
+                `${cfg.url}?where=1%3D1&geometry=${bbox}&geometryType=esriGeometryEnvelope` +
+                `&inSR=4326&outSR=4326&spatialRel=esriSpatialRelIntersects` +
+                `&outFields=${outFields}&returnGeometry=true&f=geojson`;
+            }
+            fetch(url)
+              .then((r) => r.json())
+              .then((gj) => {
+                if (!map.hasLayer(group)) return;
+                group.clearLayers();
+                // ponytail: server feature cap (ArcGIS 1000–2000/req). z≥11 keeps a
+                // city viewport well under it; for a full-count layer, paginate
+                // (ArcGIS resultOffset / WFS startIndex).
+                L.geoJSON(gj, {
+                  style: (f) => {
+                    const q = quintileOf(f.properties);
+                    return { color: "#334155", weight: 0.5, opacity: 0.6, fillColor: colors[q - 1], fillOpacity: 0.55 };
+                  },
+                  onEachFeature: (f, lyr) => {
+                    const p = f.properties;
+                    const q = quintileOf(p);
+                    const name = p[cfg.nameField] ?? "Area";
+                    const extra = cfg.rateField && p[cfg.rateField] != null ? ` · ${p[cfg.rateField]} ${cfg.rateUnit}` : "";
+                    lyr.bindTooltip(`${name} · quintile ${q}${extra}`, { sticky: true, direction: "top", opacity: 0.95 });
+                  },
+                }).addTo(group);
+              })
+              .catch((err) => console.error(`${cfg.key} layer fetch failed:`, err));
+          };
+          group.on("add", refresh);
+          map.on("moveend", refresh);
+          if (cfg.defaultOn) group.addTo(map);
+          legendEntries.push({
+            layer: group,
+            label: cfg.label,
+            labelHtml: label,
+            group: cfg.group || "Layers",
+            legendText: cfg.legendText,
+            legendItems: cfg.legendItems,
+          });
+          return;
+        }
+
         const n = cfg.oversample || 0;
         const layer = L.tileLayer.wms(cfg.url, {
           layers: cfg.layers,
@@ -176,10 +251,6 @@ export default function PortfolioMap({
         // finer scale and render n zoom levels earlier; the browser downscales
         // into the 256px slot. Same tile count, just heavier images.
         if (n) layer.wmsParams.width = layer.wmsParams.height = 256 * 2 ** n;
-        // Leaflet layer-control labels accept HTML — append coverage badge
-        const label = cfg.coverage
-          ? `${cfg.label} <span style="font-size:11px;color:#94a3b8;">— ${cfg.coverage}</span>`
-          : cfg.label;
         if (cfg.defaultOn) layer.addTo(map);
         // ponytail: use the WMS server's own GetLegendGraphic image instead of
         // hand-authoring a colour table per layer (SIMD deciles, flood bands,
