@@ -76,6 +76,13 @@ export default function Sidebar({
         >
           Block Analysis
         </button>
+        <button
+          className={`side-link ${activeNav === "risk-map" ? "active" : ""}`}
+          onClick={() => onNavigate("risk-map")}
+          disabled={!ingestionResult}
+        >
+          Risk Map
+        </button>
       </div>
 
       <div className="side-section dim">

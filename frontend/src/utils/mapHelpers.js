@@ -2,6 +2,11 @@
 // banding, data-extraction accessors, category inference, and geometry helpers.
 import L from "leaflet";
 import { UK_LAT_BOUNDS, UK_LON_BOUNDS, PROPERTY_TYPE_COLORS } from "../constants/map.js";
+import { getFireRiskBand } from "./blockModel.js";
+
+// Fire band → swatch colour (Red/Amber/Green/Unknown).
+export const fireBandColor = (band) =>
+  ({ Red: "#ef4444", Amber: "#f59e0b", Green: "#22c55e" }[band] || "#94a3b8");
 
 export const fmtMoney = (n) => {
   const x = Number(n);
@@ -408,12 +413,54 @@ export const buildPropertyFeatureAssignments = ({ sourceFeatures, targetProperty
   return { features: selectedFeatures, assignments, unmatchedPoints };
 };
 
+export function floodColor(band) {
+  switch ((band || "").toLowerCase()) {
+    case "high":     return "#ef4444";
+    case "medium":   return "#f59e0b";
+    case "low":      return "#fbbf24";
+    case "very low": return "#22c55e";
+    default:         return "#94a3b8";
+  }
+}
+
+export function colorForMode(raw, colorBy) {
+  if (colorBy === "flood")  return floodColor(raw?.flood_risk_band);
+  if (colorBy === "listed") return raw?.is_listed ? "#7c3aed" : "#94a3b8";
+  return readinessColor(getPropertyBand(raw));
+}
+
+// Worst flood band across a block's flats (High > Medium > Low > Very low).
+const FLOOD_RANK = { high: 4, medium: 3, low: 2, "very low": 1 };
+export const worstFloodBand = (flats) => {
+  let best = null, rank = 0;
+  (flats || []).forEach((p) => {
+    const b = String(p?.flood_risk_band ?? "").toLowerCase();
+    if (FLOOD_RANK[b] > rank) { rank = FLOOD_RANK[b]; best = p.flood_risk_band; }
+  });
+  return best;
+};
+
+// Block marker ring colour for the risk map's "colour by" selector.
+export function blockRingColor(block, mode) {
+  if (mode === "flood") return floodColor(worstFloodBand(block?.properties));
+  if (mode === "listed") return block?.isListed ? "#7c3aed" : "#94a3b8";
+  if (mode === "height") {
+    const h = Number(block?.maxHeight);
+    if (!Number.isFinite(h) || h <= 0) return "#94a3b8";
+    return h >= 18 ? "#ef4444" : h >= 11 ? "#f59e0b" : "#64748b";
+  }
+  if (mode === "fra") return fireBandColor(getFireRiskBand(block?.latest_fra));
+  if (mode === "fraew") return fireBandColor(getFireRiskBand(block?.latest_fraew));
+  return "#64748b"; // "none" → neutral
+}
+
 // Block hover-tooltip HTML, shared by the main block layer and the context-block layer.
-export const buildBlockTooltipHtml = (point) => {
+export const buildBlockTooltipHtml = (point, addressOnly = false) => {
   const rep = point.raw?.representativeProperty;
   const rawAddr = rep?.address || rep?.address_line_1 || "";
   const addr = rawAddr.replace(/^(flat|apartment|unit|apt)[^,]*,\s*/i, "").trim() || point.name;
   const postcode = rep?.postcode ? ` ${rep.postcode}` : "";
+  if (addressOnly) return `<div style="font-weight:700;line-height:1.4">${addr}${postcode}</div>`;
   const count = getBlockPropertyCount(point.raw) || 0;
   const h = Number.isFinite(point.storeys) && point.storeys > 0 ? point.storeys : null;
   const heightStr = h ? `${h.toFixed(1)} m` : "—";

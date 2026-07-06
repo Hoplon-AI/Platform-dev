@@ -35,13 +35,14 @@ import {
   getBlockStoreys,
   inferPropertyCategory,
   getPropertyCategoryLabel,
-  getPropertyDisplayColor,
   getFeatureIdentifier,
   getSelectedBlockPropertyPoints,
   getSelectedBlockBounds,
   getFitBoundsForMode,
   buildPropertyFeatureAssignments,
   buildBlockTooltipHtml,
+  colorForMode,
+  blockRingColor,
 } from "../utils/mapHelpers.js";
 import {
   createClusterIcon,
@@ -64,6 +65,10 @@ export default function PortfolioMap({
   onSelectBlock,
   viewMode = "blocks",
   suppressFit = false,
+  overlays = [],
+  colorBy = "readiness",
+  riskColorBy = null,
+  canvasStyle = {},
 }) {
   const mapDivRef = useRef(null);
   const mapRef = useRef(null);
@@ -94,7 +99,7 @@ export default function PortfolioMap({
           lon: latLon[1],
           readinessScore,
           readinessBand,
-          color: readinessColor(readinessBand),
+          color: colorForMode(property, colorBy),
           propertyCategory: inferPropertyCategory(property),
           propertyCategoryLabel: getPropertyCategoryLabel(property),
           sumInsured: getPropertyValue(property),
@@ -102,7 +107,7 @@ export default function PortfolioMap({
         };
       })
       .filter(Boolean);
-  }, [properties]);
+  }, [properties, colorBy]);
 
   const blockPoints = useMemo(() => {
     return (blocks || [])
@@ -142,15 +147,208 @@ export default function PortfolioMap({
       scrollWheelZoom: true,
       zoomControl: true,
       attributionControl: false,
+      minZoom: 4, // stop zooming out far enough to see repeated globe copies
     }).setView(DEFAULT_CENTER, DEFAULT_ZOOM);
 
     L.tileLayer("https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png", {
       subdomains: "abcd",
       maxZoom: 20,
+      noWrap: true,
       crossOrigin: "anonymous",
       keepBuffer: 4,
       attribution: "&copy; OpenStreetMap &copy; CARTO",
     }).addTo(map);
+
+    if (overlays.length) {
+      const legendEntries = [];
+      overlays.forEach((cfg) => {
+        // Leaflet layer-control labels accept HTML — append coverage badge
+        const label = cfg.coverage
+          ? `${cfg.label} <span style="font-size:11px;color:#94a3b8;">— ${cfg.coverage}</span>`
+          : cfg.label;
+
+        // ponytail: non-WMS overlay. Neither the ArcGIS FeatureServer (Scotland/
+        // England) nor the GeoServer WFS (Wales) has a tile service, so we fetch
+        // polygons for the current viewport and render a quintile choropleth
+        // client-side. It's an L.layerGroup, which the picker/legend below treat
+        // identically to a WMS layer (map.hasLayer/addLayer + overlayadd).
+        if (cfg.type === "arcgis" || cfg.type === "wfs") {
+          const group = L.layerGroup();
+          const colors = cfg.legendItems.map((it) => it.color);
+          const bucket = cfg.rankMax ? cfg.rankMax / 5 : null;
+          // Wales ships a ready 1–5 quintile field; Scotland/England bucket a rank.
+          const quintileOf = (p) =>
+            Math.min(5, Math.max(1, cfg.quintileField ? p[cfg.quintileField] : Math.ceil(p[cfg.field] / bucket)));
+          const refresh = () => {
+            if (!map.hasLayer(group)) return;
+            if (map.getZoom() < (cfg.minZoom ?? 11)) { group.clearLayers(); return; }
+            const b = map.getBounds();
+            let url;
+            if (cfg.type === "wfs") {
+              // WFS 2.0.0 + EPSG:4326 → bbox is lat,lon (miny,minx,maxy,maxx); the
+              // output GeoJSON is standard lon,lat which L.geoJSON reads directly.
+              const bbox = `${b.getSouth()},${b.getWest()},${b.getNorth()},${b.getEast()},urn:ogc:def:crs:EPSG::4326`;
+              url =
+                `${cfg.url}?service=WFS&version=2.0.0&request=GetFeature` +
+                `&typeName=${cfg.typeName}&outputFormat=application/json&srsName=EPSG:4326&bbox=${bbox}`;
+            } else {
+              const bbox = `${b.getWest()},${b.getSouth()},${b.getEast()},${b.getNorth()}`;
+              const outFields = [cfg.field, cfg.nameField, cfg.rateField].filter(Boolean).join(",");
+              url =
+                `${cfg.url}?where=1%3D1&geometry=${bbox}&geometryType=esriGeometryEnvelope` +
+                `&inSR=4326&outSR=4326&spatialRel=esriSpatialRelIntersects` +
+                `&outFields=${outFields}&returnGeometry=true&f=geojson`;
+            }
+            fetch(url)
+              .then((r) => r.json())
+              .then((gj) => {
+                if (!map.hasLayer(group)) return;
+                group.clearLayers();
+                // ponytail: server feature cap (ArcGIS 1000–2000/req). z≥11 keeps a
+                // city viewport well under it; for a full-count layer, paginate
+                // (ArcGIS resultOffset / WFS startIndex).
+                L.geoJSON(gj, {
+                  style: (f) => {
+                    const q = quintileOf(f.properties);
+                    return { color: "#334155", weight: 0.5, opacity: 0.6, fillColor: colors[q - 1], fillOpacity: 0.55 };
+                  },
+                  onEachFeature: (f, lyr) => {
+                    const p = f.properties;
+                    const q = quintileOf(p);
+                    const name = p[cfg.nameField] ?? "Area";
+                    const extra = cfg.rateField && p[cfg.rateField] != null ? ` · ${p[cfg.rateField]} ${cfg.rateUnit}` : "";
+                    lyr.bindTooltip(`${name} · quintile ${q}${extra}`, { sticky: true, direction: "top", opacity: 0.95 });
+                  },
+                }).addTo(group);
+              })
+              .catch((err) => console.error(`${cfg.key} layer fetch failed:`, err));
+          };
+          group.on("add", refresh);
+          map.on("moveend", refresh);
+          if (cfg.defaultOn) group.addTo(map);
+          legendEntries.push({
+            layer: group,
+            label: cfg.label,
+            labelHtml: label,
+            group: cfg.group || "Layers",
+            legendText: cfg.legendText,
+            legendItems: cfg.legendItems,
+          });
+          return;
+        }
+
+        const n = cfg.oversample || 0;
+        const layer = L.tileLayer.wms(cfg.url, {
+          layers: cfg.layers,
+          format: "image/png",
+          transparent: true,
+          crs: cfg.crs === "4326" ? L.CRS.EPSG4326 : L.CRS.EPSG3857,
+          opacity: cfg.opacity ?? 0.55,
+          attribution: cfg.attribution,
+        });
+        // ponytail: BGS scale-gates 1:50k layers (~26 m/px). Requesting a
+        // 2^n-larger image for the same tile bbox makes the server compute a
+        // finer scale and render n zoom levels earlier; the browser downscales
+        // into the 256px slot. Same tile count, just heavier images.
+        if (n) layer.wmsParams.width = layer.wmsParams.height = 256 * 2 ** n;
+        if (cfg.defaultOn) layer.addTo(map);
+        // ponytail: use the WMS server's own GetLegendGraphic image instead of
+        // hand-authoring a colour table per layer (SIMD deciles, flood bands,
+        // geology's hundreds of rock types...). Servers that don't support it
+        // (BGS geology) return no image → the row hides itself via onerror.
+        const sep = cfg.url.includes("?") ? "&" : "?";
+        legendEntries.push({
+          layer,
+          label: cfg.label,
+          labelHtml: label,
+          group: cfg.group || "Layers",
+          legendText: cfg.legendText,
+          legendColor: cfg.legendColor,
+          legendItems: cfg.legendItems,
+          legendUrl: `${cfg.url}${sep}service=WMS&request=GetLegendGraphic&version=1.3.0&format=image/png&layer=${encodeURIComponent(cfg.layers.split(",")[0])}`,
+        });
+      });
+      // ponytail: L.control.layers renders a flat always-open list — 18 overlays
+      // swamp the viewport. Native <details>/<summary> gives collapsible per-group
+      // sections (grouped by cfg.group → SEPA/EA/BGS/etc.) with zero JS and zero
+      // deps. Checkboxes toggle the WMS layer + fire the same overlayadd/remove
+      // events the legend below already listens on, so the legend needs no change.
+      const picker = L.control({ position: "topright" });
+      picker.onAdd = () => {
+        const div = L.DomUtil.create("div", "wms-picker");
+        div.style.cssText =
+          "background:rgba(255,255,255,0.95);border:1px solid #e2e8f0;border-radius:8px;padding:6px 8px;max-height:45vh;overflow:auto;box-shadow:0 1px 4px rgba(15,23,42,0.12);font-size:12px;max-width:480px;white-space:nowrap;";
+        L.DomEvent.disableScrollPropagation(div);
+        L.DomEvent.disableClickPropagation(div);
+        const groups = [...new Set(legendEntries.map((e) => e.group))];
+        div.innerHTML = groups
+          .map((g) => {
+            const rows = legendEntries
+              .map((e, i) => ({ e, i }))
+              .filter((x) => x.e.group === g)
+              .map(({ e, i }) =>
+                `<label style="display:flex;gap:6px;align-items:flex-start;padding:2px 0;cursor:pointer;"><input type="checkbox" data-idx="${i}"${map.hasLayer(e.layer) ? " checked" : ""} style="margin-top:2px;"><span>${e.labelHtml}</span></label>`
+              )
+              .join("");
+            const open = legendEntries.some((e) => e.group === g && map.hasLayer(e.layer));
+            return `<details${open ? " open" : ""} style="margin-bottom:4px;"><summary style="font-weight:600;cursor:pointer;">${g}</summary>${rows}</details>`;
+          })
+          .join("");
+        div.querySelectorAll("input[type=checkbox]").forEach((cb) => {
+          cb.addEventListener("change", () => {
+            const { layer } = legendEntries[+cb.dataset.idx];
+            if (cb.checked) { map.addLayer(layer); map.fire("overlayadd"); }
+            else { map.removeLayer(layer); map.fire("overlayremove"); }
+          });
+        });
+        return div;
+      };
+      picker.addTo(map);
+      L.control.attribution({ prefix: false }).addTo(map);
+
+      // ponytail: warm the browser cache for every legend PNG at mount, so the
+      // first layer-toggle shows its legend instantly instead of paying a WMS
+      // round-trip. Tiny (1–3 KB) images; the render() below reuses the cache.
+      legendEntries.forEach((e) => { if (!e.legendText) new Image().src = e.legendUrl; });
+
+      // Legend for whichever overlays are switched on; stacks below the layer
+      // picker and re-renders on toggle.
+      const legend = L.control({ position: "topright" });
+      legend.onAdd = () => {
+        const div = L.DomUtil.create("div", "wms-legend");
+        div.style.cssText =
+          "background:rgba(255,255,255,0.95);border:1px solid #e2e8f0;border-radius:8px;padding:10px 12px;margin-top:6px;max-height:45vh;overflow:auto;box-shadow:0 1px 4px rgba(15,23,42,0.12);font-size:14px;max-width:280px;";
+        L.DomEvent.disableScrollPropagation(div);
+        L.DomEvent.disableClickPropagation(div);
+        const render = () => {
+          const active = legendEntries.filter((e) => map.hasLayer(e.layer));
+          div.style.display = active.length ? "block" : "none";
+          div.innerHTML = active
+            .map((e) => {
+              const dot = (c) =>
+                `<span style="display:inline-block;width:15px;height:15px;border-radius:3px;background:${c};border:1px solid rgba(15,23,42,0.15);margin-right:7px;vertical-align:-3px;flex:0 0 auto;"></span>`;
+              let body;
+              if (e.legendItems) {
+                const cap = e.legendText ? `<div style="color:#475569;line-height:1.4;margin-bottom:3px;">${e.legendText}</div>` : "";
+                const rows = e.legendItems
+                  .map((it) => `<div style="display:flex;align-items:center;margin-top:3px;color:#475569;">${dot(it.color)}<span>${it.label}</span></div>`)
+                  .join("");
+                body = cap + rows;
+              } else if (e.legendText) {
+                body = `<div style="color:#475569;line-height:1.4;">${e.legendColor ? dot(e.legendColor) : ""}${e.legendText}</div>`;
+              } else {
+                body = `<img src="${e.legendUrl}" alt="" style="max-width:100%;display:block;" onerror="this.parentNode.style.display='none'">`;
+              }
+              return `<div style="margin-bottom:10px;"><div style="font-weight:600;margin-bottom:3px;">${e.label}</div>${body}</div>`;
+            })
+            .join("");
+        };
+        render();
+        map.on("overlayadd overlayremove", render);
+        return div;
+      };
+      legend.addTo(map);
+    }
 
     mapRef.current = map;
     buildingsLayerRef.current = L.layerGroup().addTo(map);
@@ -170,6 +368,7 @@ export default function PortfolioMap({
       overviewBlockLayerRef.current = null;
       pointLayerRef.current = null;
     };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -241,12 +440,13 @@ export default function PortfolioMap({
       blockPoints.forEach((point) => {
         const isSelected = sameBlock(selectedBlock, point.raw);
         const baseZ = isSelected ? 1000 : 0;
+        const ring = riskColorBy ? blockRingColor(point.raw, riskColorBy) : null;
         const marker = L.marker([point.lat, point.lon], {
-          icon: createBlockCountIcon(point, currentZoom, isSelected),
+          icon: createBlockCountIcon(point, currentZoom, isSelected, 1, 1, ring),
           keyboard: false,
           zIndexOffset: baseZ,
           _units: point.units,
-          _ringColor: riskColor(point.raw),
+          _ringColor: ring || riskColor(point.raw),
         });
 
         marker.on("mouseover", () => marker.setZIndexOffset(10000));
@@ -258,10 +458,10 @@ export default function PortfolioMap({
           }
         });
         marker.bindTooltip(
-          buildBlockTooltipHtml(point),
+          buildBlockTooltipHtml(point, Boolean(riskColorBy)),
           { direction: "top", sticky: true, opacity: 0.97 }
         );
-        marker.bindPopup(buildFlatListPopupHtml(point), { maxWidth: 320 });
+        marker.bindPopup(buildFlatListPopupHtml(point, Boolean(riskColorBy)), { maxWidth: 320 });
         attachFlatListPopupHandlers(marker, point, onSelectProperty);
         clusterGroup.addLayer(marker);
         if (isSelected) selectedMarkerRef.current = marker;
@@ -347,6 +547,7 @@ export default function PortfolioMap({
     selectedBlock,
     selectedProperty,
     visiblePoints.length,
+    riskColorBy,
   ]);
 
   useEffect(() => {
@@ -458,7 +659,7 @@ export default function PortfolioMap({
                 const assignedPoint = assignments.get(featureId) || null;
                 const isSelected = assignedPoint && selectedProperty ? sameProperty(assignedPoint.raw, selectedProperty) : false;
                 const fillColor = assignedPoint
-                  ? getPropertyDisplayColor(assignedPoint.raw, isSelected)
+                  ? colorForMode(assignedPoint.raw, colorBy)
                   : PROPERTY_TYPE_COLORS.other;
 
                 return {
@@ -503,9 +704,9 @@ export default function PortfolioMap({
           const isSelected = selectedProperty ? sameProperty(point.raw, selectedProperty) : false;
           const circle = L.circleMarker([point.lat, point.lon], {
             radius: isSelected ? 7 : 5,
-            color: isSelected ? "#1d4ed8" : getPropertyDisplayColor(point.raw, false),
+            color: isSelected ? "#1d4ed8" : colorForMode(point.raw, colorBy),
             weight: isSelected ? 3 : 2,
-            fillColor: getPropertyDisplayColor(point.raw, isSelected),
+            fillColor: isSelected ? "#1d4ed8" : colorForMode(point.raw, colorBy),
             fillOpacity: 0.8,
           });
 
@@ -528,7 +729,7 @@ export default function PortfolioMap({
     return () => {
       isCancelled = true;
     };
-  }, [activeMode, onSelectProperty, propertyPoints, selectedBlock, selectedProperty]);
+  }, [activeMode, colorBy, onSelectProperty, propertyPoints, selectedBlock, selectedProperty]);
 
   useEffect(() => {
     const map = mapRef.current;
@@ -571,6 +772,7 @@ export default function PortfolioMap({
         overflow: "hidden",
         background: "#eef3f8",
         border: "1px solid rgba(15,23,42,0.08)",
+        ...canvasStyle,
       }}
     />
   );

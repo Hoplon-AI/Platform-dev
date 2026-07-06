@@ -50,8 +50,8 @@ export const createClusterIcon = (cluster) => {
   });
 };
 
-export const createBlockCountIcon = (point, zoom, isSelected, opacity = 1, scale = 1) => {
-  const ringColor = isSelected ? "#1d4ed8" : riskColor(point.raw);
+export const createBlockCountIcon = (point, zoom, isSelected, opacity = 1, scale = 1, ringOverride = null) => {
+  const ringColor = isSelected ? "#1d4ed8" : (ringOverride || riskColor(point.raw));
   const size = Math.max(30, getBlockCircleSize(point.units, zoom, isSelected) * scale);
   const fontSize = size >= 68 ? 15 : size >= 56 ? 14 : 13;
 

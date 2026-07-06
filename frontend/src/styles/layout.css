@@ -122,6 +122,11 @@
   padding: 28px 72px;
 }
 
+/* Full-bleed map tab — map fills the column edge-to-edge */
+.main.main--map {
+  padding: 0;
+}
+
 .main-head {
   display: flex;
   justify-content: space-between;

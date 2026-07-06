@@ -5,6 +5,7 @@ import IngestionPage from "./pages/IngestionLandingPage.jsx";
 import PortfolioDashboard from "./pages/PortfolioDashboard.jsx";
 import PortfolioInsightsPage from "./pages/PortfolioInsightsPage.jsx";
 import BlockAnalysisPage from "./pages/BlockAnalysisPage.jsx";
+import FullMapPage from "./pages/FullMapPage.jsx";
 import Sidebar from "./components/Sidebar.jsx";
 
 import { getIngestionSummary } from "./utils/ingestion";
@@ -111,10 +112,10 @@ export default function App() {
     setVisitedNav((v) => (v[activeNav] ? v : { ...v, [activeNav]: true }));
   }, [activeNav]);
 
-  // The overview map is hidden via display:none when inactive; nudge Leaflet to
-  // recompute its size when it's reshown so tiles render at the right dimensions.
+  // Maps are hidden via display:none when inactive; nudge Leaflet to
+  // recompute its size when reshown so tiles render at the right dimensions.
   useEffect(() => {
-    if (activeNav !== "overview") return;
+    if (activeNav !== "overview" && activeNav !== "risk-map") return;
     const t = setTimeout(() => window.dispatchEvent(new Event("resize")), 60);
     return () => clearTimeout(t);
   }, [activeNav]);
@@ -671,7 +672,7 @@ export default function App() {
           }}
         />
 
-        <main className="main">
+        <main className={activeNav === "risk-map" ? "main main--map" : "main"}>
           {activeNav === "uploads" && (
             <>
               <div className="main-head">
@@ -763,6 +764,14 @@ export default function App() {
                 latestFireRiskPayload={latestFireRiskPayload}
                 onUploadNew={handleUploadNew}
                 haName={accessibleHAs.find((h) => h.ha_id === selectedHaId)?.ha_name || authUser?.organisation || ""}
+              />
+            </div>
+          )}
+
+          {(visitedNav["risk-map"] || activeNav === "risk-map") && (
+            <div style={{ display: activeNav === "risk-map" ? "block" : "none" }}>
+              <FullMapPage
+                properties={ingestionResult?.properties ?? []}
               />
             </div>
           )}
