@@ -81,12 +81,19 @@ export default function PortfolioDashboard({
           return Number.isFinite(height) ? Math.max(max, height) : max;
         }, 0);
         const representativeProperty = mappable[0] || items.find((p) => p.uprn) || items[0] || null;
+        // Standalone dwelling (house/bungalow/single flat): its own asset, not a block
+        const isStandalone = items.length === 1 && items[0].is_standalone === true;
+        const displayName = isStandalone
+          ? items[0].address_line_1 || String(key)
+          : key || "Unassigned block";
 
         return {
           id: key,
           block_id: key,
-          label: key || "Unassigned block",
-          name: key || "Unassigned block",
+          asset_type: isStandalone ? "standalone" : "block",
+          dwelling_form: isStandalone ? items[0].dwelling_form || "" : "",
+          label: displayName,
+          name: displayName,
           properties: items,
           count: items.length,
           lat,
@@ -228,6 +235,8 @@ export default function PortfolioDashboard({
 
   const selectedBlockId = resolvedSelectedBlock?.id ?? null;
   const geoCompletenessPct = ingestionSummary?.geoCompletenessPct ?? 0;
+  const standaloneCount = blocks.filter((b) => b.asset_type === "standalone").length;
+  const realBlockCount = blocks.length - standaloneCount;
   const highRiseBlocks = blocks.filter((b) => Number(b.maxHeight) >= 18 || Number(b.max_storeys) >= 7).length;
   const amberBlocks = blocks.filter((b) => (Number(b.maxHeight) >= 11 && Number(b.maxHeight) < 18) || (Number(b.max_storeys) >= 4 && Number(b.max_storeys) < 7)).length;
   const mappedBlocksCount = blocks.filter((b) => b.hasValidCoords).length;
@@ -402,9 +411,9 @@ export default function PortfolioDashboard({
         <KpiCard
           title={
             <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
-              Flats spread across
+              {standaloneCount > 0 ? "Portfolio structure" : "Flats spread across"}
               <HoverTooltip
-                tip="Our engine groups the properties in your SoV by shared parent UPRN and address to detect the distinct blocks across your portfolio."
+                tip="Our engine groups the properties in your SoV by shared parent UPRN and address to detect the distinct blocks across your portfolio. Standalone houses, bungalows and single flats are shown separately — they are not part of any block."
                 tipWidth={280}
                 badgeStyle={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 15, height: 15, borderRadius: 999, background: "rgba(184,86,75,0.12)", color: "var(--terracotta-2)", fontSize: 10, fontWeight: 700, fontStyle: "italic", cursor: "help" }}
               >
@@ -412,7 +421,11 @@ export default function PortfolioDashboard({
               </HoverTooltip>
             </span>
           }
-          value={blocks.length + " blocks"}
+          value={
+            standaloneCount > 0
+              ? `${realBlockCount} blocks · ${standaloneCount} standalone`
+              : blocks.length + " blocks"
+          }
           subtitle={
             <span style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
               <HoverTooltip

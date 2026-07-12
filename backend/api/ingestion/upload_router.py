@@ -915,6 +915,8 @@ async def ingest_document(
                     occupancy_type,
                     sum_insured,
                     property_type,
+                    dwelling_form,
+                    is_standalone,
                     year_of_build,
                     storeys,
                     units,

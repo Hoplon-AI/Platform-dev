@@ -86,6 +86,9 @@ export const normaliseProperty = (row, index = 0) => {
       0,
 
     property_type: row.property_type ?? row.propertyType ?? row.type ?? "",
+    dwelling_form: row.dwelling_form ?? "",
+    is_standalone:
+      typeof row.is_standalone === "boolean" ? row.is_standalone : row.is_standalone ?? null,
     occupancy_type: row.occupancy_type ?? row.occupancyType ?? row.occupancy ?? "",
     height_m:
       toNumberOrNull(row.height_m) ??

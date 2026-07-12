@@ -648,6 +648,51 @@ async def portfolio_composition(
             portfolio_id,
         )
 
+        # ── 4b. BY DWELLING FORM — standalone vs in-block split ─────────────
+        # dwelling_form/is_standalone are set deterministically at ingest
+        # (dwelling_classifier.py) and finalised by block detection.
+        dwelling_rows = await conn.fetch(
+            """
+            SELECT
+                COALESCE(dwelling_form, 'unknown')              AS dwelling_form,
+                COUNT(*)::integer                               AS units,
+                COUNT(*) FILTER (WHERE is_standalone)::integer  AS standalone_units,
+                COALESCE(SUM(sum_insured), 0)                   AS sum_insured,
+                COALESCE(SUM(sum_insured) FILTER (WHERE is_standalone), 0)
+                                                                AS standalone_tiv
+            FROM silver.properties
+            WHERE ha_id = $1 AND portfolio_id = $2::uuid
+            GROUP BY dwelling_form
+            ORDER BY units DESC
+            """,
+            ha_id,
+            portfolio_id,
+        )
+
+        from backend.core.classification.dwelling_classifier import derive_fra_requirement
+
+        dwelling_forms = []
+        standalone_units_total = 0
+        standalone_tiv_total = 0.0
+        fra_not_required_units = 0
+        for r in dwelling_rows:
+            form = r["dwelling_form"]
+            standalone_units = r["standalone_units"]
+            in_block_units = r["units"] - standalone_units
+            standalone_units_total += standalone_units
+            standalone_tiv_total += float(r["standalone_tiv"])
+            if derive_fra_requirement(form, True) == "not_required":
+                fra_not_required_units += standalone_units
+            if derive_fra_requirement(form, False) == "not_required":
+                fra_not_required_units += in_block_units
+            dwelling_forms.append({
+                "dwelling_form":    form,
+                "units":            r["units"],
+                "standalone_units": standalone_units,
+                "in_block_units":   in_block_units,
+                "sum_insured":      r["sum_insured"],
+            })
+
         # ── 5. Portfolio Composition widget — responsible_party split ────────
         # Powers the top card: Houses / Flats (HA-controlled vs third-party)
         # / Blocks (HA responsible vs third-party managed)
@@ -743,6 +788,14 @@ async def portfolio_composition(
             },
             "by_property_type": [dict(r) for r in type_rows],
             "by_age_banding":   [dict(r) for r in age_rows],
+            # ── Mixed-dwelling split (standalone houses/bungalows vs blocks) ─
+            "by_dwelling": {
+                "standalone_units":        standalone_units_total,
+                "standalone_tiv":          standalone_tiv_total,
+                "in_block_units":          (totals["total_units"] or 0) - standalone_units_total,
+                "fra_not_required_units":  fra_not_required_units,
+                "forms":                   dwelling_forms,
+            },
         }
 
 
@@ -922,6 +975,68 @@ async def portfolio_map(
         )
 
         markers = [dict(r) for r in rows]
+        for m in markers:
+            m["asset_type"] = "block"
+
+        # ── Standalone dwellings (houses/bungalows/single flats) ────────────
+        # These have no silver.blocks row by design — one marker per property.
+        # For a single-household house/bungalow no FRA is required, so absence
+        # of an assessment is a compliant state, not "Not Assessed".
+        standalone_rows = await conn.fetch(
+            """
+            SELECT
+                p.property_id::text                          AS block_id,
+                COALESCE(p.address, p.property_reference)    AS block_name,
+                1                                            AS unit_count,
+                p.sum_insured                                AS total_sum_insured,
+                p.height_max_m,
+                p.is_listed,
+                COALESCE(
+                    p.latitude,
+                    CASE WHEN p.x_coordinate IS NOT NULL
+                        THEN ST_Y(ST_Transform(
+                            ST_SetSRID(ST_MakePoint(p.x_coordinate, p.y_coordinate), 27700),
+                            4326
+                        ))
+                    END
+                )::numeric(10,6)                             AS latitude,
+                COALESCE(
+                    p.longitude,
+                    CASE WHEN p.x_coordinate IS NOT NULL
+                        THEN ST_X(ST_Transform(
+                            ST_SetSRID(ST_MakePoint(p.x_coordinate, p.y_coordinate), 27700),
+                            4326
+                        ))
+                    END
+                )::numeric(10,6)                             AS longitude,
+                p.address                                    AS sample_address,
+                p.postcode                                   AS sample_postcode,
+                p.dwelling_form
+            FROM silver.properties p
+            WHERE p.ha_id        = $1
+              AND p.portfolio_id = $2::uuid
+              AND p.is_standalone
+              AND (p.latitude IS NOT NULL OR p.x_coordinate IS NOT NULL)
+            ORDER BY p.address
+            """,
+            ha_id,
+            portfolio_id,
+        )
+
+        from backend.core.classification.dwelling_classifier import derive_fra_requirement
+
+        for r in standalone_rows:
+            m = dict(r)
+            m["asset_type"] = "standalone"
+            if derive_fra_requirement(m.get("dwelling_form"), True) == "not_required":
+                m["map_colour"] = "grey"
+                m["risk_label"] = "FRA Not Required"
+                m["fire_status"] = "not_applicable"
+            else:
+                m["map_colour"] = "grey"
+                m["risk_label"] = "Not Assessed"
+                m["fire_status"] = "not_assessed"
+            markers.append(m)
 
         # Summary counts for the map legend
         colour_counts = {"red": 0, "amber": 0, "green": 0, "grey": 0}
@@ -934,6 +1049,8 @@ async def portfolio_map(
             "portfolio_name": portfolio["portfolio_name"],
             "ha_name":        portfolio["ha_name"],
             "total_markers":  len(markers),
+            "block_count":    sum(1 for m in markers if m["asset_type"] == "block"),
+            "standalone_count": sum(1 for m in markers if m["asset_type"] == "standalone"),
             "colour_counts":  colour_counts,
             "markers":        markers,
         }

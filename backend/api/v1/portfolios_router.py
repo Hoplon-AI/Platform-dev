@@ -230,7 +230,8 @@ async def get_properties(
             SELECT
                 property_id, portfolio_id, property_reference, submission_id, block_reference,
                 address, address_2, address_3, postcode, occupancy_type, sum_insured,
-                property_type, wall_construction, roof_construction,
+                property_type, dwelling_form, is_standalone,
+                wall_construction, roof_construction,
                 year_of_build, storeys, units, uprn, parent_uprn,
                 x_coordinate, y_coordinate, country_code, uprn_match_score,
                 uprn_match_description, uprn_confidence, built_form, total_floor_area_m2, main_fuel,

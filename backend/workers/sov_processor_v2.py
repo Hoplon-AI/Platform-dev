@@ -40,6 +40,11 @@ import openpyxl
 import psycopg2
 import psycopg2.extras
 
+from backend.core.classification.dwelling_classifier import (
+    classify_dwelling_form,
+    derive_is_standalone,
+)
+
 logger = logging.getLogger(__name__)
 
 
@@ -1262,6 +1267,9 @@ def _stage_c_extract(ws, sheet_info: dict, join_data: dict | None,
             age_banding = _clean_str(get("age_banding")) or _derive_age_banding(year_of_build)
 
             wall = _clean_str(get("wall_construction"))
+            prop_type = _clean_str(get("property_type"))
+            dwelling_form = classify_dwelling_form(prop_type)
+            is_standalone = derive_is_standalone(dwelling_form, block_ref)
             conf = _compute_confidence(
                 address=address, postcode=postcode, sum_insured=sum_insured,
                 block_ref=block_ref, prop_ref=prop_ref, wall=wall,
@@ -1295,7 +1303,9 @@ def _stage_c_extract(ws, sheet_info: dict, join_data: dict | None,
                 "occupancy_type":     _clamp(_clean_str(get("occupancy_type")), DB_COLUMN_LIMITS["occupancy_type"]),
                 "sum_insured":        sum_insured,
                 "sum_insured_type":   _clamp(_clean_str(get("sum_insured_type")), DB_COLUMN_LIMITS["sum_insured_type"]),
-                "property_type":      _clamp(_clean_str(get("property_type")), DB_COLUMN_LIMITS["property_type"]),
+                "property_type":      _clamp(prop_type, DB_COLUMN_LIMITS["property_type"]),
+                "dwelling_form":      dwelling_form,
+                "is_standalone":      is_standalone,
                 "avid_property_type": _clamp(_clean_str(get("avid_property_type")), DB_COLUMN_LIMITS["avid_property_type"]),
                 "wall_construction":  _clamp(wall, DB_COLUMN_LIMITS["wall_construction"]),
                 "roof_construction":  _clamp(_clean_str(get("roof_construction")), DB_COLUMN_LIMITS["roof_construction"]),
@@ -1354,7 +1364,7 @@ INSERT INTO silver.properties (
     ha_id, portfolio_id, submission_id, property_reference, block_reference,
     address, address_2, address_3, postcode,
     occupancy_type, sum_insured, sum_insured_type,
-    property_type, avid_property_type,
+    property_type, dwelling_form, is_standalone, avid_property_type,
     wall_construction, roof_construction, floor_construction,
     year_of_build, age_banding, num_bedrooms, storeys, units,
     basement, is_listed, security_features, fire_protection,
@@ -1365,7 +1375,7 @@ VALUES (
     %(ha_id)s, %(portfolio_id)s::uuid, %(submission_id)s::uuid, %(property_reference)s, %(block_reference)s,
     %(address)s, %(address_2)s, %(address_3)s, %(postcode)s,
     %(occupancy_type)s, %(sum_insured)s, %(sum_insured_type)s,
-    %(property_type)s, %(avid_property_type)s,
+    %(property_type)s, %(dwelling_form)s, %(is_standalone)s, %(avid_property_type)s,
     %(wall_construction)s, %(roof_construction)s, %(floor_construction)s,
     %(year_of_build)s, %(age_banding)s, %(num_bedrooms)s, %(storeys)s, %(units)s,
     %(basement)s, %(is_listed)s, %(security_features)s, %(fire_protection)s,
@@ -1383,6 +1393,8 @@ DO UPDATE SET
     sum_insured        = EXCLUDED.sum_insured,
     sum_insured_type   = EXCLUDED.sum_insured_type,
     property_type      = EXCLUDED.property_type,
+    dwelling_form      = EXCLUDED.dwelling_form,
+    is_standalone      = EXCLUDED.is_standalone,
     avid_property_type = EXCLUDED.avid_property_type,
     wall_construction  = EXCLUDED.wall_construction,
     roof_construction  = EXCLUDED.roof_construction,

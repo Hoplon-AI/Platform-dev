@@ -92,7 +92,12 @@ export default function PropertyDetails({
         <FireRiskSection
           fra={blockFire.fra}
           fraew={blockFire.fraew}
-          emptyLabel="No FRA / FRAEW data linked to this block."
+          emptyLabel={
+            selectedBlock.asset_type === "standalone" &&
+            ["house", "bungalow"].includes(selectedBlock.dwelling_form)
+              ? "FRA / FRAEW not required — standalone single-household dwelling."
+              : "No FRA / FRAEW data linked to this block."
+          }
         />
 
         <BlockPropertiesTable properties={selectedBlock.properties || []} onSelectProperty={onSelectProperty} />
@@ -139,10 +144,12 @@ export default function PropertyDetails({
         <DetailRow
           label="Block"
           value={
-            property?.block_reference ??
-            selectedBlock?.label ??
-            selectedBlock?.name ??
-            selectedBlock?.block_reference
+            property?.is_standalone === true
+              ? "Standalone dwelling — not part of a block"
+              : property?.block_reference ??
+                selectedBlock?.label ??
+                selectedBlock?.name ??
+                selectedBlock?.block_reference
           }
         />
       </div>
@@ -180,7 +187,12 @@ export default function PropertyDetails({
       <FireRiskSection
         fra={propertyFire.fra}
         fraew={propertyFire.fraew}
-        emptyLabel="No FRA / FRAEW data linked to this property."
+        emptyLabel={
+          property?.is_standalone === true &&
+          ["house", "bungalow"].includes(property?.dwelling_form)
+            ? "FRA / FRAEW not required — standalone single-household dwelling."
+            : "No FRA / FRAEW data linked to this property."
+        }
       />
     </div>
   );
