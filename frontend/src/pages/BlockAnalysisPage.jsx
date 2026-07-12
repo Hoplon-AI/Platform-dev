@@ -101,7 +101,7 @@ export default function BlockAnalysisPage({ ingestionResult, latestFireRiskPaylo
       <>
         <div className="main-head">
           <div>
-            <div className="page-title">Block Analysis</div>
+            <div className="page-title">Property Analysis</div>
             {haName && (
               <div style={{ fontSize: 13, color: "var(--muted)", marginTop: 4 }}>
                 For: <strong style={{ color: "var(--terracotta)" }}>{haName}</strong>
@@ -211,13 +211,13 @@ export default function BlockAnalysisPage({ ingestionResult, latestFireRiskPaylo
     <>
       <div className="main-head">
         <div>
-          <div className="page-title">Block Analysis</div>
+          <div className="page-title">Property Analysis</div>
           {haName && (
             <div style={{ fontSize: 13, color: "var(--muted)", marginTop: 4 }}>
               For: <strong style={{ color: "var(--terracotta)" }}>{haName}</strong>
             </div>
           )}
-          <div className="page-sub">Every block with address, size, UPRN and FRA / FRAEW fire-risk banding. Click a row for the full risk profile.</div>
+          <div className="page-sub">Every block and standalone dwelling with address, type, size, UPRN and FRA / FRAEW fire-risk banding. Click a row for the full risk profile.</div>
         </div>
         <span className="pill pill-muted">
           {standaloneCount > 0
