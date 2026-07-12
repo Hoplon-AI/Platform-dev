@@ -69,17 +69,47 @@ async def get_tenant_info(
     return tenant_middleware.extract_tenant_from_token(credentials.credentials)
 
 
+async def get_tenant_ha_ids(
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(security),
+) -> List[str]:
+    """ALL HA ids the caller is authorised for.
+
+    Underwriters can be granted several HAs — authorising against only the
+    token's first HA 404s every portfolio of the others.
+    """
+    dev_mode = os.getenv("DEV_MODE", "false").lower() == "true"
+    dev_ha_id = os.getenv("DEV_HA_ID", "ha_demo")
+
+    if credentials:
+        try:
+            return tenant_middleware.authorised_ha_ids(credentials.credentials)
+        except HTTPException:
+            if dev_mode:
+                return [dev_ha_id]
+            raise
+    if dev_mode:
+        return [dev_ha_id]
+    raise HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Authentication required.",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+
+
 # ---------------------------------------------------------------------------
 # Helper — resolve portfolio_id → {portfolio_id, ha_id, ha_name, ...}
 # ---------------------------------------------------------------------------
 
-async def _resolve_portfolio(conn, portfolio_id: str, ha_id: str) -> Dict[str, Any]:
+async def _resolve_portfolio(conn, portfolio_id: str, ha_ids) -> Dict[str, Any]:
     """Fetch portfolio metadata, enforcing tenant ownership.
 
-    Raises 404 if the portfolio does not exist OR does not belong to ha_id,
+    ha_ids: a single ha_id or the caller's full authorised list.
+    Raises 404 if the portfolio does not exist OR belongs to none of them,
     intentionally indistinguishable so callers cannot enumerate other tenants'
     portfolio UUIDs.
     """
+    if isinstance(ha_ids, str):
+        ha_ids = [ha_ids]
     row = await conn.fetchrow(
         """
         SELECT
@@ -92,10 +122,10 @@ async def _resolve_portfolio(conn, portfolio_id: str, ha_id: str) -> Dict[str, A
         FROM silver.portfolios po
         JOIN public.housing_associations ha ON ha.ha_id = po.ha_id
         WHERE po.portfolio_id = $1
-          AND po.ha_id        = $2
+          AND po.ha_id        = ANY($2)
         """,
         portfolio_id,
-        ha_id,
+        ha_ids,
     )
     if not row:
         raise HTTPException(
@@ -342,6 +372,7 @@ async def list_portfolios(
 async def portfolio_summary(
     portfolio_id: str,
     tenant: Tuple[str, str] = Depends(get_tenant_info),
+    tenant_ha_ids: List[str] = Depends(get_tenant_ha_ids),
 ) -> Dict[str, Any]:
     """
     KPI header cards for a portfolio:
@@ -355,7 +386,7 @@ async def portfolio_summary(
     """
     pool = DatabasePool.get_pool()
     async with pool.acquire() as conn:
-        portfolio = await _resolve_portfolio(conn, portfolio_id, tenant[0])
+        portfolio = await _resolve_portfolio(conn, portfolio_id, tenant_ha_ids)
         ha_id = portfolio["ha_id"]
 
         row = await conn.fetchrow(
@@ -499,6 +530,7 @@ async def portfolio_summary(
 async def portfolio_composition(
     portfolio_id: str,
     tenant: Tuple[str, str] = Depends(get_tenant_info),
+    tenant_ha_ids: List[str] = Depends(get_tenant_ha_ids),
 ) -> Dict[str, Any]:
     """
     Portfolio composition breakdown:
@@ -509,7 +541,7 @@ async def portfolio_composition(
     """
     pool = DatabasePool.get_pool()
     async with pool.acquire() as conn:
-        portfolio = await _resolve_portfolio(conn, portfolio_id, tenant[0])
+        portfolio = await _resolve_portfolio(conn, portfolio_id, tenant_ha_ids)
         ha_id = portfolio["ha_id"]
 
         # ── 1. BY TENANCY / OWNERSHIP ────────────────────────────────────────
@@ -807,6 +839,7 @@ async def portfolio_composition(
 async def portfolio_map(
     portfolio_id: str,
     tenant: Tuple[str, str] = Depends(get_tenant_info),
+    tenant_ha_ids: List[str] = Depends(get_tenant_ha_ids),
 ) -> Dict[str, Any]:
     """
     Map markers — one entry per block with coordinates and RAG colour.
@@ -825,7 +858,7 @@ async def portfolio_map(
     """
     pool = DatabasePool.get_pool()
     async with pool.acquire() as conn:
-        portfolio = await _resolve_portfolio(conn, portfolio_id, tenant[0])
+        portfolio = await _resolve_portfolio(conn, portfolio_id, tenant_ha_ids)
         ha_id = portfolio["ha_id"]
 
         rows = await conn.fetch(
@@ -1065,6 +1098,7 @@ async def fra_blocks(
     portfolio_id: str,
     rag_filter: Optional[str] = None,   # RED | AMBER | GREEN | unassessed
     tenant: Tuple[str, str] = Depends(get_tenant_info),
+    tenant_ha_ids: List[str] = Depends(get_tenant_ha_ids),
 ) -> Dict[str, Any]:
     """
     FRA status table — one row per block.
@@ -1084,7 +1118,7 @@ async def fra_blocks(
     """
     pool = DatabasePool.get_pool()
     async with pool.acquire() as conn:
-        portfolio = await _resolve_portfolio(conn, portfolio_id, tenant[0])
+        portfolio = await _resolve_portfolio(conn, portfolio_id, tenant_ha_ids)
         ha_id = portfolio["ha_id"]
 
         # Build optional RAG filter
@@ -1200,6 +1234,7 @@ async def fraew_blocks(
     rag_filter: Optional[str] = None,   # RED | AMBER | GREEN | unassessed
     combustible_only: bool = False,
     tenant: Tuple[str, str] = Depends(get_tenant_info),
+    tenant_ha_ids: List[str] = Depends(get_tenant_ha_ids),
 ) -> Dict[str, Any]:
     """
     FRAEW detail table — one row per block with full PAS 9980:2022 fields.
@@ -1217,7 +1252,7 @@ async def fraew_blocks(
     """
     pool = DatabasePool.get_pool()
     async with pool.acquire() as conn:
-        portfolio = await _resolve_portfolio(conn, portfolio_id, tenant[0])
+        portfolio = await _resolve_portfolio(conn, portfolio_id, tenant_ha_ids)
         ha_id = portfolio["ha_id"]
 
         filters = ["b.ha_id = $1", "b.portfolio_id = $2::uuid"]
@@ -1369,6 +1404,7 @@ async def fraew_blocks(
 async def risk_summary(
     portfolio_id: str,
     tenant: Tuple[str, str] = Depends(get_tenant_info),
+    tenant_ha_ids: List[str] = Depends(get_tenant_ha_ids),
 ) -> Dict[str, Any]:
     """
     Combined FRA + FRAEW compliance overview for the safety widget.
@@ -1382,7 +1418,7 @@ async def risk_summary(
     """
     pool = DatabasePool.get_pool()
     async with pool.acquire() as conn:
-        portfolio = await _resolve_portfolio(conn, portfolio_id, tenant[0])
+        portfolio = await _resolve_portfolio(conn, portfolio_id, tenant_ha_ids)
         ha_id = portfolio["ha_id"]
 
         # FRA compliance stats
@@ -1549,6 +1585,7 @@ async def risk_summary(
 async def doc_completeness(
     portfolio_id: str,
     tenant: Tuple[str, str] = Depends(get_tenant_info),
+    tenant_ha_ids: List[str] = Depends(get_tenant_ha_ids),
 ) -> Dict[str, Any]:
     """
     Field completeness % for Doc A (Stock Listing) and Doc B (High Value).
@@ -1570,7 +1607,7 @@ async def doc_completeness(
     """
     pool = DatabasePool.get_pool()
     async with pool.acquire() as conn:
-        portfolio = await _resolve_portfolio(conn, portfolio_id, tenant[0])
+        portfolio = await _resolve_portfolio(conn, portfolio_id, tenant_ha_ids)
         ha_id = portfolio["ha_id"]
 
         # ── Doc A: per-property SoV field fill rates ─────────────────────────
@@ -1702,6 +1739,7 @@ async def doc_completeness(
 async def fra_block_actions(
     block_id: str,
     tenant: Tuple[str, str] = Depends(get_tenant_info),
+    tenant_ha_ids: List[str] = Depends(get_tenant_ha_ids),
 ) -> Dict[str, Any]:
     """
     Return all action items from the most recent FRA for a specific block.
@@ -1796,6 +1834,7 @@ async def fra_block_actions(
 async def red_blocks(
     portfolio_id: str,
     tenant: Tuple[str, str] = Depends(get_tenant_info),
+    tenant_ha_ids: List[str] = Depends(get_tenant_ha_ids),
 ) -> Dict[str, Any]:
     """
     All RED-rated blocks in a portfolio — for underwriter risk triage.
@@ -1810,7 +1849,7 @@ async def red_blocks(
     """
     pool = DatabasePool.get_pool()
     async with pool.acquire() as conn:
-        portfolio = await _resolve_portfolio(conn, portfolio_id, tenant[0])
+        portfolio = await _resolve_portfolio(conn, portfolio_id, tenant_ha_ids)
         ha_id = portfolio["ha_id"]
 
         rows = await conn.fetch(
@@ -1920,6 +1959,7 @@ async def red_blocks(
 async def fire_documents(
     portfolio_id: str,
     tenant: Tuple[str, str] = Depends(get_tenant_info),
+    tenant_ha_ids: List[str] = Depends(get_tenant_ha_ids),
 ) -> Dict[str, Any]:
     """
     Every FRA / FRAEW evidence document stored for the portfolio's HA.
@@ -1953,7 +1993,7 @@ async def fire_documents(
 
     pool = DatabasePool.get_pool()
     async with pool.acquire() as conn:
-        portfolio = await _resolve_portfolio(conn, portfolio_id, tenant[0])
+        portfolio = await _resolve_portfolio(conn, portfolio_id, tenant_ha_ids)
         ha_id = portfolio["ha_id"]
 
         fra_rows = await conn.fetch(

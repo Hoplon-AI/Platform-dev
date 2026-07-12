@@ -164,12 +164,14 @@ export default function App() {
     }
   };
 
-  const loadPropertiesFromApi = async (overridePortfolioId = null) => {
+  const loadPropertiesFromApi = async (overridePortfolioId = null, overrideHaId = null) => {
     try {
       // Backend returns ONE portfolio (latest for the HA by default) — pass the
       // explicit portfolio when we have it (e.g. straight after an upload).
+      // overrideHaId dodges the stale closure when called right after setSelectedHaId.
+      const haId = overrideHaId ?? selectedHaId;
       const params = new URLSearchParams();
-      if (selectedHaId) params.set("ha_id", selectedHaId);
+      if (haId) params.set("ha_id", haId);
       if (overridePortfolioId) params.set("portfolio_id", overridePortfolioId);
       const qs = params.toString();
       const res = await apiFetch(`/api/v1/portfolios/properties${qs ? `?${qs}` : ""}`);
@@ -660,6 +662,9 @@ export default function App() {
             setIngestionResult(null);
             setActiveNav("uploads");
             setUploadStage("SOV");
+            // Load the new HA's latest portfolio — switching must never leave
+            // the workspace empty when the HA already has data.
+            loadPropertiesFromApi(null, haId);
           }}
           onUploadDocuments={goToNextUpload}
           onNavigate={setActiveNav}
