@@ -216,6 +216,15 @@ export const getBlockPropertyCount = (block) =>
   Array.isArray(block?.properties) ? block.properties.length : getBlockUnits(block);
 
 export const inferPropertyCategory = (row) => {
+  // Prefer the backend's deterministic classification when present —
+  // keyword guessing below is only the fallback for unclassified rows.
+  const form = String(row?.dwelling_form ?? "").toLowerCase();
+  if (form) {
+    if (form === "flat" || form === "maisonette") return "flats";
+    if (form === "house" || form === "bungalow" || form === "sheltered") return "houses";
+    if (form === "commercial" || form === "garage" || form === "infrastructure") return "commercial";
+    if (form === "mixed_use") return "mixed";
+  }
   const propertyType = String(row?.property_type ?? row?.propertyType ?? row?.type ?? "").toLowerCase();
   const builtForm = String(row?.built_form ?? row?.builtForm ?? "").toLowerCase();
   const occupancy = String(row?.occupancy_type ?? row?.occupancyType ?? row?.occupancy ?? "").toLowerCase();
@@ -230,6 +239,12 @@ export const inferPropertyCategory = (row) => {
 };
 
 export const getPropertyCategoryLabel = (row) => {
+  // Exact form when the backend classified it (differentiates Bungalow from House)
+  const form = String(row?.dwelling_form ?? "").toLowerCase();
+  if (form === "bungalow") return "Bungalow";
+  if (form === "house") return "House";
+  if (form === "flat") return "Flat";
+  if (form === "maisonette") return "Maisonette";
   const category = inferPropertyCategory(row);
   if (category === "flats") return "Flats";
   if (category === "houses") return "Houses";

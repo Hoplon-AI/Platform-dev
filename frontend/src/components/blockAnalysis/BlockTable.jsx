@@ -5,7 +5,29 @@ import {
   blockOverallBand,
 } from "../../utils/blockModel";
 import { RiskDot } from "./primitives";
-import { accentClass } from "./blockSort";
+import { accentClass, assetTypeLabel } from "./blockSort";
+
+// Distinct colours per asset type so flats-in-blocks, houses and bungalows
+// are distinguishable at a glance in the list.
+const TYPE_PILL_STYLE = {
+  Block:    { background: "rgba(59,130,246,0.10)",  border: "1px solid rgba(59,130,246,0.30)",  color: "#1d4ed8" },
+  Flat:     { background: "rgba(139,92,246,0.10)",  border: "1px solid rgba(139,92,246,0.30)",  color: "#6d28d9" },
+  House:    { background: "rgba(34,197,94,0.10)",   border: "1px solid rgba(34,197,94,0.30)",   color: "#15803d" },
+  Bungalow: { background: "rgba(20,184,166,0.10)",  border: "1px solid rgba(20,184,166,0.35)",  color: "#0f766e" },
+};
+
+export function TypePill({ block }) {
+  const label = assetTypeLabel(block);
+  const style = TYPE_PILL_STYLE[label] || { background: "rgba(100,116,139,0.10)", border: "1px solid rgba(100,116,139,0.30)", color: "#475569" };
+  return (
+    <span
+      className="pill"
+      style={{ ...style, fontSize: 12, fontWeight: 600, padding: "3px 10px", borderRadius: 6 }}
+    >
+      {label}
+    </span>
+  );
+}
 
 // One band column cell: a colour pill with a status dot, or an em-dash when the
 // block has no such document.
@@ -42,7 +64,8 @@ export function BlockTable({ blocks, selectedId, onSelect, sort, onSort }) {
         <thead>
           <tr>
             <SortHead label="Address" col="address" sort={sort} onSort={onSort} />
-            <SortHead label="Flats" col="flats" sort={sort} onSort={onSort} align="center" width={90} />
+            <SortHead label="Type" col="type" sort={sort} onSort={onSort} align="center" width={110} />
+            <SortHead label="Units" col="flats" sort={sort} onSort={onSort} align="center" width={90} />
             <th>UPRN</th>
             <SortHead label="FRA" col="fra" sort={sort} onSort={onSort} align="center" width={120} />
             <SortHead label="FRAEW" col="fraew" sort={sort} onSort={onSort} align="center" width={120} />
@@ -61,8 +84,13 @@ export function BlockTable({ blocks, selectedId, onSelect, sort, onSort }) {
                 <td className={`ba-accent ${accentClass(overall)}`}>
                   <div className="ba-addr">{street}</div>
                   <div className="ba-addr-sub">
-                    Block {b.name}{postcode ? ` · ${postcode}` : ""}
+                    {b.asset_type === "standalone"
+                      ? `Standalone${postcode ? ` · ${postcode}` : ""}`
+                      : `Block ${b.name}${postcode ? ` · ${postcode}` : ""}`}
                   </div>
+                </td>
+                <td style={{ textAlign: "center" }}>
+                  <TypePill block={b} />
                 </td>
                 <td style={{ textAlign: "center" }}>
                   <span className="ba-flats">{b.count}</span>

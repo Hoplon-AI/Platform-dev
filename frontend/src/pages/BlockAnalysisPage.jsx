@@ -45,12 +45,32 @@ export default function BlockAnalysisPage({ ingestionResult, latestFireRiskPaylo
     [blocks]
   );
 
+  // Per-type tallies: real blocks vs each standalone dwelling form.
+  const typeCounts = useMemo(() => {
+    const c = { block: 0, house: 0, bungalow: 0, flat: 0, other: 0 };
+    for (const b of blocks) {
+      if (b.asset_type === "standalone") {
+        if (c[b.dwelling_form] !== undefined) c[b.dwelling_form]++;
+        else c.other++;
+      } else {
+        c.block++;
+      }
+    }
+    return c;
+  }, [blocks]);
+
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     return blocks.filter((b) => {
       if (q && !blockStreetText(b).includes(q)) return false;
       if (bandFilter !== "all" && (blockOverallBand(b) || "none") !== bandFilter) return false;
-      if (typeFilter !== "all" && (b.asset_type || "block") !== typeFilter) return false;
+      if (typeFilter !== "all") {
+        if (typeFilter === "block") {
+          if (b.asset_type === "standalone") return false;
+        } else if (!(b.asset_type === "standalone" && b.dwelling_form === typeFilter)) {
+          return false;
+        }
+      }
       return true;
     });
   }, [blocks, query, bandFilter, typeFilter]);
@@ -228,15 +248,18 @@ export default function BlockAnalysisPage({ ingestionResult, latestFireRiskPaylo
                     <StatChip
                       label="Blocks"
                       active={typeFilter === "block"}
-                      count={blocks.length - standaloneCount}
+                      count={typeCounts.block}
                       onClick={() => pickType("block")}
                     />
-                    <StatChip
-                      label="Standalone"
-                      active={typeFilter === "standalone"}
-                      count={standaloneCount}
-                      onClick={() => pickType("standalone")}
-                    />
+                    {typeCounts.house > 0 && (
+                      <StatChip label="Houses" active={typeFilter === "house"} count={typeCounts.house} onClick={() => pickType("house")} />
+                    )}
+                    {typeCounts.bungalow > 0 && (
+                      <StatChip label="Bungalows" active={typeFilter === "bungalow"} count={typeCounts.bungalow} onClick={() => pickType("bungalow")} />
+                    )}
+                    {typeCounts.flat > 0 && (
+                      <StatChip label="Standalone flats" active={typeFilter === "flat"} count={typeCounts.flat} onClick={() => pickType("flat")} />
+                    )}
                   </>
                 )}
               </div>
