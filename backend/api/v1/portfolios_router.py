@@ -213,16 +213,36 @@ async def get_portfolio_recent_activity(
 
 @router.get("/properties", response_model=list[dict])
 async def get_properties(
-    tenant: Tuple[str, str] = Depends(get_tenant_info),
+    ha_id: Optional[str] = None,
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(security),
 ) -> List[Dict[str, Any]]:
     """
-    Return all properties for the authenticated HA from silver.properties.
+    Return all properties for one HA from silver.properties.
     Used by the frontend on login to restore the portfolio dashboard.
+
+    ha_id (optional query param) selects which of the caller's authorised
+    HAs to load — underwriters can be granted several. Defaults to the
+    token's primary HA (or DEV_HA_ID in dev mode).
     """
     import decimal
     from datetime import date, datetime
 
-    ha_id, _user_id = tenant
+    resolved_ha, _user_id = await get_tenant_info(credentials)
+    if ha_id and ha_id != resolved_ha:
+        allowed: List[str] = []
+        if credentials:
+            try:
+                allowed = tenant_middleware.authorised_ha_ids(credentials.credentials)
+            except HTTPException:
+                allowed = []
+        if ha_id in allowed or (_is_dev_mode() and not allowed):
+            resolved_ha = ha_id
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="You are not authorised for this housing association.",
+            )
+    ha_id = resolved_ha
 
     async with DatabasePool.acquire() as conn:
         rows = await conn.fetch(

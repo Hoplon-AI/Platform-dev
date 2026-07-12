@@ -58,9 +58,14 @@ const withCite = (value, cite) => {
   );
 };
 
-export default function Dossier({ block }) {
+export default function Dossier({ block, onSelectProperty }) {
   const fra = block.latest_fra;
   const fraew = block.latest_fraew;
+  // Standalone single-household house/bungalow: FRA/FRAEW are not required
+  // (they apply to common parts of multi-occupied buildings).
+  const fraExempt =
+    block.asset_type === "standalone" &&
+    ["house", "bungalow"].includes(block.dwelling_form);
   const { band: overall, reasons } = useMemo(() => summariseBlockRisk(block), [block]);
   const { street, postcode } = blockDisplayAddress(block);
   const alerts = useMemo(() => computeBlockAlerts(block), [block]);
@@ -173,7 +178,11 @@ export default function Dossier({ block }) {
         }
       >
         {!fra ? (
-          <div className="muted">No FRA linked to this block.</div>
+          <div className="muted">
+            {fraExempt
+              ? "FRA not required — standalone single-household dwelling."
+              : "No FRA linked to this block."}
+          </div>
         ) : (
           <>
             <WarningsPanel warnings={fra.validation_warnings} />
@@ -232,7 +241,11 @@ export default function Dossier({ block }) {
         }
       >
         {!fraew ? (
-          <div className="muted">No FRAEW linked to this block.</div>
+          <div className="muted">
+            {fraExempt
+              ? "FRAEW not required — standalone single-household dwelling."
+              : "No FRAEW linked to this block."}
+          </div>
         ) : (
           <>
             <WarningsPanel warnings={fraew.validation_warnings} />
@@ -326,7 +339,15 @@ export default function Dossier({ block }) {
       </Section>
 
       {/* Properties */}
-      <Section title="Properties in this block" subtitle={`${block.count} unit${block.count === 1 ? "" : "s"}`} accessory={<Pill>{block.count}</Pill>}>
+      <Section
+        title={block.asset_type === "standalone" ? "Property" : "Properties in this block"}
+        subtitle={
+          onSelectProperty
+            ? `${block.count} unit${block.count === 1 ? "" : "s"} · click a row for the individual property analysis`
+            : `${block.count} unit${block.count === 1 ? "" : "s"}`
+        }
+        accessory={<Pill>{block.count}</Pill>}
+      >
         <div className="table-wrap" style={{ maxHeight: 420, overflowY: "auto" }}>
           <table className="table">
             <thead><tr><th>Address</th><th>UPRN</th><th>Sum insured</th><th>FRA</th><th>FRAEW</th></tr></thead>
@@ -340,7 +361,12 @@ export default function Dossier({ block }) {
                 const pf = getFireRiskBand(propFra);
                 const pfe = getFireRiskBand(propFraew);
                 return (
-                  <tr key={p.id ?? p.property_reference ?? i}>
+                  <tr
+                    key={p.id ?? p.property_reference ?? i}
+                    onClick={onSelectProperty ? () => onSelectProperty(p) : undefined}
+                    style={onSelectProperty ? { cursor: "pointer" } : undefined}
+                    title={onSelectProperty ? "Open individual property analysis" : undefined}
+                  >
                     <td>{p.address_line_1 || p.address || p.property_reference || `Property ${i + 1}`}</td>
                     <td>{p.uprn ?? "—"}</td>
                     <td>£{fmtMoney(p.sum_insured)}</td>

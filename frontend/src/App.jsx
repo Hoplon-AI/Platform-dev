@@ -166,7 +166,11 @@ export default function App() {
 
   const loadPropertiesFromApi = async (overridePortfolioId = null) => {
     try {
-      const res = await apiFetch("/api/v1/portfolios/properties");
+      const res = await apiFetch(
+        selectedHaId
+          ? `/api/v1/portfolios/properties?ha_id=${encodeURIComponent(selectedHaId)}`
+          : "/api/v1/portfolios/properties"
+      );
       const rawRows = await res.json();
       if (Array.isArray(rawRows) && rawRows.length > 0) {
         // The properties endpoint doesn't carry the original SoV filename.
