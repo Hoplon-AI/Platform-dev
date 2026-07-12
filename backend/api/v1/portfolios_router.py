@@ -214,15 +214,20 @@ async def get_portfolio_recent_activity(
 @router.get("/properties", response_model=list[dict])
 async def get_properties(
     ha_id: Optional[str] = None,
+    portfolio_id: Optional[str] = None,
     credentials: Optional[HTTPAuthorizationCredentials] = Depends(security),
 ) -> List[Dict[str, Any]]:
     """
-    Return all properties for one HA from silver.properties.
+    Return the properties of ONE portfolio from silver.properties.
     Used by the frontend on login to restore the portfolio dashboard.
 
     ha_id (optional query param) selects which of the caller's authorised
     HAs to load — underwriters can be granted several. Defaults to the
     token's primary HA (or DEV_HA_ID in dev mode).
+
+    portfolio_id (optional) selects a specific portfolio; defaults to the
+    HA's most recent one. An HA can hold several portfolios (renewal years,
+    repeated uploads) — returning them all merged doubles every block.
     """
     import decimal
     from datetime import date, datetime
@@ -245,6 +250,18 @@ async def get_properties(
     ha_id = resolved_ha
 
     async with DatabasePool.acquire() as conn:
+        # Default to the HA's most recent portfolio — never merge portfolios.
+        if not portfolio_id:
+            latest = await conn.fetchrow(
+                """
+                SELECT portfolio_id::text FROM silver.portfolios
+                WHERE ha_id = $1
+                ORDER BY created_at DESC LIMIT 1
+                """,
+                ha_id,
+            )
+            portfolio_id = latest["portfolio_id"] if latest else None
+
         rows = await conn.fetch(
             """
             SELECT
@@ -262,9 +279,11 @@ async def get_properties(
                 enrichment_status, enrichment_source, enriched_at, metadata
             FROM silver.properties
             WHERE ha_id = $1
+              AND ($2::uuid IS NULL OR portfolio_id = $2::uuid)
             ORDER BY block_reference, property_reference
             """,
             ha_id,
+            portfolio_id,
         )
 
     def _serial(v):

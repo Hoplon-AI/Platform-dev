@@ -343,21 +343,24 @@ async def _fetch_blocks(db_pool, ha_id: str, portfolio_id: Optional[str]) -> lis
     LEFT JOIN block_postcode      pc USING (block_reference)
     LEFT JOIN block_property_type pt USING (block_reference)
     LEFT JOIN block_address       ad USING (block_reference)
-    -- FRA: latest per block (joined via silver.blocks)
+    -- FRA: latest per block (joined via silver.blocks, portfolio-scoped so a
+    -- same-named block in another portfolio can never supply the assessment)
     LEFT JOIN LATERAL (
         SELECT f.*
         FROM silver.fra_features f
         JOIN silver.blocks b ON f.block_id = b.block_id
         WHERE b.ha_id = $1 AND b.name = a.block_reference
+          AND ($2::uuid IS NULL OR b.portfolio_id = $2::uuid)
         ORDER BY f.assessment_date DESC NULLS LAST
         LIMIT 1
     ) fra ON true
-    -- FRAEW: latest per block (joined via silver.blocks)
+    -- FRAEW: latest per block (joined via silver.blocks, portfolio-scoped)
     LEFT JOIN LATERAL (
         SELECT fw.*
         FROM silver.fraew_features fw
         JOIN silver.blocks b ON fw.block_id = b.block_id
         WHERE b.ha_id = $1 AND b.name = a.block_reference
+          AND ($2::uuid IS NULL OR b.portfolio_id = $2::uuid)
         ORDER BY fw.assessment_date DESC NULLS LAST
         LIMIT 1
     ) fraew ON true

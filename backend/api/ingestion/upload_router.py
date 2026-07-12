@@ -758,6 +758,23 @@ async def _resolve_or_create_portfolio(conn, ha_id: str, portfolio_id: Optional[
 
     name = os.path.splitext(filename)[0] if filename else "Portfolio"
     renewal_year = datetime.utcnow().year
+
+    # Re-uploading the same file must REPLACE its portfolio, not duplicate the
+    # whole book — reuse the existing portfolio with this name and let the SoV
+    # processor's delete-stale step swap the rows.
+    existing = await conn.fetchrow(
+        """
+        SELECT portfolio_id::text FROM silver.portfolios
+        WHERE ha_id = $1 AND name = $2 AND renewal_year = $3
+        ORDER BY created_at DESC LIMIT 1
+        """,
+        ha_id, name, renewal_year,
+    )
+    if existing:
+        logger.info("[INGEST] Reusing portfolio '%s' (%s) for ha_id=%s — re-upload replaces rows",
+                    name, existing["portfolio_id"], ha_id)
+        return existing["portfolio_id"]
+
     new_id = str(uuid.uuid4())
     await conn.execute(
         """

@@ -166,11 +166,13 @@ export default function App() {
 
   const loadPropertiesFromApi = async (overridePortfolioId = null) => {
     try {
-      const res = await apiFetch(
-        selectedHaId
-          ? `/api/v1/portfolios/properties?ha_id=${encodeURIComponent(selectedHaId)}`
-          : "/api/v1/portfolios/properties"
-      );
+      // Backend returns ONE portfolio (latest for the HA by default) — pass the
+      // explicit portfolio when we have it (e.g. straight after an upload).
+      const params = new URLSearchParams();
+      if (selectedHaId) params.set("ha_id", selectedHaId);
+      if (overridePortfolioId) params.set("portfolio_id", overridePortfolioId);
+      const qs = params.toString();
+      const res = await apiFetch(`/api/v1/portfolios/properties${qs ? `?${qs}` : ""}`);
       const rawRows = await res.json();
       if (Array.isArray(rawRows) && rawRows.length > 0) {
         // The properties endpoint doesn't carry the original SoV filename.

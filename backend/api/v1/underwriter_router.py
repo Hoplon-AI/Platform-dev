@@ -1593,9 +1593,10 @@ async def doc_completeness(
                 ROUND(AVG(CASE WHEN storeys              IS NOT NULL THEN 1.0 ELSE 0.0 END), 3) AS f_storeys,
                 ROUND(AVG(CASE WHEN is_listed            IS NOT NULL THEN 1.0 ELSE 0.0 END), 3) AS f_is_listed
             FROM silver.properties
-            WHERE ha_id = $1
+            WHERE ha_id = $1 AND portfolio_id = $2::uuid
             """,
             ha_id,
+            portfolio_id,
         )
 
         doc_a_fields = [
