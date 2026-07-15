@@ -10,6 +10,7 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from "recharts";
+import { isScotland } from "../utils/mapHelpers";
 
 /* ─────────────────────────────────────────────────────────────────────────
    Portfolio Insights — composition & risk charts for the Portfolio Overview.
@@ -99,13 +100,15 @@ function normaliseWall(raw) {
   return map[s.toLowerCase()] || s;
 }
 
-function heightBand(m) {
-  const v = Number(m);
+// Nation-aware high-rise risk band. England & Wales split at 11m and 18m
+// (Low / Medium / High); Scotland has a single 11m threshold (Low / High).
+function heightRiskBand(prop) {
+  const v = Number(prop.height_m ?? prop.height_max_m);
   if (!Number.isFinite(v) || v <= 0) return null;
-  if (v < 11) return "<11m";
-  if (v < 18) return "11–18m";
-  if (v < 30) return "18–30m";
-  return "30m+";
+  if (isScotland(prop)) return v >= 11 ? "High" : "Low";
+  if (v < 11) return "Low";
+  if (v < 18) return "Medium";
+  return "High";
 }
 
 // OS Places UPRN match confidence (GREEN/AMBER/LOW/RED) → readable labels.
@@ -141,12 +144,12 @@ const FLOOD_COLORS = {
   [UNKNOWN]: UNKNOWN_COLOR,
 };
 
-// Building height — fire-safety severity: <11m green, 11–18m amber, 18m+ red.
+// Building height risk band — fire-safety severity: Low green, Medium amber, High red.
+const HEIGHT_ORDER = ["Low", "Medium", "High", UNKNOWN];
 const HEIGHT_COLORS = {
-  "<11m": "#4F8A6B",   // green
-  "11–18m": "#C8923E", // amber
-  "18–30m": "#B8564B", // red
-  "30m+": "#9B3D33",   // deep red (HRB threshold)
+  Low: "#4F8A6B",    // green
+  Medium: "#C8923E", // amber
+  High: "#B8564B",   // red
   [UNKNOWN]: UNKNOWN_COLOR,
 };
 
@@ -216,8 +219,12 @@ function DonutLegend({ data, total, colorFor }) {
   );
 }
 
-function DonutCard({ title, data, caption, colors }) {
+function DonutCard({ title, data, caption, colors, enrichedOnly }) {
   if (!data.some((d) => d.name !== UNKNOWN)) return null;
+  // Enrichment-derived donuts: drop the "Unknown" (un-enriched) slice so the
+  // percentages are relative to enriched properties only. The caption still
+  // reports the base count.
+  if (enrichedOnly) data = data.filter((d) => d.name !== UNKNOWN);
   const total = data.reduce((s, d) => s + d.value, 0);
   const colorFor = (name, i) =>
     colors && colors[name] ? colors[name] : sliceColor(name, i);
@@ -253,7 +260,7 @@ function DonutCard({ title, data, caption, colors }) {
   );
 }
 
-function BarCard({ title, data, caption }) {
+function BarCard({ title, data, caption, labelFormatter }) {
   if (!data.some((d) => d.name !== UNKNOWN)) return null;
   return (
     <div style={cardStyle}>
@@ -273,7 +280,11 @@ function BarCard({ title, data, caption }) {
             tickLine={false}
             axisLine={false}
           />
-          <Tooltip cursor={{ fill: "rgba(30,50,70,0.05)" }} />
+          <Tooltip
+            cursor={{ fill: "rgba(30,50,70,0.05)" }}
+            labelFormatter={labelFormatter}
+            formatter={(value) => [value, "flats"]}
+          />
           <Bar dataKey="value" radius={[6, 6, 0, 0]} isAnimationActive={false}>
             {data.map((d) => (
               <Cell key={d.name} fill={d.name === UNKNOWN ? UNKNOWN_COLOR : NAVY} />
@@ -326,10 +337,7 @@ export function PortfolioInsightsPanel({ properties }) {
       countBy(list, (p) => clean(p.flood_risk_band)),
       FLOOD_ORDER
     );
-    const height = ordered(
-      countBy(list, (p) => heightBand(p.height_m ?? p.height_max_m)),
-      ["<11m", "11–18m", "18–30m", "30m+", UNKNOWN]
-    );
+    const height = ordered(countBy(list, heightRiskBand), HEIGHT_ORDER);
     const uprn = ordered(
       countBy(list, (p) => confidenceLabel(p.uprn_confidence)),
       [
@@ -352,6 +360,9 @@ export function PortfolioInsightsPanel({ properties }) {
     const blockCount = new Set(
       list.map((p) => clean(p.block_reference)).filter(Boolean)
     ).size;
+    const enrichedCount = list.filter(
+      (p) => p.uprn || p.enrichment_status === "enriched"
+    ).length;
 
     return {
       n,
@@ -364,10 +375,12 @@ export function PortfolioInsightsPanel({ properties }) {
       flood,
       floodCaption: coverage(flood),
       height,
-      heightCaption: coverage(height),
+      heightCaption: [coverage(height), "High = 18m+ (Scotland 11m+), Medium = 11–18m, Low = <11m."]
+        .filter(Boolean)
+        .join(" · "),
       uprn,
       uprnCaption: coverage(uprn),
-      stats: { totalSI, avgSI, blockCount },
+      stats: { totalSI, avgSI, blockCount, enrichedCount },
     };
   }, [properties]);
 
@@ -410,6 +423,10 @@ export function PortfolioInsightsPanel({ properties }) {
           }}
         >
           <StatTile label="Properties" value={model.n.toLocaleString()} />
+          <StatTile
+            label="Properties enriched"
+            value={`${stats.enrichedCount.toLocaleString()} (${pct(stats.enrichedCount, model.n)} of the portfolio)`}
+          />
           <StatTile label="Blocks" value={stats.blockCount.toLocaleString()} />
           <StatTile label="Total insured value" value={gbp(stats.totalSI)} />
           <StatTile label="Average sum insured" value={gbp(stats.avgSI)} />
@@ -427,24 +444,31 @@ export function PortfolioInsightsPanel({ properties }) {
           <DonutCard title="Wall construction" data={model.wall} />
           <DonutCard title="Roof construction" data={model.roof} />
           <BarCard title="Age band" data={model.ageRows} />
-          <BarCard title="Storeys" data={model.storeyRows} />
+          <BarCard
+            title="Flats by building storeys"
+            data={model.storeyRows}
+            labelFormatter={(l) => (l === UNKNOWN ? l : `${l} storeys`)}
+          />
           <DonutCard
             title="Flood risk"
             data={model.flood}
             caption={model.floodCaption}
             colors={FLOOD_COLORS}
+            enrichedOnly
           />
           <DonutCard
             title="Building height"
             data={model.height}
             caption={model.heightCaption}
             colors={HEIGHT_COLORS}
+            enrichedOnly
           />
           <DonutCard
             title="UPRN match confidence"
             data={model.uprn}
             caption={model.uprnCaption}
             colors={CONFIDENCE_COLORS}
+            enrichedOnly
           />
         </div>
       </div>

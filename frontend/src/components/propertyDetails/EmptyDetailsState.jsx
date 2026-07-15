@@ -1,7 +1,10 @@
 // Placeholder/instructional panel shown when no property or block is selected.
 import React from "react";
 
-export default function EmptyDetailsState() {
+export default function EmptyDetailsState({ legendCounts = null }) {
+  // Real block counts by worst FRA/FRAEW band; falls back to em-dash if not supplied.
+  const c = legendCounts || {};
+  const n = (v) => (Number.isFinite(v) ? v : "—");
   const numStep = (n, text) => (
     <div style={{ display: "flex", alignItems: "flex-start", gap: 12 }}>
       <span
@@ -105,10 +108,10 @@ export default function EmptyDetailsState() {
       <div style={{ background: "var(--warm-bg-2, #F3EFE8)", border: "1px solid var(--border-line, #DED7CC)", borderRadius: 12, padding: "20px 22px" }}>
         <div className="tag" style={{ marginBottom: 18 }}>Map legend</div>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: "14px 12px" }}>
-          {legendRow("#ef4444", "High risk", 8)}
-          {legendRow("#f59e0b", "Medium risk", 12)}
-          {legendRow("#22c55e", "Low risk", 9)}
-          {legendRow("#64748b", "No evidence", 10)}
+          {legendRow("#ef4444", "High risk", n(c.Red))}
+          {legendRow("#f59e0b", "Medium risk", n(c.Amber))}
+          {legendRow("#22c55e", "Low risk", n(c.Green))}
+          {legendRow("#64748b", "No evidence", n(c.none))}
         </div>
         <p style={{ margin: "16px 0 0", fontSize: 13, color: "var(--muted, #6B6560)", lineHeight: 1.55 }}>
           Marker colour reflects the worst FRA / FRAEW rating linked to the block.

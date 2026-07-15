@@ -21,6 +21,7 @@ export default function PropertyDetails({
   selectedBlock = null,
   blockMode = false,
   onSelectProperty,
+  legendCounts = null,
 }) {
   const activeSource = property || selectedBlock || {};
 
@@ -37,7 +38,7 @@ export default function PropertyDetails({
   const blockFire = useMemo(() => getFireAssessment(selectedBlock), [selectedBlock]);
 
   if (!property && !blockMode) {
-    return <EmptyDetailsState />;
+    return <EmptyDetailsState legendCounts={legendCounts} />;
   }
 
   if (blockMode && selectedBlock && !property) {
@@ -101,7 +102,7 @@ export default function PropertyDetails({
   }
 
   if (!property) {
-    return <EmptyDetailsState />;
+    return <EmptyDetailsState legendCounts={legendCounts} />;
   }
 
   return (

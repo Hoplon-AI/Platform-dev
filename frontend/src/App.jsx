@@ -32,6 +32,14 @@ export default function App() {
   // (just hidden) so its state — map position, selections, scroll — survives
   // switching tabs instead of resetting on every remount.
   const [visitedNav, setVisitedNav] = useState({ uploads: true });
+  // View (center + zoom) handed from the dashboard mini-map to the risk map on
+  // click-through, so the risk map opens where the user had zoomed.
+  const [riskMapView, setRiskMapView] = useState(null);
+
+  const openFullMap = (view) => {
+    setRiskMapView(view ? { ...view } : null); // new object → forces re-apply
+    setActiveNav("risk-map");
+  };
 
   const [isUploading, setIsUploading] = useState(false);
   const [uploadError, setUploadError] = useState(null);
@@ -742,6 +750,7 @@ export default function App() {
                 refetchFireDocuments={refetchFireDocuments}
                 portfolioId={getPortfolioIdFromResult(ingestionResult)}
                 onLoadMapData={loadPropertiesFromApi}
+                onOpenFullMap={openFullMap}
                 haName={accessibleHAs.find((h) => h.ha_id === selectedHaId)?.ha_name || authUser?.organisation || ""}
               />
             </div>
@@ -772,6 +781,7 @@ export default function App() {
             <div style={{ display: activeNav === "risk-map" ? "block" : "none" }}>
               <FullMapPage
                 properties={ingestionResult?.properties ?? []}
+                initialView={riskMapView}
               />
             </div>
           )}

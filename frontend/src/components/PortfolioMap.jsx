@@ -69,9 +69,13 @@ export default function PortfolioMap({
   colorBy = "readiness",
   riskColorBy = null,
   canvasStyle = {},
+  onViewChange = null,
+  viewOverride = null,
 }) {
   const mapDivRef = useRef(null);
   const mapRef = useRef(null);
+  const onViewChangeRef = useRef(onViewChange);
+  onViewChangeRef.current = onViewChange;
   const pointLayerRef = useRef(null);
   const buildingsLayerRef = useRef(null);
   const overviewBlockLayerRef = useRef(null);
@@ -281,7 +285,9 @@ export default function PortfolioMap({
         L.DomEvent.disableScrollPropagation(div);
         L.DomEvent.disableClickPropagation(div);
         const groups = [...new Set(legendEntries.map((e) => e.group))];
-        div.innerHTML = groups
+        const resetBtn =
+          `<button type="button" class="wms-reset" style="width:100%;margin-bottom:6px;padding:5px 8px;font-size:12px;font-weight:600;color:#1E3246;background:#f1f5f9;border:1px solid #e2e8f0;border-radius:6px;cursor:pointer;">Clear layers</button>`;
+        div.innerHTML = resetBtn + groups
           .map((g) => {
             const rows = legendEntries
               .map((e, i) => ({ e, i }))
@@ -300,6 +306,12 @@ export default function PortfolioMap({
             if (cb.checked) { map.addLayer(layer); map.fire("overlayadd"); }
             else { map.removeLayer(layer); map.fire("overlayremove"); }
           });
+        });
+        // Clear layers — remove every active overlay and uncheck its box.
+        div.querySelector(".wms-reset").addEventListener("click", () => {
+          legendEntries.forEach((e) => { if (map.hasLayer(e.layer)) map.removeLayer(e.layer); });
+          div.querySelectorAll("input[type=checkbox]").forEach((cb) => { cb.checked = false; });
+          map.fire("overlayremove");
         });
         return div;
       };
@@ -349,6 +361,27 @@ export default function PortfolioMap({
       };
       legend.addTo(map);
     }
+
+    // Reset-view button — zooms back out to the default country-wide view.
+    const resetControl = L.control({ position: "bottomleft" });
+    resetControl.onAdd = () => {
+      const btn = L.DomUtil.create("button", "map-reset-btn");
+      btn.type = "button";
+      btn.title = "Reset zoom to default view";
+      btn.innerHTML = "⤢ Reset view";
+      btn.style.cssText =
+        "background:rgba(255,255,255,0.95);border:1px solid #e2e8f0;border-radius:8px;padding:6px 10px;margin-bottom:6px;font-size:13px;font-weight:600;color:#1E3246;cursor:pointer;box-shadow:0 1px 4px rgba(15,23,42,0.12);";
+      L.DomEvent.disableClickPropagation(btn);
+      L.DomEvent.on(btn, "click", () => map.setView(DEFAULT_CENTER, DEFAULT_ZOOM, { animate: true }));
+      return btn;
+    };
+    resetControl.addTo(map);
+
+    // Report view (center + zoom) so the parent can hand it to another map.
+    map.on("moveend zoomend", () => {
+      const c = map.getCenter();
+      onViewChangeRef.current?.({ center: [c.lat, c.lng], zoom: map.getZoom() });
+    });
 
     mapRef.current = map;
     buildingsLayerRef.current = L.layerGroup().addTo(map);
@@ -760,6 +793,23 @@ export default function PortfolioMap({
       lastSelectionSignatureRef.current = "";
     }
   }, [activeMode, selectedBlock, selectedProperty, propertyPoints]);
+
+  // Restore a view handed over from another map (e.g. click-through from the
+  // dashboard mini-map to the risk map). A new object each time re-applies it.
+  // This effect is declared last, so on first mount it runs after the auto-fit
+  // and wins; on later navigations the map is already mounted and only this runs.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !viewOverride?.center) return;
+    const apply = () => {
+      map.invalidateSize();
+      map.setView(viewOverride.center, viewOverride.zoom ?? map.getZoom(), { animate: false });
+    };
+    apply();
+    // Re-apply once the (possibly just-shown) container has settled its size.
+    const t = setTimeout(apply, 120);
+    return () => clearTimeout(t);
+  }, [viewOverride]);
 
   return (
     <div

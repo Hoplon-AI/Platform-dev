@@ -16,6 +16,7 @@ import {
   HoverTooltip,
 } from "../components/dashboard/DashboardWidgets.jsx";
 import { KPI_ICONS, fireRiskSubtitle } from "../components/dashboard/dashboardHelpers.jsx";
+import { blockOverallBand } from "../utils/blockModel.js";
 import {
   FireEvidencePanel,
   UnderwriterDocumentsPanel,
@@ -32,9 +33,11 @@ export default function PortfolioDashboard({
   refetchFireDocuments,
   portfolioId = null,
   onLoadMapData,
+  onOpenFullMap,
   haName = "",
 }) {
   const properties = ingestionResult?.properties || [];
+  const miniMapViewRef = useRef(null);
   const [selectedBlock, setSelectedBlock] = useState(null);
   const [selectedProperty, setSelectedProperty] = useState(null);
   const [mapDataLoading, setMapDataLoading] = useState(false);
@@ -231,6 +234,18 @@ export default function PortfolioDashboard({
   const highRiseBlocks = blocks.filter((b) => Number(b.maxHeight) >= 18 || Number(b.max_storeys) >= 7).length;
   const amberBlocks = blocks.filter((b) => (Number(b.maxHeight) >= 11 && Number(b.maxHeight) < 18) || (Number(b.max_storeys) >= 4 && Number(b.max_storeys) < 7)).length;
   const mappedBlocksCount = blocks.filter((b) => b.hasValidCoords).length;
+  // Real block counts by worst FRA/FRAEW band for the map legend (High/Medium/Low/No evidence).
+  const legendCounts = useMemo(() => {
+    const c = { Red: 0, Amber: 0, Green: 0, none: 0 };
+    for (const b of blocks) {
+      const ob = blockOverallBand(b);
+      if (ob === "Red") c.Red++;
+      else if (ob === "Amber") c.Amber++;
+      else if (ob === "Green") c.Green++;
+      else c.none++;
+    }
+    return c;
+  }, [blocks]);
   const enrichedPropertiesCount = properties.filter((p) => p.uprn || p.enrichment_status === "enriched").length;
   // Quality of the matches we made: share of enriched properties with a GREEN
   // (confident) OS Places UPRN match, not coverage over the whole portfolio.
@@ -416,13 +431,13 @@ export default function PortfolioDashboard({
           subtitle={
             <span style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
               <HoverTooltip
-                tip="18 m+ or 7+ storeys — defined as higher-risk under the Building Safety Act 2022"
+                tip="18 m+ or 7+ storeys — higher-risk buildings under the Building Safety Act 2022 (England) and Building Safety category 1 in Wales. In Scotland the high-rise threshold is 11 m and above."
                 badgeStyle={{ padding: "2px 8px", borderRadius: 6, background: "rgba(225,29,72,0.09)", border: "1px solid rgba(225,29,72,0.28)", fontWeight: 600, fontSize: 13, color: "var(--navy)", cursor: "default" }}
               >
                 {highRiseBlocks} high-risk
               </HoverTooltip>
               <HoverTooltip
-                tip="11–18 m or 4–6 storeys — medium-rise under Approved Document B (2022)"
+                tip="11–18 m or 4–6 storeys — medium-rise under Approved Document B (2022, England) and Building Safety category 2 in Wales. In Scotland these already meet the 11 m high-rise threshold."
                 badgeStyle={{ padding: "2px 8px", borderRadius: 6, background: "rgba(245,158,11,0.10)", border: "1px solid rgba(245,158,11,0.30)", fontWeight: 600, fontSize: 13, color: "var(--navy)", cursor: "default" }}
               >
                 {amberBlocks} mid-risk
@@ -526,6 +541,7 @@ export default function PortfolioDashboard({
               selectedBlock={resolvedSelectedBlock}
               blockMode={!resolvedSelectedProperty}
               onSelectProperty={handleSelectProperty}
+              legendCounts={legendCounts}
             />
           </div>
         </div>
@@ -537,6 +553,15 @@ export default function PortfolioDashboard({
             </div>
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
               <span className="pill pill-muted">{mappedBlocksCount} mapped blocks</span>
+              {typeof onOpenFullMap === "function" && (
+                <button
+                  className="btn btn-primary"
+                  style={{ padding: "4px 10px", fontSize: 12 }}
+                  onClick={() => onOpenFullMap(miniMapViewRef.current)}
+                >
+                  Open in full risk map ↗
+                </button>
+              )}
               {typeof onLoadMapData === "function" && (
                 <button
                   className="btn"
@@ -612,6 +637,7 @@ export default function PortfolioDashboard({
               onSelectBlock={handleSelectBlock}
               onSelectProperty={handleSelectProperty}
               suppressFit={suppressMapFit}
+              onViewChange={(v) => { miniMapViewRef.current = v; }}
             />
           </div>
 

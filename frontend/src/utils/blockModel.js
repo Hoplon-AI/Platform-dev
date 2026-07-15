@@ -196,10 +196,13 @@ export const getWallTypes = (fraew) => {
 
 // ---------- height ----------
 
-export const heightCategory = (m) => {
+// Descriptive height band. Scotland has a single 11m high-rise threshold, so
+// everything 11m+ collapses to one band; England & Wales keep the 11m/18m/30m splits.
+export const heightCategory = (m, isScot = false) => {
   const h = Number(m);
   if (!Number.isFinite(h) || h <= 0) return null;
   if (h < 11) return "Under 11m";
+  if (isScot) return "11m+ (high-rise)";
   if (h < 18) return "11–18m";
   if (h < 30) return "18–30m";
   return "Over 30m";
