@@ -16,7 +16,10 @@ from typing import Literal
 
 import pdfplumber
 from fastapi import APIRouter, File, HTTPException, Query, UploadFile
+from fastapi.encoders import jsonable_encoder
 from fastapi.responses import JSONResponse
+
+from backend.workers.extraction_common import citations_to_json
 
 logger = logging.getLogger(__name__)
 
@@ -113,7 +116,7 @@ async def test_extract_pdf(
             from backend.workers.fra_processor import FRAProcessor
             processor = FRAProcessor(db_conn=None, llm_client=llm)
             raw_json = await processor._call_llm(text)
-            parsed = processor._parse_llm_response(raw_json)
+            parsed = processor._parse_llm_response(raw_json, source_text=text)
             rag_status = processor._normalise_rag_status(parsed.risk_rating)
             result = {
                 "document_type": "fra",
@@ -124,6 +127,9 @@ async def test_extract_pdf(
                 "pages_extracted": text.count("[Page "),
                 "rag_status": rag_status,
                 "extraction_confidence": parsed.extraction_confidence,
+                "llm_reported_confidence": parsed.llm_reported_confidence,
+                "validation_warnings": parsed.validation_warnings,
+                "citations": citations_to_json(parsed.citations),
                 "extracted_fields": {
                     "fra_assessment_type": parsed.fra_assessment_type,
                     "assessment_date": str(parsed.assessment_date) if parsed.assessment_date else None,
@@ -156,6 +162,9 @@ async def test_extract_pdf(
                             "due_date": str(a.due_date) if a.due_date else None,
                             "status": a.status,
                             "responsible": a.responsible,
+                            "pg": a.pg,
+                            "source_verified": a.source_verified,
+                            "source_page": a.source_page,
                         }
                         for a in parsed.action_items
                     ],
@@ -170,13 +179,12 @@ async def test_extract_pdf(
             from backend.workers.fraew_processor import FRAEWProcessor
             processor = FRAEWProcessor(db_conn=None, llm_client=llm)
             raw_json = await processor._call_llm(text)
-            parsed = processor._parse_llm_response(raw_json)
-            llm_rag = (processor._extract_json(raw_json) or {}).get("rag_status")
+            parsed = processor._parse_llm_response(raw_json, source_text=text)
             result_debug = {
                 "pass1_raw": processor.last_pass1_response,
                 "pass2_raw": processor.last_pass2_response,
             }
-            rag_status = processor._normalise_rag_status(parsed.building_risk_rating, llm_rag=llm_rag)
+            rag_status = processor._normalise_rag_status(parsed.building_risk_rating)
             material_flags = processor._derive_material_flags(parsed.wall_types)
             result = {
                 "document_type": "fraew",
@@ -187,6 +195,9 @@ async def test_extract_pdf(
                 "pages_extracted": text.count("[Page "),
                 "rag_status": rag_status,
                 "extraction_confidence": parsed.extraction_confidence,
+                "llm_reported_confidence": parsed.llm_reported_confidence,
+                "validation_warnings": parsed.validation_warnings,
+                "citations": citations_to_json(parsed.citations),
                 "extracted_fields": {
                     "report_reference": parsed.report_reference,
                     "assessment_date": parsed.assessment_date,
@@ -231,4 +242,6 @@ async def test_extract_pdf(
         logger.exception("Test extraction failed for %s", filename)
         raise HTTPException(status_code=500, detail=f"Extraction failed: {e}")
 
-    return JSONResponse(content=result)
+    # jsonable_encoder: result contains Pydantic models and date objects,
+    # which JSONResponse's plain json.dumps cannot serialise
+    return JSONResponse(content=jsonable_encoder(result))

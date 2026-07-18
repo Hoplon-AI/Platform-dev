@@ -1485,9 +1485,28 @@ import json
 import logging
 import re
 import uuid
-from dataclasses import dataclass, field
 from datetime import date, datetime
-from typing import Any, Optional
+from typing import Any, Literal, Optional
+
+from pydantic import BaseModel, Field, ValidationError, ValidationInfo, field_validator
+
+from backend.workers.extraction_common import (
+    WARN_WEIGHT_DROPPED,
+    Citation,
+    _date_to_str,
+    _to_bool,
+    _to_date,
+    _to_float,
+    _to_str,
+    citations_to_json,
+    composite_confidence,
+    coverage_score,
+    ctx_warn,
+    make_warning,
+    parse_citations,
+    verify_citations,
+    verify_item_sources,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -1504,32 +1523,124 @@ _ADDR_STOP_WORDS = frozenset({
 # Data classes
 # ──────────────────────────────────────────────────────────────────────
 
-@dataclass
-class FRAActionItem:
-    issue_ref:   Optional[str]
+HazardType = Literal[
+    "Housekeeping", "Means of Escape", "Fire Spread", "Detection",
+    "Signage", "Emergency Plans", "Fire Service Facilities", "Structural", "Other",
+]
+
+
+class FRAActionItem(BaseModel):
+    """Single action item / deficiency from an FRA. All coercion happens in validators."""
+
+    issue_ref:   Optional[str] = None
     description: str
-    hazard_type: Optional[str]
-    priority:    str            # advisory | low | medium | high
-    due_date:    Optional[date]
-    status:      str            # outstanding | completed | overdue
-    responsible: Optional[str]
+    hazard_type: HazardType = "Other"
+    priority:    Literal["advisory", "low", "medium", "high"] = "low"
+    due_date:    Optional[date] = None
+    status:      Literal["outstanding", "completed", "overdue"] = "outstanding"
+    responsible: Optional[str] = None
+    # citation: page the LLM found this action on; verification set by Python
+    pg:              Optional[int] = None
+    source_verified: Optional[bool] = None
+    source_page:     Optional[int] = None
+
+    @field_validator("issue_ref", "responsible", mode="before")
+    @classmethod
+    def _clean_str(cls, v: Any) -> Optional[str]:
+        return _to_str(v)
+
+    @field_validator("pg", mode="before")
+    @classmethod
+    def _pg_to_int(cls, v: Any) -> Optional[int]:
+        try:
+            return int(v) if v is not None else None
+        except (TypeError, ValueError):
+            return None
+
+    @field_validator("description", mode="before")
+    @classmethod
+    def _require_description(cls, v: Any) -> str:
+        s = _to_str(v)
+        if not s:
+            raise ValueError("action item description is empty")
+        return s
+
+    @field_validator("due_date", mode="before")
+    @classmethod
+    def _parse_date(cls, v: Any, info: ValidationInfo) -> Optional[date]:
+        d = _to_date(v)
+        if d is None and _to_str(v) is not None:
+            ctx_warn(info.context, "action_items.due_date", v, "unparseable date, nulled")
+        return d
+
+    # Priority/status/hazard fallbacks are by-design inference (the prompt
+    # instructs the LLM to infer) — no warnings for these.
+    @field_validator("priority", mode="before")
+    @classmethod
+    def _norm_priority(cls, v: Any) -> str:
+        return _normalise_priority(v)
+
+    @field_validator("status", mode="before")
+    @classmethod
+    def _norm_status(cls, v: Any) -> str:
+        return _normalise_status(v)
+
+    @field_validator("hazard_type", mode="before")
+    @classmethod
+    def _norm_hazard(cls, v: Any) -> str:
+        return _normalise_hazard_type(v)
 
 
-@dataclass
-class FRAExtractedFeatures:
-    risk_rating:                   Optional[str]
-    fra_assessment_type:           Optional[str]
-    assessment_date:               Optional[date]
-    assessment_valid_until:        Optional[date]
-    next_review_date:              Optional[date]
-    assessor_name:                 Optional[str]
-    assessor_company:              Optional[str]
-    assessor_qualification:        Optional[str]
-    responsible_person:            Optional[str]
-    evacuation_strategy:           Optional[str]
+class SignificantFinding(BaseModel):
+    finding:  str
+    location: Optional[str] = None
+    severity: Literal["high", "medium", "low"] = "low"
+
+    @field_validator("finding", mode="before")
+    @classmethod
+    def _req_finding(cls, v: Any) -> str:
+        s = _to_str(v)
+        if not s:
+            raise ValueError("finding text is empty")
+        return s
+
+    @field_validator("location", mode="before")
+    @classmethod
+    def _clean_loc(cls, v: Any) -> Optional[str]:
+        return _to_str(v)
+
+    @field_validator("severity", mode="before")
+    @classmethod
+    def _norm_severity(cls, v: Any) -> str:
+        s = (_to_str(v) or "low").lower()
+        return s if s in ("high", "medium", "low") else "low"
+
+
+class FRAExtraction(BaseModel):
+    """Validated, normalised output of one FRA LLM extraction call."""
+
+    risk_rating:                   Optional[str] = None
+    fra_assessment_type:           Optional[str] = None
+    assessment_date:               Optional[date] = None
+    assessment_valid_until:        Optional[date] = None
+    next_review_date:              Optional[date] = None
+    assessor_name:                 Optional[str] = None
+    assessor_company:              Optional[str] = None
+    assessor_qualification:        Optional[str] = None
+    responsible_person:            Optional[str] = None
+    # building identity fields (single-pass prompt only)
+    block_reference:               Optional[str] = None
+    building_name:                 Optional[str] = None
+    building_address:              Optional[str] = None
+    num_storeys:                   Optional[int] = None
+    num_units:                     Optional[int] = None
+    build_year:                    Optional[int] = None
+    # strategy
+    evacuation_strategy:           Optional[str] = None
     evacuation_strategy_changed:   bool = False
     evacuation_strategy_notes:     Optional[str] = None
     has_accessibility_needs_noted: bool = False
+    # fire systems (None = not mentioned)
     has_sprinkler_system:          Optional[bool] = None
     has_smoke_detection:           Optional[bool] = None
     has_fire_alarm_system:         Optional[bool] = None
@@ -1540,12 +1651,176 @@ class FRAExtractedFeatures:
     has_firefighting_shaft:        Optional[bool] = None
     has_dry_riser:                 Optional[bool] = None
     has_wet_riser:                 Optional[bool] = None
-    action_items:                  list = field(default_factory=list)
-    significant_findings:          list = field(default_factory=list)
+    # actions & findings
+    action_items:                  list[FRAActionItem] = Field(default_factory=list)
+    significant_findings:          list[SignificantFinding] = Field(default_factory=list)
+    # compliance flags
     bsa_2022_applicable:           bool = False
     accountable_person_noted:      bool = False
     mandatory_occurrence_noted:    bool = False
+    # per-field citations — enriched with verification results in
+    # _parse_llm_response (verified/found_page/snippet never trusted from LLM)
+    citations:                     dict[str, Citation] = Field(default_factory=dict)
+    # confidence — extraction_confidence holds the composite after
+    # _parse_llm_response; the raw LLM self-report is kept alongside
     extraction_confidence:         float = 0.5
+    llm_reported_confidence:       Optional[float] = None
+    # repair/skip events harvested during validation (never LLM-supplied)
+    validation_warnings:           list[dict] = Field(default_factory=list)
+
+    # ── string fields ──────────────────────────────────────────────────
+    @field_validator(
+        "risk_rating", "assessor_name", "assessor_company", "assessor_qualification",
+        "responsible_person", "block_reference", "building_name", "building_address",
+        "evacuation_strategy_notes",
+        mode="before",
+    )
+    @classmethod
+    def _clean_str(cls, v: Any) -> Optional[str]:
+        return _to_str(v)
+
+    # ── date fields ────────────────────────────────────────────────────
+    @field_validator("assessment_date", "assessment_valid_until", "next_review_date", mode="before")
+    @classmethod
+    def _parse_date(cls, v: Any, info: ValidationInfo) -> Optional[date]:
+        d = _to_date(v)
+        if d is None and _to_str(v) is not None:
+            ctx_warn(info.context, info.field_name, v, "unparseable date, nulled")
+        return d
+
+    # ── evacuation strategy enum ───────────────────────────────────────
+    @field_validator("evacuation_strategy", mode="before")
+    @classmethod
+    def _norm_evac(cls, v: Any, info: ValidationInfo) -> Optional[str]:
+        VALID = ("stay_put", "simultaneous", "phased", "temporary_evacuation")
+        s = _to_str(v)
+        if s is not None and s not in VALID:
+            ctx_warn(info.context, "evacuation_strategy", v, "not a valid strategy enum, nulled")
+            return None
+        return s
+
+    # ── FRA assessment type normalisation ──────────────────────────────
+    @field_validator("fra_assessment_type", mode="before")
+    @classmethod
+    def _norm_fra_type(cls, v: Any, info: ValidationInfo) -> Optional[str]:
+        s = _to_str(v)
+        if not s:
+            return None
+        if re.match(r"^Type\s*[1-4]$", s, re.IGNORECASE):
+            return s
+        m = re.search(r"\b([1-4])\b", s)
+        if m:
+            return f"Type {m.group(1)}"
+        ctx_warn(info.context, "fra_assessment_type", v, "no Type 1-4 recognisable, nulled")
+        return None
+
+    # ── Optional[bool] fire-system fields ─────────────────────────────
+    @field_validator(
+        "has_sprinkler_system", "has_smoke_detection", "has_fire_alarm_system",
+        "has_fire_doors", "has_compartmentation", "has_emergency_lighting",
+        "has_fire_extinguishers", "has_firefighting_shaft", "has_dry_riser", "has_wet_riser",
+        mode="before",
+    )
+    @classmethod
+    def _to_optional_bool(cls, v: Any, info: ValidationInfo) -> Optional[bool]:
+        b = _to_bool(v)
+        if b is None and v is not None:
+            ctx_warn(info.context, info.field_name, v, "unrecognised boolean, nulled")
+        return b
+
+    # ── required-bool compliance flags ────────────────────────────────
+    @field_validator(
+        "evacuation_strategy_changed", "has_accessibility_needs_noted",
+        "bsa_2022_applicable", "accountable_person_noted", "mandatory_occurrence_noted",
+        mode="before",
+    )
+    @classmethod
+    def _to_bool_flag(cls, v: Any) -> bool:
+        return bool(_to_bool(v) or False)
+
+    # ── integer fields ─────────────────────────────────────────────────
+    @field_validator("num_storeys", "num_units", "build_year", mode="before")
+    @classmethod
+    def _to_int(cls, v: Any, info: ValidationInfo) -> Optional[int]:
+        if v is None:
+            return None
+        try:
+            return int(v)
+        except (TypeError, ValueError):
+            ctx_warn(info.context, info.field_name, v, "not an integer, nulled")
+            return None
+
+    # ── confidence clamp ───────────────────────────────────────────────
+    @field_validator("extraction_confidence", mode="before")
+    @classmethod
+    def _clamp_confidence(cls, v: Any, info: ValidationInfo) -> float:
+        try:
+            float(v)
+        except (TypeError, ValueError):
+            ctx_warn(info.context, "extraction_confidence", v,
+                     "self-reported confidence unparseable, defaulted to 0.5")
+        return _to_float(v, default=0.5)
+
+    # ── citations block ────────────────────────────────────────────────
+    @field_validator("citations", mode="before")
+    @classmethod
+    def _parse_citations(cls, v: Any, info: ValidationInfo) -> dict:
+        return parse_citations(v, info.context)
+
+    # ── action items — validate each; skipped items become warnings ────
+    @field_validator("action_items", mode="before")
+    @classmethod
+    def _parse_actions(cls, v: Any, info: ValidationInfo) -> list:
+        if v is None:
+            return []
+        if not isinstance(v, list):
+            ctx_warn(info.context, "action_items", type(v).__name__,
+                     "not a list, dropped", weight=WARN_WEIGHT_DROPPED)
+            return []
+        result = []
+        for i, item in enumerate(v):
+            if not isinstance(item, dict):
+                ctx_warn(info.context, f"action_items[{i}]", item,
+                         "not an object, dropped", weight=WARN_WEIGHT_DROPPED)
+                continue
+            try:
+                parsed = FRAActionItem.model_validate(item, context=info.context)
+                # never trust verification fields from the LLM
+                parsed.source_verified = None
+                parsed.source_page = None
+                result.append(parsed)
+            except ValidationError as exc:
+                ctx_warn(info.context, f"action_items[{i}]",
+                         item.get("description") or item.get("issue_ref"),
+                         f"invalid action item dropped: {exc.errors()[0].get('msg', 'validation error')}",
+                         weight=WARN_WEIGHT_DROPPED)
+                logger.warning("Dropped invalid action item %d: %s", i, exc)
+        return result
+
+    # ── significant findings ───────────────────────────────────────────
+    @field_validator("significant_findings", mode="before")
+    @classmethod
+    def _parse_findings(cls, v: Any, info: ValidationInfo) -> list:
+        if v is None:
+            return []
+        if not isinstance(v, list):
+            ctx_warn(info.context, "significant_findings", type(v).__name__,
+                     "not a list, dropped", weight=WARN_WEIGHT_DROPPED)
+            return []
+        result = []
+        for i, f in enumerate(v):
+            if not isinstance(f, dict):
+                ctx_warn(info.context, f"significant_findings[{i}]", f,
+                         "not an object, dropped", weight=WARN_WEIGHT_DROPPED)
+                continue
+            try:
+                result.append(SignificantFinding.model_validate(f, context=info.context))
+            except ValidationError as exc:
+                ctx_warn(info.context, f"significant_findings[{i}]", f.get("finding"),
+                         f"invalid finding dropped: {exc.errors()[0].get('msg', 'validation error')}",
+                         weight=WARN_WEIGHT_DROPPED)
+                logger.warning("Dropped invalid finding %d: %s", i, exc)
+        return result
 
 
 # ──────────────────────────────────────────────────────────────────────
@@ -1603,7 +1878,7 @@ Documents use many layouts — recognise them all:
 
 For each action item capture:
   issue_ref   = any reference number or code assigned to the action (null if none)
-  description = the full action text as written
+  description = the full action text as written — VERBATIM, do not paraphrase
   hazard_type = closest match: Housekeeping | Means of Escape | Fire Spread | Detection | Signage | Emergency Plans | Fire Service Facilities | Structural | Other
   priority    = high | medium | low | advisory
     Infer if not stated: immediate/1 month → high | 3–6 months → medium | 12 months → low | no date → advisory
@@ -1611,10 +1886,19 @@ For each action item capture:
   status      = outstanding | completed | overdue
     Completed/closed/done → completed. Past due date and not done → overdue. Otherwise → outstanding.
   responsible = named team, role, or person responsible (null if not stated)
+  pg          = the [Page N] number where this action appears in the document
 
 ━━━ SIGNIFICANT FINDINGS ━━━
 List major fire safety concerns noted by the assessor that are not already captured as action items
 (e.g. structural deficiencies, lack of compartmentation, evacuation strategy concerns).
+
+━━━ CITATIONS ━━━
+The document text contains [Page N] markers. For each field in the "citations" object, cite the evidence:
+  pg = the [Page N] number where you found the value
+  q  = the FIRST 6-8 WORDS of the source sentence or table row, copied VERBATIM (exact characters)
+  c  = your confidence: "H" (stated explicitly) | "M" (inferred from context) | "L" (uncertain)
+Omit a field from "citations" when its value is null. Do NOT paraphrase q — it is matched
+character-for-character against the document.
 
 Return ONLY this JSON — no markdown, no commentary:
 {{
@@ -1653,17 +1937,28 @@ Return ONLY this JSON — no markdown, no commentary:
   "action_items": [
     {{
       "issue_ref": "reference number or null",
-      "description": "full action text",
+      "description": "full action text, verbatim",
       "hazard_type": "one of the 9 categories above",
       "priority": "high or medium or low or advisory",
       "due_date": "YYYY-MM-DD or null",
       "status": "outstanding or completed or overdue",
-      "responsible": "team or person or null"
+      "responsible": "team or person or null",
+      "pg": page number where this action appears
     }}
   ],
   "significant_findings": [
     {{"finding": "description", "location": "location or null", "severity": "high or medium or low"}}
   ],
+  "citations": {{
+    "risk_rating":            {{"pg": page number, "q": "first 6-8 words verbatim", "c": "H or M or L"}},
+    "assessment_date":        {{"pg": ..., "q": "...", "c": "..."}},
+    "assessment_valid_until": {{"pg": ..., "q": "...", "c": "..."}},
+    "next_review_date":       {{"pg": ..., "q": "...", "c": "..."}},
+    "evacuation_strategy":    {{"pg": ..., "q": "...", "c": "..."}},
+    "assessor_name":          {{"pg": ..., "q": "...", "c": "..."}},
+    "num_storeys":            {{"pg": ..., "q": "...", "c": "..."}},
+    "num_units":              {{"pg": ..., "q": "...", "c": "..."}}
+  }},
   "extraction_confidence": 0.0 to 1.0
 }}
 
@@ -1761,12 +2056,13 @@ Return ONLY this JSON:
   "action_items": [
     {{
       "issue_ref": "Action Ref number or Issue Ref or null",
-      "description": "exact Action Required text",
+      "description": "exact Action Required text, verbatim",
       "hazard_type": "one of the 9 categories above",
       "priority": "advisory|low|medium|high",
       "due_date": "YYYY-MM-DD or null",
       "status": "outstanding|completed|overdue",
-      "responsible": "Responsible team/person or null"
+      "responsible": "Responsible team/person or null",
+      "pg": page number where this action appears
     }}
   ],
   "significant_findings": [
@@ -1780,73 +2076,8 @@ DOCUMENT EXCERPT:
 
 
 # ──────────────────────────────────────────────────────────────────────
-# Type coercion helpers
+# FRA-specific normalisers (generic coercion lives in extraction_common)
 # ──────────────────────────────────────────────────────────────────────
-
-def _to_date(value: Any) -> Optional[date]:
-    if value is None:
-        return None
-    if isinstance(value, date) and not isinstance(value, datetime):
-        return value
-    if isinstance(value, datetime):
-        return value.date()
-    if isinstance(value, str):
-        s = value.strip()
-        if not s or s.lower() in ("null", "n/a", "unknown", "tbc", "tbd", "none"):
-            return None
-        try:
-            return date.fromisoformat(s[:10])
-        except ValueError:
-            pass
-        s_stripped = re.sub(r"(\d+)(st|nd|rd|th)\b", r"\1", s, flags=re.IGNORECASE)
-        for fmt in ("%d %B %Y", "%d %b %Y", "%d/%m/%Y", "%d-%m-%Y",
-                    "%Y/%m/%d", "%Y.%m.%d", "%d.%m.%Y",
-                    "%B %d, %Y", "%b %d, %Y", "%B %Y", "%b %Y"):
-            try:
-                return datetime.strptime(s_stripped if s_stripped != s else s, fmt).date()
-            except ValueError:
-                continue
-        logger.warning("Could not parse date: %r", value)
-    return None
-
-
-def _to_bool(value: Any) -> Optional[bool]:
-    if value is None:
-        return None
-    if isinstance(value, bool):
-        return value
-    if isinstance(value, int):
-        return bool(value)
-    if isinstance(value, str):
-        v = value.strip().lower()
-        if v in ("true", "yes", "1", "present", "installed", "provided", "fitted"):
-            return True
-        if v in ("false", "no", "0", "not present", "not installed", "none", "n/a"):
-            return False
-    return None
-
-
-def _to_float(value: Any, default: float = 0.5) -> float:
-    try:
-        return max(0.0, min(1.0, float(value)))
-    except (TypeError, ValueError):
-        return default
-
-
-def _to_str(value: Any) -> Optional[str]:
-    if value is None:
-        return None
-    s = str(value).strip()
-    if s.lower() in ("null", "none", "n/a", "unknown", "tbc", "tbd",
-                     "not stated", "not applicable", "not available",
-                     "not provided", "not assessed", ""):
-        return None
-    return s
-
-
-def _date_to_str(d: Optional[date]) -> Optional[str]:
-    return d.isoformat() if d else None
-
 
 def _normalise_priority(raw: Any) -> str:
     s = (_to_str(raw) or "").lower()
@@ -1922,7 +2153,7 @@ class FRAProcessor:
         logger.info("FRAProcessor.process() upload_id=%s ha_id=%s", upload_id, ha_id)
 
         raw_json = await self._call_llm(text)
-        features = self._parse_llm_response(raw_json)
+        features = self._parse_llm_response(raw_json, source_text=text)
 
         # Fallback: populate assessment_valid_until from next_review_date when null
         if features.assessment_valid_until is None and features.next_review_date is not None:
@@ -1930,14 +2161,13 @@ class FRAProcessor:
 
         rag_status = self._normalise_rag_status(features.risk_rating)
 
-        # Auto-resolve block_id from LLM-extracted building name/address if not provided
+        # Auto-resolve block_id from Pydantic-validated building fields
         if not block_id:
-            llm_data = self._extract_json(raw_json) or {}
             block_id = await self._resolve_block_id(
                 ha_id,
-                llm_data.get("building_name"),
-                llm_data.get("building_address"),
-                llm_data.get("block_reference"),
+                features.building_name,
+                features.building_address,
+                features.block_reference,
             )
 
         logger.info(
@@ -2155,10 +2385,10 @@ class FRAProcessor:
         merged["action_items"]         = actions.get("action_items") or meta.get("action_items") or []
         merged["significant_findings"] = actions.get("significant_findings") or meta.get("significant_findings") or []
 
-        # Average confidence
+        # Min confidence — a failed pass must not be masked by a good one
         c1 = float(meta.get("extraction_confidence") or 0.5)
         c2 = float(actions.get("extraction_confidence") or 0.5)
-        merged["extraction_confidence"] = round((c1 + c2) / 2, 3)
+        merged["extraction_confidence"] = round(min(c1, c2), 3)
 
         logger.info(
             "Merged: risk=%s actions=%d findings=%d confidence=%.3f",
@@ -2314,98 +2544,112 @@ class FRAProcessor:
         logger.error("JSON parse failed. Raw (500 chars):\n%s", raw[:500])
         return None
 
-    def _parse_llm_response(self, raw_json: str) -> FRAExtractedFeatures:
+    # Fields whose absence almost always means the extraction failed, not
+    # that the document is silent — used for the coverage component.
+    # Fallback groups count as one slot: council FRAs often name only the
+    # organisation (no individual assessor), and stay-put blocks legitimately
+    # have smoke detection but no communal fire alarm.
+    def _critical_values(self, features: FRAExtraction) -> list:
+        return [
+            features.risk_rating,
+            features.assessment_date,
+            features.evacuation_strategy,
+            features.assessor_name or features.assessor_company
+            or features.responsible_person,
+            features.has_fire_alarm_system if features.has_fire_alarm_system is not None
+            else features.has_smoke_detection,
+            features.has_fire_doors,
+            features.has_emergency_lighting,
+            features.action_items,
+        ]
+
+    def _parse_llm_response(self, raw_json: str, source_text: Optional[str] = None) -> FRAExtraction:
         data = self._extract_json(raw_json)
         if data is None:
-            return self._empty_features(confidence=0.1)
+            logger.warning("FRAProcessor: JSON parse failed — returning empty extraction")
+            empty = FRAExtraction(extraction_confidence=0.1)
+            empty.validation_warnings = [make_warning(
+                "_document", None, "LLM response was not parseable JSON", weight=0.5)]
+            return empty
 
-        action_items = []
-        for item in data.get("action_items") or []:
-            if not isinstance(item, dict):
-                continue
-            desc = _to_str(item.get("description"))
-            if not desc:
-                continue
-            action_items.append(FRAActionItem(
-                issue_ref   = _to_str(item.get("issue_ref")),
-                description = desc,
-                hazard_type = _normalise_hazard_type(item.get("hazard_type")),
-                priority    = _normalise_priority(item.get("priority")),
-                due_date    = _to_date(item.get("due_date")),
-                status      = _normalise_status(item.get("status")),
-                responsible = _to_str(item.get("responsible")),
-            ))
+        # These are computed here, never accepted from the LLM
+        data.pop("validation_warnings", None)
+        data.pop("llm_reported_confidence", None)
 
-        significant_findings = []
-        for f in data.get("significant_findings") or []:
-            if not isinstance(f, dict):
-                continue
-            finding = _to_str(f.get("finding"))
-            if not finding:
-                continue
-            severity = _to_str(f.get("severity")) or "low"
-            if severity not in ("high", "medium", "low"):
-                severity = "low"
-            significant_findings.append({
-                "finding":  finding,
-                "location": _to_str(f.get("location")),
-                "severity": severity,
-            })
+        warnings: list[dict] = []
+        try:
+            features = FRAExtraction.model_validate(data, context={"warnings": warnings})
+        except ValidationError as exc:
+            logger.error("FRAExtraction model_validate failed: %s", exc)
+            empty = FRAExtraction(extraction_confidence=0.1)
+            empty.validation_warnings = [make_warning(
+                "_document", None, f"model validation failed: {exc.errors()[0].get('msg', '')}",
+                weight=0.5)]
+            return empty
 
-        VALID_EVAC = ("stay_put", "simultaneous", "phased", "temporary_evacuation")
-        evac = _to_str(data.get("evacuation_strategy"))
-        if evac not in VALID_EVAC:
-            evac = None
+        # Consistency checks first — their warnings feed per-field citation scores
+        warnings.extend(self._consistency_warnings(features))
 
-        fra_type = _to_str(data.get("fra_assessment_type"))
-        if fra_type and not re.match(r"^Type\s*[1-4]$", fra_type, re.IGNORECASE):
-            m = re.search(r"\b([1-4])\b", fra_type)
-            fra_type = f"Type {m.group(1)}" if m else None
+        # Ground each cited value in the source text; unverifiable quotes
+        # and self-reported "L" fields append to warnings
+        verify_citations(features.citations, source_text, warnings)
+        verify_item_sources(features.action_items, source_text, warnings, "action_items")
 
-        bsa = bool(_to_bool(data.get("bsa_2022_applicable")) or False)
+        features.llm_reported_confidence = features.extraction_confidence
+        features.validation_warnings = warnings
+        coverage = coverage_score(self._critical_values(features))
+        features.extraction_confidence = composite_confidence(
+            features.llm_reported_confidence, coverage, warnings)
 
-        return FRAExtractedFeatures(
-            risk_rating                   = _to_str(data.get("risk_rating")),
-            fra_assessment_type           = fra_type,
-            assessment_date               = _to_date(data.get("assessment_date")),
-            assessment_valid_until        = _to_date(data.get("assessment_valid_until")),
-            next_review_date              = _to_date(data.get("next_review_date")),
-            assessor_name                 = _to_str(data.get("assessor_name")),
-            assessor_company              = _to_str(data.get("assessor_company")),
-            assessor_qualification        = _to_str(data.get("assessor_qualification")),
-            responsible_person            = _to_str(data.get("responsible_person")),
-            evacuation_strategy           = evac,
-            evacuation_strategy_changed   = bool(_to_bool(data.get("evacuation_strategy_changed")) or False),
-            evacuation_strategy_notes     = _to_str(data.get("evacuation_strategy_notes")),
-            has_accessibility_needs_noted = bool(_to_bool(data.get("has_accessibility_needs_noted")) or False),
-            has_sprinkler_system          = _to_bool(data.get("has_sprinkler_system")),
-            has_smoke_detection           = _to_bool(data.get("has_smoke_detection")),
-            has_fire_alarm_system         = _to_bool(data.get("has_fire_alarm_system")),
-            has_fire_doors                = _to_bool(data.get("has_fire_doors")),
-            has_compartmentation          = _to_bool(data.get("has_compartmentation")),
-            has_emergency_lighting        = _to_bool(data.get("has_emergency_lighting")),
-            has_fire_extinguishers        = _to_bool(data.get("has_fire_extinguishers")),
-            has_firefighting_shaft        = _to_bool(data.get("has_firefighting_shaft")),
-            has_dry_riser                 = _to_bool(data.get("has_dry_riser")),
-            has_wet_riser                 = _to_bool(data.get("has_wet_riser")),
-            action_items                  = action_items,
-            significant_findings          = significant_findings,
-            bsa_2022_applicable           = bsa,
-            accountable_person_noted      = bool(_to_bool(data.get("accountable_person_noted")) or False),
-            mandatory_occurrence_noted    = bool(_to_bool(data.get("mandatory_occurrence_noted")) or False),
-            extraction_confidence         = _to_float(data.get("extraction_confidence"), default=0.5),
-        )
+        if warnings:
+            logger.warning(
+                "FRAProcessor: %d validation warning(s): %s",
+                len(warnings),
+                "; ".join(f"{w['field']}: {w['reason']}" for w in warnings[:10]),
+            )
+        if features.extraction_confidence < 0.3:
+            logger.warning(
+                "FRAProcessor: low extraction confidence %.2f (self=%.2f coverage=%.2f "
+                "warnings=%d risk=%s actions=%d)",
+                features.extraction_confidence, features.llm_reported_confidence,
+                coverage, len(warnings),
+                features.risk_rating, len(features.action_items),
+            )
+        return features
 
-    def _empty_features(self, confidence: float = 0.1) -> FRAExtractedFeatures:
-        return FRAExtractedFeatures(
-            risk_rating=None, fra_assessment_type=None,
-            assessment_date=None, assessment_valid_until=None,
-            next_review_date=None, assessor_name=None,
-            assessor_company=None, assessor_qualification=None,
-            responsible_person=None, evacuation_strategy=None,
-            action_items=[], significant_findings=[],
-            extraction_confidence=confidence,
-        )
+    def _consistency_warnings(self, features: FRAExtraction) -> list[dict]:
+        """Cross-field sanity checks — each failure is a confidence penalty."""
+        out: list[dict] = []
+        today = date.today()
+
+        if (features.assessment_date and features.next_review_date
+                and features.assessment_date > features.next_review_date):
+            out.append(make_warning(
+                "next_review_date", _date_to_str(features.next_review_date),
+                "before assessment_date"))
+        if (features.assessment_date and features.assessment_valid_until
+                and features.assessment_date > features.assessment_valid_until):
+            out.append(make_warning(
+                "assessment_valid_until", _date_to_str(features.assessment_valid_until),
+                "before assessment_date"))
+        if features.assessment_date and features.assessment_date > today:
+            out.append(make_warning(
+                "assessment_date", _date_to_str(features.assessment_date),
+                "in the future"))
+        if features.build_year is not None and not (1600 <= features.build_year <= today.year):
+            out.append(make_warning(
+                "build_year", features.build_year, "outside plausible range"))
+        if features.assessment_date:
+            far = sum(
+                1 for a in features.action_items
+                if a.due_date is not None
+                and abs((a.due_date - features.assessment_date).days) > 15 * 365
+            )
+            if far:
+                out.append(make_warning(
+                    "action_items.due_date", far,
+                    f"{far} action due date(s) >15y from assessment_date"))
+        return out
 
     # ── Derived fields ────────────────────────────────────────────────
 
@@ -2474,7 +2718,7 @@ class FRAProcessor:
 
     async def _write_to_db(
         self,
-        features:         FRAExtractedFeatures,
+        features:         FRAExtraction,
         rag_status:       Optional[str],
         is_in_date:       Optional[bool],
         action_counts:    dict,
@@ -2490,27 +2734,43 @@ class FRAProcessor:
 
         action_items_json = json.dumps([
             {
-                "issue_ref":   a.issue_ref,
-                "description": a.description,
-                "hazard_type": a.hazard_type,
-                "priority":    a.priority,
-                "due_date":    _date_to_str(a.due_date),
-                "status":      a.status,
-                "responsible": a.responsible,
+                "issue_ref":       a.issue_ref,
+                "description":     a.description,
+                "hazard_type":     a.hazard_type,
+                "priority":        a.priority,
+                "due_date":        _date_to_str(a.due_date),
+                "status":          a.status,
+                "responsible":     a.responsible,
+                "pg":              a.pg,
+                "source_verified": a.source_verified,
+                "source_page":     a.source_page,
             }
             for a in features.action_items
         ])
 
-        significant_findings_json = json.dumps(features.significant_findings)
+        significant_findings_json = json.dumps([
+            {
+                "finding":  f.finding,
+                "location": f.location,
+                "severity": f.severity,
+            }
+            for f in features.significant_findings
+        ])
 
         raw_features_json = json.dumps({
-            "risk_rating":            features.risk_rating,
-            "fra_assessment_type":    features.fra_assessment_type,
-            "assessment_date":        _date_to_str(features.assessment_date),
-            "assessment_valid_until": _date_to_str(features.assessment_valid_until),
-            "evacuation_strategy":    features.evacuation_strategy,
-            "bsa_2022_applicable":    features.bsa_2022_applicable,
+            "risk_rating":              features.risk_rating,
+            "fra_assessment_type":      features.fra_assessment_type,
+            "assessment_date":          _date_to_str(features.assessment_date),
+            "assessment_valid_until":   _date_to_str(features.assessment_valid_until),
+            "evacuation_strategy":      features.evacuation_strategy,
+            "bsa_2022_applicable":      features.bsa_2022_applicable,
+            # raw LLM self-report — extraction_confidence column holds the composite
+            "llm_reported_confidence":  features.llm_reported_confidence,
+            "validation_warning_count": len(features.validation_warnings),
         })
+
+        validation_warnings_json = json.dumps(features.validation_warnings)
+        citations_json = json.dumps(citations_to_json(features.citations))
 
         async with self.db.transaction():
 
@@ -2545,7 +2805,8 @@ class FRAProcessor:
                     total_action_count, high_priority_action_count,
                     overdue_action_count, outstanding_action_count, no_date_action_count,
                     bsa_2022_applicable, accountable_person_noted, mandatory_occurrence_noted,
-                    extraction_confidence, raw_features, created_at, updated_at
+                    extraction_confidence, raw_features, validation_warnings, citations,
+                    created_at, updated_at
                 )
                 VALUES (
                     $1,$2,$3,$4, $5,$6,$7, $8,$9,$10,$11,
@@ -2553,7 +2814,7 @@ class FRAProcessor:
                     $20,$21,$22,$23,$24,$25,$26,$27,$28,$29,
                     $30::jsonb,$31::jsonb,
                     $32,$33,$34,$35,$36,
-                    $37,$38,$39,$40,$41::jsonb,$42,$43
+                    $37,$38,$39,$40,$41::jsonb,$42::jsonb,$43::jsonb,$44,$45
                 )
             """,
                 fra_id, feature_id, ha_id, block_id,
@@ -2577,7 +2838,7 @@ class FRAProcessor:
                 action_counts["no_date_action_count"],
                 features.bsa_2022_applicable, features.accountable_person_noted,
                 features.mandatory_occurrence_noted, features.extraction_confidence,
-                raw_features_json, now, now,
+                raw_features_json, validation_warnings_json, citations_json, now, now,
             )
 
         return feature_id, fra_id

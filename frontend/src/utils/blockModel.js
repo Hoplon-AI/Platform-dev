@@ -302,12 +302,19 @@ export const buildBlocks = (properties = [], fireDocuments = []) => {
       return Number.isFinite(h) ? Math.max(max, h) : max;
     }, 0);
     const representativeProperty = mappable[0] || items.find((p) => p.uprn) || items[0] || null;
+    // Standalone dwelling (house/bungalow/single flat): its own asset, not a block
+    const isStandalone = items.length === 1 && items[0].is_standalone === true;
+    const displayName = isStandalone
+      ? items[0].address_line_1 || String(key)
+      : key || "Unassigned block";
 
     return {
       id: key,
       block_id: key,
-      label: key || "Unassigned block",
-      name: key || "Unassigned block",
+      asset_type: isStandalone ? "standalone" : "block",
+      dwelling_form: isStandalone ? items[0].dwelling_form || "" : "",
+      label: displayName,
+      name: displayName,
       block_reference: key || "",
       properties: items,
       count: items.length,

@@ -214,24 +214,62 @@ async def get_portfolio_recent_activity(
 
 @router.get("/properties", response_model=list[dict])
 async def get_properties(
-    tenant: Tuple[str, str] = Depends(get_tenant_info),
+    ha_id: Optional[str] = None,
+    portfolio_id: Optional[str] = None,
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(security),
 ) -> List[Dict[str, Any]]:
     """
-    Return all properties for the authenticated HA from silver.properties.
+    Return the properties of ONE portfolio from silver.properties.
     Used by the frontend on login to restore the portfolio dashboard.
+
+    ha_id (optional query param) selects which of the caller's authorised
+    HAs to load — underwriters can be granted several. Defaults to the
+    token's primary HA (or DEV_HA_ID in dev mode).
+
+    portfolio_id (optional) selects a specific portfolio; defaults to the
+    HA's most recent one. An HA can hold several portfolios (renewal years,
+    repeated uploads) — returning them all merged doubles every block.
     """
     import decimal
     from datetime import date, datetime
 
-    ha_id, _user_id = tenant
+    resolved_ha, _user_id = await get_tenant_info(credentials)
+    if ha_id and ha_id != resolved_ha:
+        allowed: List[str] = []
+        if credentials:
+            try:
+                allowed = tenant_middleware.authorised_ha_ids(credentials.credentials)
+            except HTTPException:
+                allowed = []
+        if ha_id in allowed or (_is_dev_mode() and not allowed):
+            resolved_ha = ha_id
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="You are not authorised for this housing association.",
+            )
+    ha_id = resolved_ha
 
     async with DatabasePool.acquire() as conn:
+        # Default to the HA's most recent portfolio — never merge portfolios.
+        if not portfolio_id:
+            latest = await conn.fetchrow(
+                """
+                SELECT portfolio_id::text FROM silver.portfolios
+                WHERE ha_id = $1
+                ORDER BY created_at DESC LIMIT 1
+                """,
+                ha_id,
+            )
+            portfolio_id = latest["portfolio_id"] if latest else None
+
         rows = await conn.fetch(
             """
             SELECT
                 property_id, portfolio_id, property_reference, submission_id, block_reference,
                 address, address_2, address_3, postcode, occupancy_type, sum_insured,
-                property_type, wall_construction, roof_construction,
+                property_type, dwelling_form, is_standalone,
+                wall_construction, roof_construction,
                 year_of_build, storeys, units, uprn, parent_uprn,
                 x_coordinate, y_coordinate, country_code, uprn_match_score,
                 uprn_match_description, uprn_confidence, built_form, total_floor_area_m2, main_fuel,
@@ -243,9 +281,11 @@ async def get_properties(
                 building_geometry, os_construction_material
             FROM silver.properties
             WHERE ha_id = $1
+              AND ($2::uuid IS NULL OR portfolio_id = $2::uuid)
             ORDER BY block_reference, property_reference
             """,
             ha_id,
+            portfolio_id,
         )
 
     def _serial(v):

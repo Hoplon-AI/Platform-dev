@@ -20,10 +20,37 @@ class TenantMiddleware:
             algorithm: JWT algorithm
         """
         import os
-        self.secret_key = secret_key or os.getenv("JWT_SECRET_KEY", "your-secret-key")
+        # Default MUST match auth_router.JWT_SECRET — a mismatch makes every
+        # login token fail validation here, silently falling back to DEV_HA_ID.
+        self.secret_key = secret_key or os.getenv("JWT_SECRET_KEY", "equirisk-dev-secret-change-in-prod")
         self.algorithm = algorithm
         self.security = HTTPBearer()
     
+    def authorised_ha_ids(self, token: str) -> list[str]:
+        """
+        All HA ids this token grants access to.
+
+        Underwriter tokens carry ha_ids (list); HA-user tokens carry ha_id
+        (singular). Raises HTTPException on an invalid/expired token.
+        """
+        try:
+            payload = jwt.decode(token, self.secret_key, algorithms=[self.algorithm])
+        except jwt.ExpiredSignatureError:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Token expired"
+            )
+        except jwt.InvalidTokenError:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid token"
+            )
+        ha_ids = payload.get("ha_ids") or []
+        single = payload.get("ha_id")
+        if single and single not in ha_ids:
+            ha_ids = [single, *ha_ids]
+        return ha_ids
+
     def extract_tenant_from_token(self, token: str) -> tuple[str, str]:
         """
         Extract ha_id and user_id from JWT token.

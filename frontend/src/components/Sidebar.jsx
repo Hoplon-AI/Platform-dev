@@ -1,5 +1,19 @@
 // Left navigation sidebar: HA selector, workspace/analysis nav, user + sign-out.
+// Styled after docs/golden-thread mockup: grouped white cards with red accent
+// border on a cream rail. Becomes an off-canvas drawer below 900px.
 import React from "react";
+
+function NavItem({ active, disabled, onClick, children }) {
+  return (
+    <button
+      className={`navitem ${active ? "active" : ""}`}
+      onClick={onClick}
+      disabled={disabled}
+    >
+      {children}
+    </button>
+  );
+}
 
 export default function Sidebar({
   accessibleHAs,
@@ -7,30 +21,33 @@ export default function Sidebar({
   activeNav,
   ingestionResult,
   authUser,
+  open,
+  onClose,
   onSelectHa,
   onUploadDocuments,
   onNavigate,
   onSignOut,
 }) {
   return (
-    <aside className="sidebar">
-      <div className="brand">
-        <img src="/logo.png" alt="EquiRisk" style={{ height: 36, width: "auto", display: "block", marginBottom: 8 }} />
-        <div className="pill pill-muted">UNDERWRITER</div>
+    <aside className={`sidebar ${open ? "open" : ""}`}>
+      <div className="sidebar-top">
+        <span className="wordmark">EquiRisk</span>
+        <button className="sidebar-close" onClick={onClose} aria-label="Close navigation">
+          ✕
+        </button>
       </div>
+      <span className="role-chip">UNDERWRITER</span>
 
       {accessibleHAs.length > 0 && (
-        <div className="side-section">
-          <div className="side-head">Housing Association</div>
+        <div className="navsec">
+          <div className="navgroup">Housing Association</div>
           {accessibleHAs.length === 1 ? (
-            <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text)", padding: "6px 10px", background: "var(--panel-soft)", borderRadius: 8, border: "1px solid var(--border-soft)" }}>
-              {accessibleHAs[0].ha_name}
-            </div>
+            <div className="navitem navitem-static">{accessibleHAs[0].ha_name}</div>
           ) : (
             <select
+              className="nav-select"
               value={selectedHaId}
               onChange={(e) => onSelectHa(e.target.value)}
-              style={{ width: "100%", padding: "6px 8px", fontSize: 13, borderRadius: 8, border: "1px solid var(--border)", background: "var(--panel)", color: "var(--text)", cursor: "pointer" }}
             >
               {accessibleHAs.map((ha) => (
                 <option key={ha.ha_id} value={ha.ha_id}>{ha.ha_name}</option>
@@ -40,75 +57,59 @@ export default function Sidebar({
         </div>
       )}
 
-      <div className="side-section">
-        <div className="side-head">Portfolio Workspace</div>
-
-        <button
-          className={`side-link ${activeNav === "uploads" ? "active" : ""}`}
-          onClick={onUploadDocuments}
-        >
+      <div className="navsec">
+        <div className="navgroup">Portfolio</div>
+        <NavItem active={activeNav === "uploads"} onClick={onUploadDocuments}>
           Upload Documents
-        </button>
-
-        <button
-          className={`side-link ${activeNav === "overview" ? "active" : ""}`}
+        </NavItem>
+        <NavItem
+          active={activeNav === "overview"}
+          disabled={!ingestionResult}
           onClick={() => onNavigate("overview")}
-          disabled={!ingestionResult}
         >
-          Portfolio Overview
-        </button>
-
-        <button
-          className={`side-link ${activeNav === "insights" ? "active" : ""}`}
+          Overview
+        </NavItem>
+        <NavItem
+          active={activeNav === "insights"}
+          disabled={!ingestionResult}
           onClick={() => onNavigate("insights")}
-          disabled={!ingestionResult}
         >
-          Portfolio Insights
-        </button>
+          Insights
+        </NavItem>
       </div>
 
-      <div className="side-section">
-        <div className="side-head">Analysis</div>
-        <button
-          className={`side-link ${activeNav === "block-analysis" ? "active" : ""}`}
+      <div className="navsec">
+        <div className="navgroup">Analysis</div>
+        <NavItem
+          active={activeNav === "block-analysis"}
+          disabled={!ingestionResult}
           onClick={() => onNavigate("block-analysis")}
-          disabled={!ingestionResult}
         >
-          Block Analysis
-        </button>
-        <button
-          className={`side-link ${activeNav === "risk-map" ? "active" : ""}`}
-          onClick={() => onNavigate("risk-map")}
+          Property Analysis
+        </NavItem>
+        <NavItem
+          active={activeNav === "risk-map"}
           disabled={!ingestionResult}
+          onClick={() => onNavigate("risk-map")}
         >
           Risk Map
-        </button>
+        </NavItem>
       </div>
 
-      <div className="side-section dim">
-        <div className="side-head">Coming soon</div>
-        <div className="side-item">Evidence Summary</div>
-        <div className="side-item">Documents</div>
+      <div className="navsec">
+        <div className="navgroup">Building Safety</div>
+        <span className="navitem soon">Evidence Summary <i className="soon-tag">Soon</i></span>
+        <span className="navitem soon">Documents <i className="soon-tag">Soon</i></span>
       </div>
 
-      <div className="side-bottom">
+      <div className="sidebar-bottom">
         {authUser && (
-          <div style={{ marginBottom: 10, padding: "8px 10px", background: "var(--panel-soft)", borderRadius: 8, border: "1px solid var(--border-soft)" }}>
-            <div style={{ fontSize: 12, fontWeight: 600, color: "var(--text)", lineHeight: 1.3, marginBottom: 2 }}>
-              {authUser.full_name}
-            </div>
-            <div style={{ fontSize: 11, color: "var(--muted)", lineHeight: 1.3 }}>
-              {authUser.organisation}
-            </div>
+          <div className="userbox">
+            <b>{authUser.full_name}</b>
+            <span>{authUser.organisation}</span>
           </div>
         )}
-        <button
-          className="btn btn-ghost"
-          style={{ width: "100%", textAlign: "left" }}
-          onClick={onSignOut}
-        >
-          Sign out
-        </button>
+        <button className="signout" onClick={onSignOut}>Sign out</button>
       </div>
     </aside>
   );

@@ -1,4 +1,4 @@
-import React, { useMemo } from "react";
+import React, { useMemo, useState } from "react";
 
 import { PortfolioInsightsPanel } from "../components/PortfolioInsights.jsx";
 import { PortfolioAnalysisWindow } from "./PortfolioDashboard.jsx";
@@ -9,8 +9,33 @@ import {
   ageBandKey,
 } from "../utils/portfolioBreakdown.js";
 
+// Segment predicates — every chart on the page is rebuilt for the selected
+// slice of the portfolio (blocks vs houses/bungalows vs flats).
+const SEGMENTS = [
+  { id: "all",    label: "All properties",      match: () => true },
+  { id: "blocks", label: "Flats in blocks",      match: (p) => p.is_standalone !== true },
+  { id: "houses", label: "Houses & bungalows",   match: (p) => ["house", "bungalow"].includes(p.dwelling_form) },
+  { id: "flats",  label: "Flats & maisonettes",  match: (p) => ["flat", "maisonette"].includes(p.dwelling_form) },
+];
+
 export default function PortfolioInsightsPage({ ingestionResult, onUploadNew, haName = "" }) {
-  const properties = ingestionResult?.properties || [];
+  const allProperties = ingestionResult?.properties || [];
+  const [segmentId, setSegmentId] = useState("all");
+
+  // Only offer segments that exist in this portfolio (block-only books just see "All").
+  const availableSegments = useMemo(
+    () =>
+      SEGMENTS.filter(
+        (s) => s.id === "all" || allProperties.some((p) => s.match(p))
+      ),
+    [allProperties]
+  );
+
+  const segment = availableSegments.find((s) => s.id === segmentId) || SEGMENTS[0];
+  const properties = useMemo(
+    () => (segment.id === "all" ? allProperties : allProperties.filter(segment.match)),
+    [allProperties, segment]
+  );
 
   const tenancyRows = useMemo(
     () => buildBreakdown(properties, (property) => property.occupancy_type || "Not recorded", (property) => property.sum_insured),
@@ -29,7 +54,7 @@ export default function PortfolioInsightsPage({ ingestionResult, onUploadNew, ha
     [properties]
   );
 
-  if (!properties.length) {
+  if (!allProperties.length) {
     return (
       <div className="content-wrap">
         <div className="card">
@@ -54,9 +79,39 @@ export default function PortfolioInsightsPage({ ingestionResult, onUploadNew, ha
             </div>
           )}
         </div>
+        {availableSegments.length > 1 && (
+          <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: "var(--muted)" }}>
+            Show insights for
+            <select
+              className="input"
+              style={{ width: "auto", padding: "6px 10px", fontSize: 13, fontWeight: 600 }}
+              value={segment.id}
+              onChange={(e) => setSegmentId(e.target.value)}
+            >
+              {availableSegments.map((s) => {
+                const n = s.id === "all" ? allProperties.length : allProperties.filter(s.match).length;
+                return (
+                  <option key={s.id} value={s.id}>
+                    {s.label} ({n})
+                  </option>
+                );
+              })}
+            </select>
+          </label>
+        )}
       </div>
 
-      <PortfolioInsightsPanel properties={properties} />
+      {segment.id !== "all" && (
+        <div className="muted" style={{ margin: "0 0 12px", fontSize: 13 }}>
+          All charts below cover only <strong>{segment.label.toLowerCase()}</strong> — {properties.length} of {allProperties.length} properties.
+        </div>
+      )}
+
+      {/* Property-type donut heading mirrors the "Show insights for" selection */}
+      <PortfolioInsightsPanel
+        properties={properties}
+        segmentTitle={`${segment.label} (${properties.length})`}
+      />
 
       <PortfolioAnalysisWindow
         tenancyRows={tenancyRows}

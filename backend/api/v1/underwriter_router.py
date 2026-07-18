@@ -69,17 +69,47 @@ async def get_tenant_info(
     return tenant_middleware.extract_tenant_from_token(credentials.credentials)
 
 
+async def get_tenant_ha_ids(
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(security),
+) -> List[str]:
+    """ALL HA ids the caller is authorised for.
+
+    Underwriters can be granted several HAs — authorising against only the
+    token's first HA 404s every portfolio of the others.
+    """
+    dev_mode = os.getenv("DEV_MODE", "false").lower() == "true"
+    dev_ha_id = os.getenv("DEV_HA_ID", "ha_demo")
+
+    if credentials:
+        try:
+            return tenant_middleware.authorised_ha_ids(credentials.credentials)
+        except HTTPException:
+            if dev_mode:
+                return [dev_ha_id]
+            raise
+    if dev_mode:
+        return [dev_ha_id]
+    raise HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Authentication required.",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+
+
 # ---------------------------------------------------------------------------
 # Helper — resolve portfolio_id → {portfolio_id, ha_id, ha_name, ...}
 # ---------------------------------------------------------------------------
 
-async def _resolve_portfolio(conn, portfolio_id: str, ha_id: str) -> Dict[str, Any]:
+async def _resolve_portfolio(conn, portfolio_id: str, ha_ids) -> Dict[str, Any]:
     """Fetch portfolio metadata, enforcing tenant ownership.
 
-    Raises 404 if the portfolio does not exist OR does not belong to ha_id,
+    ha_ids: a single ha_id or the caller's full authorised list.
+    Raises 404 if the portfolio does not exist OR belongs to none of them,
     intentionally indistinguishable so callers cannot enumerate other tenants'
     portfolio UUIDs.
     """
+    if isinstance(ha_ids, str):
+        ha_ids = [ha_ids]
     row = await conn.fetchrow(
         """
         SELECT
@@ -92,10 +122,10 @@ async def _resolve_portfolio(conn, portfolio_id: str, ha_id: str) -> Dict[str, A
         FROM silver.portfolios po
         JOIN public.housing_associations ha ON ha.ha_id = po.ha_id
         WHERE po.portfolio_id = $1
-          AND po.ha_id        = $2
+          AND po.ha_id        = ANY($2)
         """,
         portfolio_id,
-        ha_id,
+        ha_ids,
     )
     if not row:
         raise HTTPException(
@@ -342,6 +372,7 @@ async def list_portfolios(
 async def portfolio_summary(
     portfolio_id: str,
     tenant: Tuple[str, str] = Depends(get_tenant_info),
+    tenant_ha_ids: List[str] = Depends(get_tenant_ha_ids),
 ) -> Dict[str, Any]:
     """
     KPI header cards for a portfolio:
@@ -355,7 +386,7 @@ async def portfolio_summary(
     """
     pool = DatabasePool.get_pool()
     async with pool.acquire() as conn:
-        portfolio = await _resolve_portfolio(conn, portfolio_id, tenant[0])
+        portfolio = await _resolve_portfolio(conn, portfolio_id, tenant_ha_ids)
         ha_id = portfolio["ha_id"]
 
         row = await conn.fetchrow(
@@ -499,6 +530,7 @@ async def portfolio_summary(
 async def portfolio_composition(
     portfolio_id: str,
     tenant: Tuple[str, str] = Depends(get_tenant_info),
+    tenant_ha_ids: List[str] = Depends(get_tenant_ha_ids),
 ) -> Dict[str, Any]:
     """
     Portfolio composition breakdown:
@@ -509,7 +541,7 @@ async def portfolio_composition(
     """
     pool = DatabasePool.get_pool()
     async with pool.acquire() as conn:
-        portfolio = await _resolve_portfolio(conn, portfolio_id, tenant[0])
+        portfolio = await _resolve_portfolio(conn, portfolio_id, tenant_ha_ids)
         ha_id = portfolio["ha_id"]
 
         # ── 1. BY TENANCY / OWNERSHIP ────────────────────────────────────────
@@ -648,6 +680,51 @@ async def portfolio_composition(
             portfolio_id,
         )
 
+        # ── 4b. BY DWELLING FORM — standalone vs in-block split ─────────────
+        # dwelling_form/is_standalone are set deterministically at ingest
+        # (dwelling_classifier.py) and finalised by block detection.
+        dwelling_rows = await conn.fetch(
+            """
+            SELECT
+                COALESCE(dwelling_form, 'unknown')              AS dwelling_form,
+                COUNT(*)::integer                               AS units,
+                COUNT(*) FILTER (WHERE is_standalone)::integer  AS standalone_units,
+                COALESCE(SUM(sum_insured), 0)                   AS sum_insured,
+                COALESCE(SUM(sum_insured) FILTER (WHERE is_standalone), 0)
+                                                                AS standalone_tiv
+            FROM silver.properties
+            WHERE ha_id = $1 AND portfolio_id = $2::uuid
+            GROUP BY dwelling_form
+            ORDER BY units DESC
+            """,
+            ha_id,
+            portfolio_id,
+        )
+
+        from backend.core.classification.dwelling_classifier import derive_fra_requirement
+
+        dwelling_forms = []
+        standalone_units_total = 0
+        standalone_tiv_total = 0.0
+        fra_not_required_units = 0
+        for r in dwelling_rows:
+            form = r["dwelling_form"]
+            standalone_units = r["standalone_units"]
+            in_block_units = r["units"] - standalone_units
+            standalone_units_total += standalone_units
+            standalone_tiv_total += float(r["standalone_tiv"])
+            if derive_fra_requirement(form, True) == "not_required":
+                fra_not_required_units += standalone_units
+            if derive_fra_requirement(form, False) == "not_required":
+                fra_not_required_units += in_block_units
+            dwelling_forms.append({
+                "dwelling_form":    form,
+                "units":            r["units"],
+                "standalone_units": standalone_units,
+                "in_block_units":   in_block_units,
+                "sum_insured":      r["sum_insured"],
+            })
+
         # ── 5. Portfolio Composition widget — responsible_party split ────────
         # Powers the top card: Houses / Flats (HA-controlled vs third-party)
         # / Blocks (HA responsible vs third-party managed)
@@ -743,6 +820,14 @@ async def portfolio_composition(
             },
             "by_property_type": [dict(r) for r in type_rows],
             "by_age_banding":   [dict(r) for r in age_rows],
+            # ── Mixed-dwelling split (standalone houses/bungalows vs blocks) ─
+            "by_dwelling": {
+                "standalone_units":        standalone_units_total,
+                "standalone_tiv":          standalone_tiv_total,
+                "in_block_units":          (totals["total_units"] or 0) - standalone_units_total,
+                "fra_not_required_units":  fra_not_required_units,
+                "forms":                   dwelling_forms,
+            },
         }
 
 
@@ -754,6 +839,7 @@ async def portfolio_composition(
 async def portfolio_map(
     portfolio_id: str,
     tenant: Tuple[str, str] = Depends(get_tenant_info),
+    tenant_ha_ids: List[str] = Depends(get_tenant_ha_ids),
 ) -> Dict[str, Any]:
     """
     Map markers — one entry per block with coordinates and RAG colour.
@@ -772,7 +858,7 @@ async def portfolio_map(
     """
     pool = DatabasePool.get_pool()
     async with pool.acquire() as conn:
-        portfolio = await _resolve_portfolio(conn, portfolio_id, tenant[0])
+        portfolio = await _resolve_portfolio(conn, portfolio_id, tenant_ha_ids)
         ha_id = portfolio["ha_id"]
 
         rows = await conn.fetch(
@@ -922,6 +1008,68 @@ async def portfolio_map(
         )
 
         markers = [dict(r) for r in rows]
+        for m in markers:
+            m["asset_type"] = "block"
+
+        # ── Standalone dwellings (houses/bungalows/single flats) ────────────
+        # These have no silver.blocks row by design — one marker per property.
+        # For a single-household house/bungalow no FRA is required, so absence
+        # of an assessment is a compliant state, not "Not Assessed".
+        standalone_rows = await conn.fetch(
+            """
+            SELECT
+                p.property_id::text                          AS block_id,
+                COALESCE(p.address, p.property_reference)    AS block_name,
+                1                                            AS unit_count,
+                p.sum_insured                                AS total_sum_insured,
+                p.height_max_m,
+                p.is_listed,
+                COALESCE(
+                    p.latitude,
+                    CASE WHEN p.x_coordinate IS NOT NULL
+                        THEN ST_Y(ST_Transform(
+                            ST_SetSRID(ST_MakePoint(p.x_coordinate, p.y_coordinate), 27700),
+                            4326
+                        ))
+                    END
+                )::numeric(10,6)                             AS latitude,
+                COALESCE(
+                    p.longitude,
+                    CASE WHEN p.x_coordinate IS NOT NULL
+                        THEN ST_X(ST_Transform(
+                            ST_SetSRID(ST_MakePoint(p.x_coordinate, p.y_coordinate), 27700),
+                            4326
+                        ))
+                    END
+                )::numeric(10,6)                             AS longitude,
+                p.address                                    AS sample_address,
+                p.postcode                                   AS sample_postcode,
+                p.dwelling_form
+            FROM silver.properties p
+            WHERE p.ha_id        = $1
+              AND p.portfolio_id = $2::uuid
+              AND p.is_standalone
+              AND (p.latitude IS NOT NULL OR p.x_coordinate IS NOT NULL)
+            ORDER BY p.address
+            """,
+            ha_id,
+            portfolio_id,
+        )
+
+        from backend.core.classification.dwelling_classifier import derive_fra_requirement
+
+        for r in standalone_rows:
+            m = dict(r)
+            m["asset_type"] = "standalone"
+            if derive_fra_requirement(m.get("dwelling_form"), True) == "not_required":
+                m["map_colour"] = "grey"
+                m["risk_label"] = "FRA Not Required"
+                m["fire_status"] = "not_applicable"
+            else:
+                m["map_colour"] = "grey"
+                m["risk_label"] = "Not Assessed"
+                m["fire_status"] = "not_assessed"
+            markers.append(m)
 
         # Summary counts for the map legend
         colour_counts = {"red": 0, "amber": 0, "green": 0, "grey": 0}
@@ -934,6 +1082,8 @@ async def portfolio_map(
             "portfolio_name": portfolio["portfolio_name"],
             "ha_name":        portfolio["ha_name"],
             "total_markers":  len(markers),
+            "block_count":    sum(1 for m in markers if m["asset_type"] == "block"),
+            "standalone_count": sum(1 for m in markers if m["asset_type"] == "standalone"),
             "colour_counts":  colour_counts,
             "markers":        markers,
         }
@@ -948,6 +1098,7 @@ async def fra_blocks(
     portfolio_id: str,
     rag_filter: Optional[str] = None,   # RED | AMBER | GREEN | unassessed
     tenant: Tuple[str, str] = Depends(get_tenant_info),
+    tenant_ha_ids: List[str] = Depends(get_tenant_ha_ids),
 ) -> Dict[str, Any]:
     """
     FRA status table — one row per block.
@@ -967,7 +1118,7 @@ async def fra_blocks(
     """
     pool = DatabasePool.get_pool()
     async with pool.acquire() as conn:
-        portfolio = await _resolve_portfolio(conn, portfolio_id, tenant[0])
+        portfolio = await _resolve_portfolio(conn, portfolio_id, tenant_ha_ids)
         ha_id = portfolio["ha_id"]
 
         # Build optional RAG filter
@@ -1083,6 +1234,7 @@ async def fraew_blocks(
     rag_filter: Optional[str] = None,   # RED | AMBER | GREEN | unassessed
     combustible_only: bool = False,
     tenant: Tuple[str, str] = Depends(get_tenant_info),
+    tenant_ha_ids: List[str] = Depends(get_tenant_ha_ids),
 ) -> Dict[str, Any]:
     """
     FRAEW detail table — one row per block with full PAS 9980:2022 fields.
@@ -1100,7 +1252,7 @@ async def fraew_blocks(
     """
     pool = DatabasePool.get_pool()
     async with pool.acquire() as conn:
-        portfolio = await _resolve_portfolio(conn, portfolio_id, tenant[0])
+        portfolio = await _resolve_portfolio(conn, portfolio_id, tenant_ha_ids)
         ha_id = portfolio["ha_id"]
 
         filters = ["b.ha_id = $1", "b.portfolio_id = $2::uuid"]
@@ -1252,6 +1404,7 @@ async def fraew_blocks(
 async def risk_summary(
     portfolio_id: str,
     tenant: Tuple[str, str] = Depends(get_tenant_info),
+    tenant_ha_ids: List[str] = Depends(get_tenant_ha_ids),
 ) -> Dict[str, Any]:
     """
     Combined FRA + FRAEW compliance overview for the safety widget.
@@ -1265,7 +1418,7 @@ async def risk_summary(
     """
     pool = DatabasePool.get_pool()
     async with pool.acquire() as conn:
-        portfolio = await _resolve_portfolio(conn, portfolio_id, tenant[0])
+        portfolio = await _resolve_portfolio(conn, portfolio_id, tenant_ha_ids)
         ha_id = portfolio["ha_id"]
 
         # FRA compliance stats
@@ -1432,6 +1585,7 @@ async def risk_summary(
 async def doc_completeness(
     portfolio_id: str,
     tenant: Tuple[str, str] = Depends(get_tenant_info),
+    tenant_ha_ids: List[str] = Depends(get_tenant_ha_ids),
 ) -> Dict[str, Any]:
     """
     Field completeness % for Doc A (Stock Listing) and Doc B (High Value).
@@ -1453,7 +1607,7 @@ async def doc_completeness(
     """
     pool = DatabasePool.get_pool()
     async with pool.acquire() as conn:
-        portfolio = await _resolve_portfolio(conn, portfolio_id, tenant[0])
+        portfolio = await _resolve_portfolio(conn, portfolio_id, tenant_ha_ids)
         ha_id = portfolio["ha_id"]
 
         # ── Doc A: per-property SoV field fill rates ─────────────────────────
@@ -1476,9 +1630,10 @@ async def doc_completeness(
                 ROUND(AVG(CASE WHEN storeys              IS NOT NULL THEN 1.0 ELSE 0.0 END), 3) AS f_storeys,
                 ROUND(AVG(CASE WHEN is_listed            IS NOT NULL THEN 1.0 ELSE 0.0 END), 3) AS f_is_listed
             FROM silver.properties
-            WHERE ha_id = $1
+            WHERE ha_id = $1 AND portfolio_id = $2::uuid
             """,
             ha_id,
+            portfolio_id,
         )
 
         doc_a_fields = [
@@ -1584,6 +1739,7 @@ async def doc_completeness(
 async def fra_block_actions(
     block_id: str,
     tenant: Tuple[str, str] = Depends(get_tenant_info),
+    tenant_ha_ids: List[str] = Depends(get_tenant_ha_ids),
 ) -> Dict[str, Any]:
     """
     Return all action items from the most recent FRA for a specific block.
@@ -1678,6 +1834,7 @@ async def fra_block_actions(
 async def red_blocks(
     portfolio_id: str,
     tenant: Tuple[str, str] = Depends(get_tenant_info),
+    tenant_ha_ids: List[str] = Depends(get_tenant_ha_ids),
 ) -> Dict[str, Any]:
     """
     All RED-rated blocks in a portfolio — for underwriter risk triage.
@@ -1692,7 +1849,7 @@ async def red_blocks(
     """
     pool = DatabasePool.get_pool()
     async with pool.acquire() as conn:
-        portfolio = await _resolve_portfolio(conn, portfolio_id, tenant[0])
+        portfolio = await _resolve_portfolio(conn, portfolio_id, tenant_ha_ids)
         ha_id = portfolio["ha_id"]
 
         rows = await conn.fetch(
@@ -1802,6 +1959,7 @@ async def red_blocks(
 async def fire_documents(
     portfolio_id: str,
     tenant: Tuple[str, str] = Depends(get_tenant_info),
+    tenant_ha_ids: List[str] = Depends(get_tenant_ha_ids),
 ) -> Dict[str, Any]:
     """
     Every FRA / FRAEW evidence document stored for the portfolio's HA.
@@ -1823,9 +1981,19 @@ async def fire_documents(
     def _iso(v):
         return v.isoformat() if v is not None and hasattr(v, "isoformat") else v
 
+    def _load_jsonb(v, default):
+        if v is None:
+            return default
+        if isinstance(v, str):
+            try:
+                return json.loads(v)
+            except (ValueError, TypeError):
+                return default
+        return v
+
     pool = DatabasePool.get_pool()
     async with pool.acquire() as conn:
-        portfolio = await _resolve_portfolio(conn, portfolio_id, tenant[0])
+        portfolio = await _resolve_portfolio(conn, portfolio_id, tenant_ha_ids)
         ha_id = portfolio["ha_id"]
 
         fra_rows = await conn.fetch(
@@ -1864,7 +2032,11 @@ async def fire_documents(
                 COALESCE(f.outstanding_action_count, 0)      AS outstanding_action_count,
                 COALESCE(f.high_priority_action_count, 0)    AS high_priority_action_count,
                 COALESCE(f.no_date_action_count, 0)          AS no_date_action_count,
-                f.action_items
+                f.action_items,
+                f.extraction_confidence,
+                (f.raw_features->>'llm_reported_confidence')::float AS llm_reported_confidence,
+                f.validation_warnings,
+                f.citations
             FROM silver.fra_features f
             LEFT JOIN silver.document_features df ON df.feature_id = f.feature_id
             LEFT JOIN public.upload_audit ua       ON ua.upload_id = df.upload_id
@@ -1899,7 +2071,11 @@ async def fire_documents(
                 w.interim_measures_required,
                 w.interim_measures_detail,
                 w.remedial_actions,
-                w.pas_9980_compliant
+                w.pas_9980_compliant,
+                w.extraction_confidence,
+                (w.fraew_features_json->>'llm_reported_confidence')::float AS llm_reported_confidence,
+                w.validation_warnings,
+                w.citations
             FROM silver.fraew_features w
             LEFT JOIN silver.document_features df ON df.feature_id = w.feature_id
             LEFT JOIN public.upload_audit ua       ON ua.upload_id = w.upload_id
@@ -1956,6 +2132,12 @@ async def fire_documents(
                 "high_priority_action_count":   r["high_priority_action_count"],
                 "no_date_action_count":         r["no_date_action_count"],
                 "action_items":                 (json.loads(r["action_items"]) if isinstance(r["action_items"], str) else r["action_items"]) if r["action_items"] else [],
+                # validation_warnings stays null for rows processed before the
+                # grounding pipeline — the UI uses that to mark legacy scores
+                "extraction_confidence":        r["extraction_confidence"],
+                "llm_reported_confidence":      r["llm_reported_confidence"],
+                "validation_warnings":          _load_jsonb(r["validation_warnings"], None),
+                "citations":                    _load_jsonb(r["citations"], {}),
             },
             "fraew": None,
         })
@@ -1992,6 +2174,10 @@ async def fire_documents(
                 "interim_measures_detail":   r["interim_measures_detail"],
                 "pas_9980_compliant":        r["pas_9980_compliant"],
                 "remedial_actions":          (json.loads(r["remedial_actions"]) if isinstance(r["remedial_actions"], str) else r["remedial_actions"]) if r["remedial_actions"] else [],
+                "extraction_confidence":     r["extraction_confidence"],
+                "llm_reported_confidence":   r["llm_reported_confidence"],
+                "validation_warnings":       _load_jsonb(r["validation_warnings"], None),
+                "citations":                 _load_jsonb(r["citations"], {}),
             },
         })
 

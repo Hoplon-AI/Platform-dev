@@ -758,6 +758,23 @@ async def _resolve_or_create_portfolio(conn, ha_id: str, portfolio_id: Optional[
 
     name = os.path.splitext(filename)[0] if filename else "Portfolio"
     renewal_year = datetime.utcnow().year
+
+    # Re-uploading the same file must REPLACE its portfolio, not duplicate the
+    # whole book — reuse the existing portfolio with this name and let the SoV
+    # processor's delete-stale step swap the rows.
+    existing = await conn.fetchrow(
+        """
+        SELECT portfolio_id::text FROM silver.portfolios
+        WHERE ha_id = $1 AND name = $2 AND renewal_year = $3
+        ORDER BY created_at DESC LIMIT 1
+        """,
+        ha_id, name, renewal_year,
+    )
+    if existing:
+        logger.info("[INGEST] Reusing portfolio '%s' (%s) for ha_id=%s — re-upload replaces rows",
+                    name, existing["portfolio_id"], ha_id)
+        return existing["portfolio_id"]
+
     new_id = str(uuid.uuid4())
     await conn.execute(
         """
@@ -786,7 +803,12 @@ async def ingest_document(
         None,
         description="Portfolio UUID to upload into. If omitted for a SoV upload, a new portfolio is created automatically.",
     ),
+    ha_id: Optional[str] = Query(
+        None,
+        description="Housing association to upload under. Must be one of the caller's authorised HAs. Defaults to the token's primary HA.",
+    ),
     tenant: Tuple[str, str] = Depends(get_tenant_info),
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(security),
 ):
     """
     Single ingestion endpoint for all document types.
@@ -799,7 +821,27 @@ async def ingest_document(
     and auto-detection disagree, the user's selection takes priority and a
     `detection_warning` is included in the response.
     """
-    ha_id, user_id = tenant
+    resolved_ha, user_id = tenant
+
+    # Honour the ha_id the frontend's HA selector sends, but only when the
+    # caller is actually authorised for it (token ha_ids, or DEV_MODE fallback).
+    if ha_id and ha_id != resolved_ha:
+        allowed: list[str] = []
+        if credentials:
+            try:
+                allowed = middleware.authorised_ha_ids(credentials.credentials)
+            except HTTPException:
+                allowed = []
+        dev_mode = os.getenv("DEV_MODE", "false").lower() == "true"
+        if ha_id in allowed or (dev_mode and not allowed):
+            resolved_ha = ha_id
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="You are not authorised for this housing association.",
+            )
+    ha_id = resolved_ha
+
     file_content = await file.read()
     filename = file.filename or "upload"
 
@@ -915,6 +957,8 @@ async def ingest_document(
                     occupancy_type,
                     sum_insured,
                     property_type,
+                    dwelling_form,
+                    is_standalone,
                     year_of_build,
                     storeys,
                     units,

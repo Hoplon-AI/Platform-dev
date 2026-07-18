@@ -455,6 +455,17 @@ def enrich_single_property(
             updates["flood_risk_note"] = flood_result.get("flood_risk_note")
             sources.append("FLOOD")
 
+    # 7. Dwelling form fallback — only when SoV ingest left it NULL
+    # (classifier consults property_type first, EPC built_form second)
+    if not prop.get("dwelling_form"):
+        from backend.core.classification.dwelling_classifier import classify_dwelling_form
+        form = classify_dwelling_form(
+            prop.get("property_type") or updates.get("property_type"),
+            prop.get("built_form") or updates.get("built_form"),
+        )
+        if form:
+            updates["dwelling_form"] = form
+
     updates["enrichment_status"] = "enriched"
     updates["enrichment_source"] = ",".join(sources)
     updates["enriched_at"] = datetime.now(timezone.utc)
@@ -606,9 +617,47 @@ def run_block_detection(ha_id: str, places_key: str = "", portfolio_id: str | No
                 """, fill_params)
                 filled = cur.rowcount
 
+                # ── Step 6: finalise is_standalone now membership is known ──
+                # Anything linked to a block (SoV name or detection fill) is
+                # not standalone; detection-confirmed loners with no linkage are.
+                p_portfolio_clause = "AND p.portfolio_id = %s::uuid" if portfolio_id else ""
+
+                params_false = (ha_id, portfolio_id) if portfolio_id else (ha_id,)
+                cur.execute(f"""
+                    UPDATE silver.properties p
+                    SET is_standalone = FALSE
+                    WHERE p.ha_id = %s
+                      AND ((p.block_reference IS NOT NULL AND p.block_reference != '')
+                           OR p.block_id IS NOT NULL)
+                      AND p.is_standalone IS DISTINCT FROM FALSE
+                      {p_portfolio_clause}
+                """, params_false)
+                in_block_flagged = cur.rowcount
+
+                standalone_flagged = 0
+                standalone_uprns = [str(u) for u in detection_result.get("standalone", []) if u]
+                if standalone_uprns:
+                    params_true = ((ha_id, standalone_uprns, portfolio_id)
+                                   if portfolio_id else (ha_id, standalone_uprns))
+                    cur.execute(f"""
+                        UPDATE silver.properties p
+                        SET is_standalone = TRUE
+                        WHERE p.ha_id = %s
+                          AND p.uprn = ANY(%s)
+                          AND (p.block_reference IS NULL OR p.block_reference = '')
+                          AND p.block_id IS NULL
+                          AND p.is_standalone IS DISTINCT FROM TRUE
+                          {p_portfolio_clause}
+                    """, params_true)
+                    standalone_flagged = cur.rowcount
+
         logger.info(f"Block detection: {upserted} blocks upserted, "
-                    f"{filled} NULL block_refs filled")
-        return {"blocks_upserted": upserted, "block_refs_filled": filled}
+                    f"{filled} NULL block_refs filled, "
+                    f"{standalone_flagged} flagged standalone, "
+                    f"{in_block_flagged} flagged in-block")
+        return {"blocks_upserted": upserted, "block_refs_filled": filled,
+                "standalone_flagged": standalone_flagged,
+                "in_block_flagged": in_block_flagged}
     finally:
         conn.close()
 

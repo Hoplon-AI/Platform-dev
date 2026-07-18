@@ -328,28 +328,9 @@
   }
 }
 
+/* Shell/sidebar/topbar responsive rules live in layout.css (mobile drawer);
+   this file only adapts map/dashboard content grids. */
 @media (max-width: 980px) {
-  .shell {
-    grid-template-columns: 1fr;
-  }
-
-  .sidebar {
-    border-right: none;
-    border-bottom: 1px solid var(--border);
-    gap: 14px;
-    position: static;
-    max-height: none;
-    overflow-y: visible;
-  }
-
-  .main {
-    padding: 18px;
-  }
-
-  .main-head {
-    flex-direction: column;
-  }
-
   .stepper {
     grid-template-columns: 1fr;
   }
@@ -371,18 +352,6 @@
 }
 
 @media (max-width: 700px) {
-  .topbar {
-    padding: 0 14px;
-    height: auto;
-    min-height: 56px;
-    flex-direction: column;
-    align-items: flex-start;
-    justify-content: center;
-    gap: 2px;
-    padding-top: 8px;
-    padding-bottom: 8px;
-  }
-
   .page-title {
     font-size: 26px;
   }

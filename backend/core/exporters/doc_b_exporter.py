@@ -34,6 +34,9 @@ logger = logging.getLogger(__name__)
 #         "fraew" = filled from FRAEW document
 # ---------------------------------------------------------------------------
 DOC_B_COLUMNS = [
+    # Asset Type — Block vs Standalone house/bungalow/flat (mixed portfolios)
+    ("",    "Asset Type",                                   "sov",      "asset_type"),
+
     # Section 1 — Policy Information (Q1–Q8) — insurer
     ("Q1",  "Policy number",                                "insurer",  None),
     ("Q2",  "Cover Commencement Date",                      "insurer",  None),
@@ -208,7 +211,10 @@ async def _fetch_blocks(db_pool, ha_id: str, portfolio_id: Optional[str]) -> lis
             MODE() WITHIN GROUP (ORDER BY p.floor_construction) AS floor_construction,
             MODE() WITHIN GROUP (ORDER BY p.roof_construction)  AS roof_construction,
             BOOL_OR(p.basement)                             AS basement,
-            BOOL_OR(p.is_listed)                            AS is_listed
+            BOOL_OR(p.is_listed)                            AS is_listed,
+            -- Synthetic single-dwelling rows: every unit flagged standalone
+            BOOL_AND(p.is_standalone)                       AS is_standalone,
+            MODE() WITHIN GROUP (ORDER BY p.dwelling_form)  AS dwelling_form
         FROM silver.properties p
         WHERE p.ha_id = $1
           AND ($2::uuid IS NULL OR p.portfolio_id = $2::uuid)
@@ -299,6 +305,8 @@ async def _fetch_blocks(db_pool, ha_id: str, portfolio_id: Optional[str]) -> lis
         a.roof_construction,
         a.basement,
         a.is_listed,
+        a.is_standalone,
+        a.dwelling_form,
         o.occupancy_type,
         pt.property_type,
         -- FRA fields (Q32-Q40)
@@ -335,21 +343,24 @@ async def _fetch_blocks(db_pool, ha_id: str, portfolio_id: Optional[str]) -> lis
     LEFT JOIN block_postcode      pc USING (block_reference)
     LEFT JOIN block_property_type pt USING (block_reference)
     LEFT JOIN block_address       ad USING (block_reference)
-    -- FRA: latest per block (joined via silver.blocks)
+    -- FRA: latest per block (joined via silver.blocks, portfolio-scoped so a
+    -- same-named block in another portfolio can never supply the assessment)
     LEFT JOIN LATERAL (
         SELECT f.*
         FROM silver.fra_features f
         JOIN silver.blocks b ON f.block_id = b.block_id
         WHERE b.ha_id = $1 AND b.name = a.block_reference
+          AND ($2::uuid IS NULL OR b.portfolio_id = $2::uuid)
         ORDER BY f.assessment_date DESC NULLS LAST
         LIMIT 1
     ) fra ON true
-    -- FRAEW: latest per block (joined via silver.blocks)
+    -- FRAEW: latest per block (joined via silver.blocks, portfolio-scoped)
     LEFT JOIN LATERAL (
         SELECT fw.*
         FROM silver.fraew_features fw
         JOIN silver.blocks b ON fw.block_id = b.block_id
         WHERE b.ha_id = $1 AND b.name = a.block_reference
+          AND ($2::uuid IS NULL OR b.portfolio_id = $2::uuid)
         ORDER BY fw.assessment_date DESC NULLS LAST
         LIMIT 1
     ) fraew ON true
@@ -366,12 +377,13 @@ async def _fetch_blocks(db_pool, ha_id: str, portfolio_id: Optional[str]) -> lis
 def _write_section_headers(ws):
     """Row 1: section group headers spanning multiple columns."""
     sections = [
-        ("Policy Information",          1,  8,  "insurer"),
-        ("General Property Details",    9,  27, "sov"),
-        ("Construction",                28, 31, "sov"),
-        ("Fire Risk Management",        32, 40, "fra"),
-        ("EWS / Cladding Information",  41, 58, "fraew"),
-        ("Claim Information",           59, 64, "insurer"),
+        ("Asset",                       1,  1,  "sov"),
+        ("Policy Information",          2,  9,  "insurer"),
+        ("General Property Details",    10, 28, "sov"),
+        ("Construction",                29, 32, "sov"),
+        ("Fire Risk Management",        33, 41, "fra"),
+        ("EWS / Cladding Information",  42, 59, "fraew"),
+        ("Claim Information",           60, 65, "insurer"),
     ]
     for label, start, end, source in sections:
         cell = ws.cell(row=1, column=start, value=label)
@@ -388,7 +400,7 @@ def _write_section_headers(ws):
 def _write_question_headers(ws):
     """Row 2: individual question headers."""
     for col_idx, (q_num, label, source, _) in enumerate(DOC_B_COLUMNS, start=1):
-        cell = ws.cell(row=2, column=col_idx, value=f"{q_num}: {label}")
+        cell = ws.cell(row=2, column=col_idx, value=f"{q_num}: {label}" if q_num else label)
         cell.font = Font(bold=True, name="Calibri", size=9,
                          color="FFFFFF" if source in ("sov",) else "1F4E79")
         cell.fill = FILLS[source]
@@ -401,15 +413,36 @@ def _write_question_headers(ws):
     ws.row_dimensions[2].height = 60
 
 
+def _asset_type_label(block) -> str:
+    """'Block' or 'Standalone House/Bungalow/Flat' for the Asset Type column."""
+    if not block.get("is_standalone"):
+        return "Block"
+    form = (block.get("dwelling_form") or "").replace("_", " ").title()
+    return f"Standalone {form}".strip()
+
+
 def _write_data_rows(ws, blocks):
+    from backend.core.classification.dwelling_classifier import derive_fra_requirement
+
     for row_idx, block in enumerate(blocks, start=3):
         fill = ALT_ROW_FILL if row_idx % 2 == 0 else None
 
+        # Standalone single-household dwellings are exempt from FRA/FRAEW —
+        # show that as an explicit compliant state, never as a blank cell.
+        fra_exempt = bool(block.get("is_standalone")) and derive_fra_requirement(
+            block.get("dwelling_form"), True
+        ) == "not_required"
+
         for col_idx, (q_num, label, source, db_field) in enumerate(DOC_B_COLUMNS, start=1):
-            if db_field and db_field in block.keys():
+            if db_field == "asset_type":
+                value = _asset_type_label(block)
+            elif db_field and db_field in block.keys():
                 value = block[db_field]
             else:
                 value = None
+
+            if value is None and fra_exempt and source in ("fra", "fraew"):
+                value = "N/A — single dwelling"
 
             # Format booleans nicely
             if isinstance(value, bool):
