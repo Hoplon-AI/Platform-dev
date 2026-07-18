@@ -23,7 +23,7 @@ const RISK_LEGENDS = {
   listed: [{ c: "#7c3aed", l: "Listed" }, { c: "#94a3b8", l: "Not listed" }],
 };
 
-export default function FullMapPage({ properties = [] }) {
+export default function FullMapPage({ properties = [], initialView = null }) {
   const [riskColorBy, setRiskColorBy] = useState("none");
   const blocks = useMemo(() => buildBlocks(properties), [properties]);
 
@@ -37,6 +37,7 @@ export default function FullMapPage({ properties = [] }) {
         riskColorBy={riskColorBy}
         viewMode="blocks"
         canvasStyle={{ height: "100%", borderRadius: 0, border: "none" }}
+        viewOverride={initialView}
       />
 
       {/* Colour blocks by risk type (left of Leaflet's zoom control) */}
@@ -88,26 +89,14 @@ export default function FullMapPage({ properties = [] }) {
                 {item.l}
               </span>
             ))}
+            {riskColorBy === "height" && (
+              <span style={{ fontSize: 11, color: "var(--muted)", marginLeft: 4 }}>
+                (Scotland: ≥11m = High)
+              </span>
+            )}
           </div>
         )}
       </div>
-
-      <p
-        style={{
-          position: "absolute",
-          bottom: 4,
-          left: 8,
-          zIndex: 1000,
-          fontSize: 11,
-          color: "var(--muted)",
-          background: "rgba(255,255,255,0.85)",
-          borderRadius: 6,
-          padding: "2px 8px",
-          margin: 0,
-        }}
-      >
-        Risk overlays use generalised open (OGL) datasets for demonstration — not property-precise underwriting data.
-      </p>
     </div>
   );
 }

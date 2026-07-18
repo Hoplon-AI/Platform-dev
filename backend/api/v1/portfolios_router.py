@@ -10,6 +10,7 @@ Backed by Gold views:
 
 from __future__ import annotations
 
+import json
 import os
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -276,7 +277,8 @@ async def get_properties(
                 height_roofbase_m, height_confidence, building_footprint_m2,
                 is_listed, listed_grade, listed_name, listed_reference,
                 flood_risk_band, flood_risk_source,
-                enrichment_status, enrichment_source, enriched_at, metadata
+                enrichment_status, enrichment_source, enriched_at, metadata,
+                building_geometry, os_construction_material
             FROM silver.properties
             WHERE ha_id = $1
               AND ($2::uuid IS NULL OR portfolio_id = $2::uuid)
@@ -293,5 +295,12 @@ async def get_properties(
             return v.isoformat()
         return v
 
-    return [{k: _serial(v) for k, v in dict(r).items()} for r in rows]
+    def _row(r):
+        d = {k: _serial(v) for k, v in dict(r).items()}
+        # asyncpg returns JSONB as a string (no codec set); the map needs a dict.
+        if isinstance(d.get("building_geometry"), str):
+            d["building_geometry"] = json.loads(d["building_geometry"])
+        return d
+
+    return [_row(r) for r in rows]
 

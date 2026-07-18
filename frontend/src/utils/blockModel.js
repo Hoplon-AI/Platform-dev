@@ -196,10 +196,13 @@ export const getWallTypes = (fraew) => {
 
 // ---------- height ----------
 
-export const heightCategory = (m) => {
+// Descriptive height band. Scotland has a single 11m high-rise threshold, so
+// everything 11m+ collapses to one band; England & Wales keep the 11m/18m/30m splits.
+export const heightCategory = (m, isScot = false) => {
   const h = Number(m);
   if (!Number.isFinite(h) || h <= 0) return null;
   if (h < 11) return "Under 11m";
+  if (isScot) return "11m+ (high-rise)";
   if (h < 18) return "11–18m";
   if (h < 30) return "18–30m";
   return "Over 30m";
@@ -334,6 +337,9 @@ export const buildBlocks = (properties = [], fireDocuments = []) => {
         null,
       isListed: items.some((p) => p.is_listed === true || p.listed_grade),
       listedGrade: items.find((p) => isPresent(p.listed_grade))?.listed_grade ?? null,
+      // ponytail: flats in a block share a footprint — take the first; refine to
+      // the parent_uprn's geometry if a block ever spans two buildings.
+      geometry: items.find((p) => p.building_geometry)?.building_geometry ?? null,
       representativeProperty,
     };
   });

@@ -5,6 +5,7 @@ export const DEFAULT_ZOOM = 5;
 export const CLUSTER_ZOOM = 13;
 export const BLOCK_ZOOM = 18;
 export const FOCUSED_ZOOM = 19;
+export const POLYGON_ZOOM = 17; // risk map: switch block bubbles → footprint polygons at/above this zoom
 export const CONTEXT_BLOCK_ZOOM = 16.5;
 export const CONTEXT_BLOCK_FADE_START_ZOOM = 18.5;
 export const CONTEXT_BLOCK_HIDE_ZOOM = 19;

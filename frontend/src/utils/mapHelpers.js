@@ -455,6 +455,24 @@ export const worstFloodBand = (flats) => {
   return best;
 };
 
+// Scottish postcode areas — fallback nation check when country_code is absent.
+const SCOTTISH_PC_AREAS = new Set([
+  "AB", "DD", "DG", "EH", "FK", "G", "HS", "IV", "KA", "KW",
+  "KY", "ML", "PA", "PH", "TD", "ZE",
+]);
+function isScottishPostcode(postcode) {
+  const area = String(postcode || "").trim().toUpperCase().match(/^[A-Z]{1,2}/)?.[0];
+  return area ? SCOTTISH_PC_AREAS.has(area) : false;
+}
+
+// Is a property in Scotland? Prefers OS Places COUNTRY_CODE ("S"), falls back to
+// postcode area. Scotland uses a single 11m high-rise threshold vs England/Wales' 11m+18m.
+export function isScotland(prop) {
+  const cc = String(prop?.country_code || "").trim().toUpperCase();
+  if (cc) return cc === "S";
+  return isScottishPostcode(prop?.post_code || prop?.postcode);
+}
+
 // Block marker ring colour for the risk map's "colour by" selector.
 export function blockRingColor(block, mode) {
   if (mode === "flood") return floodColor(worstFloodBand(block?.properties));
@@ -462,6 +480,11 @@ export function blockRingColor(block, mode) {
   if (mode === "height") {
     const h = Number(block?.maxHeight);
     if (!Number.isFinite(h) || h <= 0) return "#94a3b8";
+    // Scotland has a single 11m high-rise threshold; England & Wales split at
+    // 11m and 18m (Wales Building Safety categories 3/2/1 mirror the English bands).
+    if (isScotland(block?.representativeProperty)) {
+      return h >= 11 ? "#ef4444" : "#64748b";
+    }
     return h >= 18 ? "#ef4444" : h >= 11 ? "#f59e0b" : "#64748b";
   }
   if (mode === "fra") return fireBandColor(getFireRiskBand(block?.latest_fra));

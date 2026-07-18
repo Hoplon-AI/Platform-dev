@@ -6,6 +6,8 @@ import {
   getPropertyLabel,
   floodColor,
   worstFloodBand,
+  isScotland,
+  blockRingColor,
 } from "../../utils/mapHelpers.js";
 import { getFireRiskBand, heightCategory } from "../../utils/blockModel.js";
 
@@ -32,10 +34,9 @@ export const buildBlockRiskStripHtml = (point) => {
   const flood = worstFloodBand(block.properties);
   const floodValue = flood || "No data";
 
-  const h = Number(block.maxHeight ?? point.storeys);
-  const heightCat = heightCategory(block.maxHeight);
-  const heightColor = !Number.isFinite(h) || h <= 0 ? "#94a3b8"
-    : h >= 18 ? "#ef4444" : h >= 11 ? "#f59e0b" : "#64748b";
+  const isScot = isScotland(block.representativeProperty);
+  const heightCat = heightCategory(block.maxHeight, isScot);
+  const heightColor = blockRingColor(block, "height");
 
   const listedValue = block.isListed ? (block.listedGrade ? `Grade ${block.listedGrade}` : "Yes") : "No";
   const chips = [

@@ -18,6 +18,7 @@ import {
   boolLabel,
   isPresent,
 } from "../../utils/blockModel";
+import { isScotland } from "../../utils/mapHelpers";
 import { G } from "../../constants/glossary";
 import {
   Tip,
@@ -75,7 +76,7 @@ export default function Dossier({ block, onSelectProperty }) {
   const fraStatus = useMemo(() => assessmentStatus(fra), [fra]);
   const fraewStatus = useMemo(() => assessmentStatus(fraew), [fraew]);
 
-  const hCat = heightCategory(block.maxHeight) || (fraew?.building_height_category && titleCase(fraew.building_height_category));
+  const hCat = heightCategory(block.maxHeight, isScotland(block.representativeProperty)) || (fraew?.building_height_category && titleCase(fraew.building_height_category));
   const fraBand = getFireRiskBand(fra);
   const fraewBand = getFireRiskBand(fraew);
   const bandColor = { Red: "#ef4444", Amber: "#f59e0b", Green: "#10b981" }[overall] || "#94a3b8";

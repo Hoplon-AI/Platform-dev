@@ -131,7 +131,7 @@ def _call_os_places(address: str, postcode: str, api_key: str) -> dict | None:
 def _call_epc(uprn: str, email: str, api_key: str) -> dict | None:
     """UPRN → most recent EPC certificate (England/Wales only)."""
     try:
-        from backend.geo.uprn_maps.uprn_to_epc import get_epc_from_uprn
+        from backend.geo.uprn_maps.uprn_to_new_epc import get_epc_from_uprn
         result = get_epc_from_uprn(uprn, email, api_key)
         return result[0] if isinstance(result, list) and result else None
     except Exception as exc:
@@ -144,10 +144,35 @@ def _call_ngd_buildings(x: float, y: float, api_key: str) -> dict | None:
     try:
         from backend.geo.uprn_maps.uprn_to_height import get_building_from_coords
         result = get_building_from_coords(x, y, api_key)
-        return result.get("properties", {}) if isinstance(result, dict) else None
+        if not isinstance(result, dict):
+            return None
+        # Keep the footprint geometry (BNG) alongside the properties — the map
+        # renders it as a polygon. Callers ignore _geometry if they don't need it.
+        return {**result.get("properties", {}), "_geometry": result.get("geometry")}
     except Exception as exc:
         logger.warning(f"NGD error: {exc}")
         return None
+
+
+def _reproject_geometry(geom: dict | None) -> dict | None:
+    """Reproject a GeoJSON Polygon/MultiPolygon from BNG (EPSG:27700) to WGS84.
+
+    NGD returns footprints in eastings/northings; Leaflet needs [lon, lat].
+    Walks the coordinate rings, converting each vertex via pyproj.
+    """
+    if not geom or "coordinates" not in geom:
+        return None
+    from backend.geo.uprn_maps.uprn_to_listed import _bng_to_lonlat
+
+    def ring(r):
+        return [list(_bng_to_lonlat(pt[0], pt[1])) for pt in r]
+
+    gtype = geom.get("type")
+    if gtype == "Polygon":
+        return {"type": gtype, "coordinates": [ring(r) for r in geom["coordinates"]]}
+    if gtype == "MultiPolygon":
+        return {"type": gtype, "coordinates": [[ring(r) for r in poly] for poly in geom["coordinates"]]}
+    return None
 
 
 def _call_listed(uprn: str, api_key: str) -> dict | None:
@@ -390,6 +415,12 @@ def enrich_single_property(
         updates["height_roofbase_m"] = ngd_result.get("height_relativeroofbase_m")
         updates["height_confidence"] = ngd_result.get("height_confidencelevel")
         updates["building_footprint_m2"] = ngd_result.get("geometry_area_m2")
+        # Keep OS constructionmaterial raw, before SoV-priority merge buries it in
+        # wall_construction — lets the insights panel chart OS construction on its own.
+        updates["os_construction_material"] = ngd_result.get("constructionmaterial")
+        geom = _reproject_geometry(ngd_result.get("_geometry"))
+        if geom:
+            updates["building_geometry"] = psycopg2.extras.Json(geom)
         ngd_map = {
             "constructionmaterial": "wall_construction",
             "roofmaterial_primarymaterial": "roof_construction",
@@ -783,3 +814,19 @@ async def enrich_portfolio(
     logger.info(f"[ENRICH] DONE: {enriched}/{total} in {elapsed:.0f}s | "
                 f"Blocks: {block_result.get('blocks_upserted', 0)}")
     return result
+
+
+if __name__ == "__main__":
+    # Self-check for _reproject_geometry: a BNG ring in Glasgow → WGS84 lon/lat.
+    # Cathcart is ~(258000, 660000) BNG → ~(-4.3, 55.8) WGS84.
+    poly = {"type": "Polygon", "coordinates": [[
+        [258000, 660000], [258010, 660000], [258010, 660010], [258000, 660000],
+    ]]}
+    out = _reproject_geometry(poly)
+    assert out["type"] == "Polygon"
+    lon, lat = out["coordinates"][0][0]
+    assert -8 <= lon <= 2, f"lon out of UK range: {lon}"
+    assert 49 <= lat <= 61, f"lat out of UK range: {lat}"
+    assert _reproject_geometry(None) is None
+    assert _reproject_geometry({"type": "Point", "coordinates": [1, 2]}) is None
+    print(f"OK: {poly['coordinates'][0][0]} BNG -> [{lon}, {lat}] WGS84")
