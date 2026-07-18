@@ -817,3 +817,55 @@ The platform has transitioned from isolated ingestion prototypes and partially m
 * Geo-aware portfolio analysis foundations
 
 The primary remaining work is now correctness, normalization consistency, enrichment stabilization, document workflows, risk aggregation, export generation, evidence analytics, and geo-validation rather than initial frontend/backend structural integration.
+
+⸻
+
+Development, Deployment & Operations
+
+Branch / Release Workflow
+
+Three-tier flow: feature/* → staging → main → production. Full guide in docs/DEV_WORKFLOW.md.
+
+* feature/*  — branch off staging; local only
+* staging    — integration / QA branch
+* main       — stable, reviewed; receives squash/merge PRs from staging
+* production — release branch; intended to deploy the live site (pipeline pending)
+
+Note: the default branch is main (there is no master).
+
+Local Development
+
+Prerequisites: Docker Desktop running, Python venv, Node 18+.
+
+1. docker compose up -d                                       (Postgres :5432 + LocalStack :4566)
+2. .\venv\Scripts\uvicorn.exe backend.main:app --port 8000    (API on :8000; auto-loads .env)
+3. cd frontend; npm install; npm run dev                      (UI on :5173)
+
+Frontend API wiring is automatic: npm run dev → http://127.0.0.1:8000 (frontend/.env);
+npm run build → the CloudFront URL (frontend/.env.production). Dev mode (DEV_MODE=true)
+bypasses login and serves the ha_demo portfolio (~971 properties).
+
+Hosting & Deployment
+
+* Live frontend: https://d16062fpplraah.cloudfront.net (AWS CloudFront).
+* IMPORTANT — there is currently NO automated frontend deploy. The live site is updated
+  manually (vite build → aws s3 sync → CloudFront invalidation). No branch auto-deploys.
+* The CDK workflow (.github/workflows/cdk-deploy-dev.yml) runs on push to main, but its
+  deploy job is disabled (if: false, FIXME KAN-463) — only lint + synth run. CDK manages
+  backend infra (ECS / networking / data), NOT the CloudFront frontend.
+* To wire production → live: build a workflow on push to production (vite build →
+  aws s3 sync s3://<bucket> → cloudfront create-invalidation). Needs valid AWS creds for
+  account 025215344919 (eu-west-1) plus the frontend S3 bucket name and CloudFront
+  distribution ID.
+
+AWS / Bedrock Credentials (important gotcha)
+
+LLM extraction (SoV + FRA/FRAEW) uses AWS Bedrock and needs valid AWS keys. backend/main.py
+calls load_dotenv() with override=False, so AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY already
+present in the OS environment SHADOW the values in .env. A stale User-scope AWS_ACCESS_KEY_ID
+caused "UnrecognizedClientException: The security token included in the request is invalid"
+on FRA upload, even though .env held a valid key. If you hit this:
+
+* Check the active identity: aws sts get-caller-identity
+* Fix by any of: remove the stale User-scope AWS_* env vars; export AWS_* from .env before
+  launching the backend; or set load_dotenv(override=True). Region is eu-west-2.

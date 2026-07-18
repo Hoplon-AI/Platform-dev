@@ -8,6 +8,7 @@ POST /api/v1/enrich/{ha_id}/blocks  — Re-run block detection only
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import os
 from typing import Optional
@@ -28,16 +29,32 @@ _active_jobs: dict[str, dict] = {}
 
 class EnrichRequest(BaseModel):
     limit: int = Field(0, description="Max properties to enrich (0 = all)")
+    portfolio_id: Optional[str] = Field(None, description="Scope enrichment to a specific portfolio UUID")
 
 
-async def _run_background(ha_id: str, limit: int):
-    _active_jobs[ha_id] = {"status": "running", "result": None}
+def _enrich_sync(ha_id: str, limit: int, portfolio_id: Optional[str] = None) -> dict:
+    """Drive the (synchronous) enrich_portfolio coroutine in a worker thread.
+
+    enrich_portfolio is declared async but does only blocking I/O (psycopg2 +
+    requests) and never awaits the main event loop, so running it in its own
+    loop on a separate thread is safe and keeps the server responsive — without
+    this, enrichment freezes the entire event loop (even /health and /status
+    time out) for the whole batch.
+    """
+    return asyncio.run(enrich_portfolio(ha_id=ha_id, limit=limit, portfolio_id=portfolio_id))
+
+
+async def _run_background(ha_id: str, limit: int, portfolio_id: Optional[str] = None):
+    # target = how many rows this job will process (0 = all). Surfaced via
+    # /status so the frontend can show smooth progress against the real cap.
+    _active_jobs[ha_id] = {"status": "running", "result": None, "target": limit}
     try:
-        result = await enrich_portfolio(ha_id=ha_id, limit=limit)
-        _active_jobs[ha_id] = {"status": "complete", "result": result}
+        # Offload to a thread so the blocking enrichment doesn't freeze the loop.
+        result = await asyncio.to_thread(_enrich_sync, ha_id, limit, portfolio_id)
+        _active_jobs[ha_id] = {"status": "complete", "result": result, "target": limit}
     except Exception as exc:
         logger.error(f"Enrichment failed for {ha_id}: {exc}", exc_info=True)
-        _active_jobs[ha_id] = {"status": "failed", "result": {"error": str(exc)}}
+        _active_jobs[ha_id] = {"status": "failed", "result": {"error": str(exc)}, "target": limit}
 
 
 @router.post("/{ha_id}")
@@ -46,8 +63,8 @@ async def start_enrichment(ha_id: str, req: EnrichRequest, bg: BackgroundTasks):
     if ha_id in _active_jobs and _active_jobs[ha_id]["status"] == "running":
         return {"ha_id": ha_id, "status": "already_running"}
 
-    bg.add_task(_run_background, ha_id, req.limit)
-    return {"ha_id": ha_id, "status": "started", "message": "Check /status for progress"}
+    bg.add_task(_run_background, ha_id, req.limit, req.portfolio_id)
+    return {"ha_id": ha_id, "status": "started", "portfolio_id": req.portfolio_id, "message": "Check /status for progress"}
 
 
 @router.get("/{ha_id}/status")
@@ -118,6 +135,7 @@ async def enrichment_status(ha_id: str):
         "ha_id": ha_id,
         "job_status": job["status"] if job else "no_job",
         "job_result": job.get("result") if job else None,
+        "target": job.get("target") if job else None,
         "counts": counts,
         "total_properties": total,
         "total_sum_insured": raw.get("total_si", 0),
@@ -127,10 +145,10 @@ async def enrichment_status(ha_id: str):
 
 
 @router.post("/{ha_id}/blocks")
-async def rerun_blocks(ha_id: str):
+async def rerun_blocks(ha_id: str, portfolio_id: Optional[str] = None):
     """Re-run block detection without re-enriching."""
     try:
-        result = run_block_detection(ha_id)
-        return {"ha_id": ha_id, **result}
+        result = run_block_detection(ha_id, portfolio_id=portfolio_id)
+        return {"ha_id": ha_id, "portfolio_id": portfolio_id, **result}
     except Exception as exc:
         raise HTTPException(500, str(exc))

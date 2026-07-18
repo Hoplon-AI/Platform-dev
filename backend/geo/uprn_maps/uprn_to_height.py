@@ -46,7 +46,7 @@ def get_building_from_coords(x: float, y: float, api_key: str) -> dict | str:
     }
 
     try:
-        response = requests.get(NGD_BUILDINGS_URL, params=params)
+        response = requests.get(NGD_BUILDINGS_URL, params=params, timeout=15)
         response.raise_for_status()
         data = response.json()
     except requests.exceptions.RequestException as e:
@@ -212,6 +212,7 @@ def get_building_height_from_uprn(
         "age_band": props.get("buildingage_period"),
         "year_of_build": props.get("buildingage_year"),
         "basement": props.get("basementpresence"),
+        "basement_flat": props.get("basementpresence_selfcontained"),
     }
 
 
@@ -243,6 +244,7 @@ if __name__ == "__main__":
             print(f"Age Band:              {result['age_band']}")
             print(f"Year of Build:         {result['year_of_build']}")
             print(f"Basement:              {result['basement']}")
+            print(f"Basement flat:         {result['basement_flat']}")
             print(f"OS ID:               {result['osid']}")
         else:
             print(f"Error: {result}")

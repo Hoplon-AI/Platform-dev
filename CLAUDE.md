@@ -293,3 +293,7 @@ LEFT JOIN LATERAL (
 - SQL: Parameterized queries ($1, $2), explicit columns, snake_case, schema prefix
 - All new columns added to existing tables must have DEFAULT or be nullable
 - Enrichment columns follow SoV-priority rule (never overwrite)
+
+## Response standards
+
+- Response in a concise and to the point manner, avoiding unnecessary verbosity or repetition.

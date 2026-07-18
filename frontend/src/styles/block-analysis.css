@@ -1,0 +1,211 @@
+/* ============================================================
+   Block Analysis page
+   ============================================================ */
+.ba-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px 24px;
+}
+
+.ba-search {
+  position: relative;
+  flex: 1 1 300px;
+  max-width: 480px;
+}
+.ba-search svg {
+  position: absolute;
+  left: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  pointer-events: none;
+}
+.ba-search .input {
+  padding-left: 42px;
+}
+
+.ba-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.ba-stat {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid var(--border);
+  background: var(--panel);
+  border-radius: 999px;
+  padding: 7px 14px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-light);
+  transition: background 0.16s ease, border-color 0.16s ease, color 0.16s ease;
+}
+.ba-stat:hover {
+  border-color: #cfd8e3;
+  background: #f8fafc;
+}
+.ba-stat.is-active {
+  border-color: var(--primary);
+  background: var(--primary-soft);
+  color: #1e3a8a;
+}
+.ba-stat .ba-stat-n {
+  font-weight: 800;
+  color: var(--text);
+}
+.ba-stat.is-active .ba-stat-n {
+  color: #1e3a8a;
+}
+
+/* table */
+.ba-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  min-width: 720px;
+}
+.ba-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  text-align: left;
+  font-size: 11.5px;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--muted);
+  background: #fbfdff;
+  padding: 12px 18px;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+  user-select: none;
+}
+.ba-table th.is-sortable {
+  cursor: pointer;
+}
+.ba-table th.is-sortable:hover {
+  color: var(--text-light);
+}
+.ba-table th .ba-arrow {
+  margin-left: 5px;
+  font-size: 9px;
+  vertical-align: middle;
+}
+.ba-table th.is-sorted {
+  color: var(--primary);
+}
+
+.ba-table tbody tr {
+  cursor: pointer;
+  transition: background 0.14s ease;
+}
+.ba-table tbody tr:hover {
+  background: #f6f9ff;
+}
+.ba-table tbody tr.is-active {
+  background: var(--primary-soft);
+}
+.ba-table tbody td {
+  padding: 13px 18px;
+  border-bottom: 1px solid var(--border-soft);
+  font-size: 14px;
+  color: var(--text);
+  vertical-align: middle;
+}
+.ba-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+/* leading risk-accent cell */
+.ba-accent {
+  position: relative;
+}
+.ba-accent::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  background: transparent;
+}
+.ba-accent.r-red::before { background: var(--danger); }
+.ba-accent.r-amber::before { background: var(--warning); }
+.ba-accent.r-green::before { background: var(--accent); }
+
+.ba-addr {
+  font-weight: 700;
+  color: var(--text);
+  line-height: 1.3;
+}
+.ba-addr-sub {
+  font-size: 12px;
+  color: var(--muted);
+  margin-top: 2px;
+}
+.ba-uprn {
+  font-variant-numeric: tabular-nums;
+  color: var(--text-light);
+  font-size: 13px;
+}
+.ba-flats {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 38px;
+  padding: 4px 10px;
+  border-radius: 8px;
+  background: var(--panel-soft);
+  border: 1px solid var(--border-soft);
+  font-weight: 700;
+  font-size: 13px;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+.ba-dash {
+  color: #cbd5e1;
+  font-weight: 600;
+}
+.ba-chev {
+  color: #cbd5e1;
+  transition: color 0.14s ease, transform 0.14s ease;
+}
+.ba-table tbody tr:hover .ba-chev {
+  color: var(--primary);
+  transform: translateX(2px);
+}
+
+.ba-meta {
+  font-size: 12.5px;
+  color: var(--muted);
+  padding: 12px 18px 0;
+}
+
+.ba-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--primary);
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.ba-back:hover {
+  text-decoration: underline;
+}
+
+@media (max-width: 720px) {
+  .ba-toolbar {
+    align-items: stretch;
+  }
+  .ba-search {
+    max-width: none;
+  }
+}

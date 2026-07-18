@@ -19,6 +19,8 @@ from __future__ import annotations
 
 import logging
 import os
+import re
+import sys
 import time
 from datetime import datetime, timezone
 import traceback
@@ -38,7 +40,7 @@ DEFAULT_EPC_KEY = os.getenv("EPC_API_KEY", "")
 
 RATE_LIMIT_DELAY_S = 0.25  # ~400 calls/min, within 600/min limit
 EPC_DAILY_LIMIT = 5000
-BATCH_COMMIT_SIZE = 50
+BATCH_COMMIT_SIZE = 5  # commit every 5 rows so /status shows live progress and partial results persist
 
 
 def _get_db_conn():
@@ -46,7 +48,7 @@ def _get_db_conn():
         os.getenv("DATABASE_URL", "postgresql://postgres:postgres@localhost:5432/platform_dev")
     )
 
-def _api_call_with_retry(func, *args, max_retries=3):
+def _api_call_with_retry(func, *args, max_retries=2):
     for attempt in range(max_retries):
         try:
             result = func(*args)
@@ -74,7 +76,7 @@ def _batch_os_places_by_postcode(postcode: str, api_key: str) -> list[dict]:
         import requests
         url = "https://api.os.uk/search/places/v1/postcode"
         params = {"postcode": postcode, "key": api_key, "maxresults": 100}
-        response = requests.get(url, params=params)
+        response = requests.get(url, params=params, timeout=15)
         response.raise_for_status()
         data = response.json()
         results = []
@@ -129,7 +131,7 @@ def _call_os_places(address: str, postcode: str, api_key: str) -> dict | None:
 def _call_epc(uprn: str, email: str, api_key: str) -> dict | None:
     """UPRN → most recent EPC certificate (England/Wales only)."""
     try:
-        from backend.geo.uprn_maps.uprn_to_epc import get_epc_from_uprn
+        from backend.geo.uprn_maps.uprn_to_new_epc import get_epc_from_uprn
         result = get_epc_from_uprn(uprn, email, api_key)
         return result[0] if isinstance(result, list) and result else None
     except Exception as exc:
@@ -142,10 +144,35 @@ def _call_ngd_buildings(x: float, y: float, api_key: str) -> dict | None:
     try:
         from backend.geo.uprn_maps.uprn_to_height import get_building_from_coords
         result = get_building_from_coords(x, y, api_key)
-        return result.get("properties", {}) if isinstance(result, dict) else None
+        if not isinstance(result, dict):
+            return None
+        # Keep the footprint geometry (BNG) alongside the properties — the map
+        # renders it as a polygon. Callers ignore _geometry if they don't need it.
+        return {**result.get("properties", {}), "_geometry": result.get("geometry")}
     except Exception as exc:
         logger.warning(f"NGD error: {exc}")
         return None
+
+
+def _reproject_geometry(geom: dict | None) -> dict | None:
+    """Reproject a GeoJSON Polygon/MultiPolygon from BNG (EPSG:27700) to WGS84.
+
+    NGD returns footprints in eastings/northings; Leaflet needs [lon, lat].
+    Walks the coordinate rings, converting each vertex via pyproj.
+    """
+    if not geom or "coordinates" not in geom:
+        return None
+    from backend.geo.uprn_maps.uprn_to_listed import _bng_to_lonlat
+
+    def ring(r):
+        return [list(_bng_to_lonlat(pt[0], pt[1])) for pt in r]
+
+    gtype = geom.get("type")
+    if gtype == "Polygon":
+        return {"type": gtype, "coordinates": [ring(r) for r in geom["coordinates"]]}
+    if gtype == "MultiPolygon":
+        return {"type": gtype, "coordinates": [[ring(r) for r in poly] for poly in geom["coordinates"]]}
+    return None
 
 
 def _call_listed(uprn: str, api_key: str) -> dict | None:
@@ -165,6 +192,73 @@ def _call_address_confidence(original: str, returned: str) -> dict | None:
         from backend.geo.uprn_maps.address_confidence import compare_addresses
         return compare_addresses(original, returned)
     except Exception:
+        return None
+
+
+def _standardise_address(address: str | None) -> str | None:
+    """Reorder address so flat notation leads (OS Places expects this).
+    Mirrors the same function in sov_processor_v2.py.
+    """
+    if not address:
+        return address
+    parts = [p.strip() for p in address.split(",") if p.strip()]
+    if not parts:
+        return address
+    for i, part in enumerate(parts):
+        if re.match(r"^(flat|unit|apt|apartment|room|suite)\b", part, re.IGNORECASE):
+            continue
+        m = re.match(r"^(.+?)\s+(\d+/\d+)\s*$", part)
+        if m:
+            flat_notation = m.group(2).strip()
+            parts[i] = m.group(1).strip()
+            if not re.match(r"^\d+/\d+", parts[0]):
+                parts.insert(0, flat_notation)
+            return ", ".join(parts)
+    for i in range(1, len(parts)):
+        part = parts[i]
+        if (re.match(r"^(flat|unit|apt|apartment|room|suite)\s+\S+", part, re.IGNORECASE)
+                or re.match(r"^\d+/\d+$", part)):
+            parts.insert(0, parts.pop(i))
+            return ", ".join(parts)
+    return address
+
+
+def _building_only_address(address: str) -> str | None:
+    """Strip leading flat notation to produce a building-only fallback query.
+
+    "0/1, 40 Balmore Road, Glasgow"  ->  "40 Balmore Road, Glasgow"
+    "Flat 3, 45 High Street, Oxford" ->  "45 High Street, Oxford"
+    Returns None if no flat notation is detected (nothing to strip).
+    """
+    m = re.match(r"^\d+/\d+\s*,\s*(.+)$", address)
+    if m:
+        return m.group(1).strip()
+    m = re.match(r"^(flat|unit|apt|apartment|room|suite)\s+\S+\s*,\s*(.+)$", address, re.IGNORECASE)
+    if m:
+        return m.group(2).strip()
+    return None
+
+
+def _run_cross_reference(query: str, os_data: dict, api_key: str) -> dict:
+    """Run Igor's cross_reference scoring on an OS Places result."""
+    try:
+        from backend.geo.uprn_maps.cross_reference import cross_reference
+        matched_addr = os_data.get("ADDRESS", "")
+        os_score = float(os_data.get("MATCH") or 0.0)
+        return cross_reference(query, matched_addr, os_score, os_data, api_key)
+    except Exception as exc:
+        logger.warning(f"cross_reference failed: {exc}")
+        return {"level": "RED", "confidence": 0.0, "reasons": ["cross_reference_error"]}
+
+
+def _call_flood_risk(x: float, y: float, country_code: str, postcode: str | None) -> dict | None:
+    """Get flood risk band for a BNG point via the relevant national agency."""
+    try:
+        from backend.geo.uprn_maps.flood_risk import get_flood_risk_from_coords
+        result = get_flood_risk_from_coords(x, y, country_code, postcode=postcode)
+        return result if isinstance(result, dict) else None
+    except Exception as exc:
+        logger.warning(f"Flood risk error: {exc}")
         return None
 
 
@@ -209,26 +303,50 @@ def enrich_single_property(
     updates = {}
     sources = []
 
+    # Standardise address before sending to OS Places (handles Scottish X/Y notation)
+    std_address = _standardise_address(address) or address
+
     # 1. OS Places (must be first, with retry)
     os_data = None
     pc_normalized = _normalize_postcode(postcode) if postcode else ""
     if postcode_cache and pc_normalized in postcode_cache:
-        os_data = _match_address_to_uprn(address, postcode_cache[pc_normalized])
+        os_data = _match_address_to_uprn(std_address, postcode_cache[pc_normalized])
     if not os_data:
-        os_data = _api_call_with_retry(_call_os_places, address, postcode, places_key)
+        os_data = _api_call_with_retry(_call_os_places, std_address, postcode, places_key)
         time.sleep(RATE_LIMIT_DELAY_S)
 
     if not os_data:
         return {"enrichment_status": "failed", "enriched_at": datetime.now(timezone.utc)}
 
+    # Cross-reference the full-address result
+    full_query = f"{std_address}, {postcode}" if postcode else std_address
+    xref = _run_cross_reference(full_query, os_data, places_key)
+    uprn_confidence = xref.get("level", "RED")
+    uprn_confidence_reason = "; ".join(xref.get("reasons", [])) or uprn_confidence
+
+    # Option B: RED → try building-only query (strip flat notation)
+    if uprn_confidence == "RED":
+        building_addr = _building_only_address(std_address)
+        if building_addr:
+            fb_data = _api_call_with_retry(_call_os_places, building_addr, postcode, places_key)
+            time.sleep(RATE_LIMIT_DELAY_S)
+            if fb_data:
+                building_query = f"{building_addr}, {postcode}" if postcode else building_addr
+                fb_xref = _run_cross_reference(building_query, fb_data, places_key)
+                if fb_xref.get("level") in ("GREEN", "AMBER"):
+                    # Option B succeeded — use building UPRN with LOW confidence
+                    os_data = fb_data
+                    uprn_confidence = "LOW"
+                    uprn_confidence_reason = "flat not found in OS; building matched"
+                    logger.info(f"  UPRN fallback (building-only) for '{std_address[:40]}'")
+    # Option A: if still RED, keep original result as best-guess (logged below)
+    if uprn_confidence == "RED":
+        logger.warning(f"  RED UPRN confidence for '{std_address[:40]}': {uprn_confidence_reason}")
+
     uprn = str(os_data.get("UPRN", ""))
     parent_uprn = str(os_data.get("PARENT_UPRN") or "")
     x = os_data.get("X_COORDINATE")
     y = os_data.get("Y_COORDINATE")
-
-    conf = _call_address_confidence(address, os_data.get("ADDRESS", ""))
-    if conf and conf.get("confidence") == "LOW":
-        logger.warning(f"  Address mismatch: SoV='{address[:40]}' score={conf['score']}")
 
     updates["uprn"] = uprn if uprn else None
     updates["parent_uprn"] = parent_uprn if parent_uprn else None
@@ -237,6 +355,8 @@ def enrich_single_property(
     updates["country_code"] = os_data.get("COUNTRY_CODE")
     updates["uprn_match_score"] = float(os_data["MATCH"]) if os_data.get("MATCH") else None
     updates["uprn_match_description"] = os_data.get("MATCH_DESCRIPTION")
+    updates["uprn_confidence"] = uprn_confidence
+    updates["uprn_confidence_reason"] = uprn_confidence_reason
     sources.append("OS_PLACES")
 
     # 2. EPC + NGD + Listed in PARALLEL
@@ -295,6 +415,12 @@ def enrich_single_property(
         updates["height_roofbase_m"] = ngd_result.get("height_relativeroofbase_m")
         updates["height_confidence"] = ngd_result.get("height_confidencelevel")
         updates["building_footprint_m2"] = ngd_result.get("geometry_area_m2")
+        # Keep OS constructionmaterial raw, before SoV-priority merge buries it in
+        # wall_construction — lets the insights panel chart OS construction on its own.
+        updates["os_construction_material"] = ngd_result.get("constructionmaterial")
+        geom = _reproject_geometry(ngd_result.get("_geometry"))
+        if geom:
+            updates["building_geometry"] = psycopg2.extras.Json(geom)
         ngd_map = {
             "constructionmaterial": "wall_construction",
             "roofmaterial_primarymaterial": "roof_construction",
@@ -317,6 +443,18 @@ def enrich_single_property(
             updates["listed_name"] = listed_result.get("name")
             updates["listed_reference"] = listed_result.get("reference")
 
+    # 6. Flood Risk
+    x_val = updates.get("x_coordinate")
+    y_val = updates.get("y_coordinate")
+    country = os_data.get("COUNTRY_CODE", "")
+    if x_val and y_val and country:
+        flood_result = _call_flood_risk(float(x_val), float(y_val), country, postcode or None)
+        if flood_result:
+            updates["flood_risk_band"] = flood_result.get("flood_risk_band")
+            updates["flood_risk_source"] = flood_result.get("flood_risk_source")
+            updates["flood_risk_note"] = flood_result.get("flood_risk_note")
+            sources.append("FLOOD")
+
     updates["enrichment_status"] = "enriched"
     updates["enrichment_source"] = ",".join(sources)
     updates["enriched_at"] = datetime.now(timezone.utc)
@@ -327,7 +465,7 @@ def enrich_single_property(
 # Block Detection — uses EXISTING silver.blocks table
 # ─────────────────────────────────────────────────────────────────
 
-def run_block_detection(ha_id: str, places_key: str = "") -> dict:
+def run_block_detection(ha_id: str, places_key: str = "", portfolio_id: str | None = None) -> dict:
     """
     After enrichment, group properties into blocks using detect_block_properties().
 
@@ -352,13 +490,16 @@ def run_block_detection(ha_id: str, places_key: str = "") -> dict:
     try:
         # ── Step 1: fetch all enriched properties that have a UPRN ──────────
         with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
-            cur.execute("""
+            portfolio_clause = "AND portfolio_id = %s::uuid" if portfolio_id else ""
+            params = (ha_id, portfolio_id) if portfolio_id else (ha_id,)
+            cur.execute(f"""
                 SELECT uprn, parent_uprn, address, property_id
                 FROM silver.properties
                 WHERE ha_id = %s
                   AND uprn IS NOT NULL
                   AND uprn != ''
-            """, (ha_id,))
+                  {portfolio_clause}
+            """, params)
             enriched_rows = cur.fetchall()
 
         if not enriched_rows:
@@ -423,14 +564,14 @@ def run_block_detection(ha_id: str, places_key: str = "") -> dict:
 
                     cur.execute("""
                         INSERT INTO silver.blocks (
-                            ha_id, name,
+                            ha_id, portfolio_id, name,
                             parent_uprn, unit_count, total_sum_insured,
                             max_storeys, predominant_wall, predominant_roof,
                             height_max_m, is_listed, listed_grade
                         ) VALUES (
-                            %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s
+                            %s, %s::uuid, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s
                         )
-                        ON CONFLICT (ha_id, name)
+                        ON CONFLICT (ha_id, portfolio_id, name)
                         DO UPDATE SET
                             parent_uprn       = EXCLUDED.parent_uprn,
                             unit_count        = EXCLUDED.unit_count,
@@ -443,7 +584,7 @@ def run_block_detection(ha_id: str, places_key: str = "") -> dict:
                             listed_grade      = EXCLUDED.listed_grade,
                             updated_at        = NOW()
                     """, (
-                        ha_id, agg["block_name"],
+                        ha_id, portfolio_id, agg["block_name"],
                         root_parent_uprn, agg["unit_count"], agg["total_si"],
                         agg["max_storeys"], agg["wall"], agg["roof"],
                         agg["height"], agg["listed"], agg["grade"],
@@ -451,7 +592,9 @@ def run_block_detection(ha_id: str, places_key: str = "") -> dict:
                     upserted += 1
 
                 # Fill NULL block_reference on properties via parent_uprn match
-                cur.execute("""
+                portfolio_fill_clause = "AND p.portfolio_id = %s::uuid AND blk.portfolio_id = %s::uuid" if portfolio_id else ""
+                fill_params = (ha_id, ha_id, portfolio_id, portfolio_id) if portfolio_id else (ha_id, ha_id)
+                cur.execute(f"""
                     UPDATE silver.properties p
                     SET block_reference = blk.name
                     FROM silver.blocks blk
@@ -459,7 +602,8 @@ def run_block_detection(ha_id: str, places_key: str = "") -> dict:
                       AND p.parent_uprn = blk.parent_uprn
                       AND blk.ha_id = %s
                       AND (p.block_reference IS NULL OR p.block_reference = '')
-                """, (ha_id, ha_id))
+                      {portfolio_fill_clause}
+                """, fill_params)
                 filled = cur.rowcount
 
         logger.info(f"Block detection: {upserted} blocks upserted, "
@@ -494,6 +638,7 @@ async def enrich_portfolio(
     epc_email: str = "",
     epc_key: str = "",
     limit: int = 0,
+    portfolio_id: str | None = None,
 ) -> dict:
     """
     Enrich all pending properties for an HA.
@@ -516,11 +661,14 @@ async def enrich_portfolio(
     try:
         with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
             lim = f"LIMIT {limit}" if limit > 0 else ""
+            portfolio_clause = "AND portfolio_id = %s::uuid" if portfolio_id else ""
+            params = (ha_id, portfolio_id) if portfolio_id else (ha_id,)
             cur.execute(f"""
                 SELECT * FROM silver.properties
                 WHERE ha_id = %s AND enrichment_status = 'pending'
+                {portfolio_clause}
                 ORDER BY property_reference {lim}
-            """, (ha_id,))
+            """, params)
             rows = cur.fetchall()
     finally:
         conn.close()
@@ -601,7 +749,7 @@ async def enrich_portfolio(
     # Block detection
     block_result = {}
     try:
-        block_result = run_block_detection(ha_id, places_key=places_key)
+        block_result = run_block_detection(ha_id, places_key=places_key, portfolio_id=portfolio_id)
     except Exception as exc:
         logger.error(f"[ENRICH] Block detection failed: {exc}")
         block_result = {"error": str(exc)}
@@ -617,3 +765,19 @@ async def enrich_portfolio(
     logger.info(f"[ENRICH] DONE: {enriched}/{total} in {elapsed:.0f}s | "
                 f"Blocks: {block_result.get('blocks_upserted', 0)}")
     return result
+
+
+if __name__ == "__main__":
+    # Self-check for _reproject_geometry: a BNG ring in Glasgow → WGS84 lon/lat.
+    # Cathcart is ~(258000, 660000) BNG → ~(-4.3, 55.8) WGS84.
+    poly = {"type": "Polygon", "coordinates": [[
+        [258000, 660000], [258010, 660000], [258010, 660010], [258000, 660000],
+    ]]}
+    out = _reproject_geometry(poly)
+    assert out["type"] == "Polygon"
+    lon, lat = out["coordinates"][0][0]
+    assert -8 <= lon <= 2, f"lon out of UK range: {lon}"
+    assert 49 <= lat <= 61, f"lat out of UK range: {lat}"
+    assert _reproject_geometry(None) is None
+    assert _reproject_geometry({"type": "Point", "coordinates": [1, 2]}) is None
+    print(f"OK: {poly['coordinates'][0][0]} BNG -> [{lon}, {lat}] WGS84")

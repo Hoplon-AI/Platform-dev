@@ -1,0 +1,307 @@
+/* common */
+.page.pad-xl {
+  padding: 0;
+}
+
+.content-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  width: 100%;
+}
+
+.card {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-soft);
+  overflow: hidden;
+  transition: box-shadow 0.4s var(--ease), border-color 0.4s var(--ease);
+}
+
+/* Container cards get a restrained focus nudge (no transform — they hold maps
+   and scroll areas, so a lift would cause reflow jitter). */
+.card:hover {
+  box-shadow: var(--shadow);
+  border-color: var(--border-line);
+}
+
+.card-lg {
+  border-radius: var(--radius-lg);
+}
+
+.card-soft {
+  background: linear-gradient(180deg, #ffffff 0%, var(--warm-bg) 100%);
+}
+
+.card-header {
+  padding: 20px 22px 0;
+}
+
+.card-body {
+  padding: 20px 22px 22px;
+}
+
+.card-title {
+  font-family: var(--font-serif);
+  font-size: 20px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--navy);
+}
+
+.card-subtitle,
+.card-muted {
+  margin-top: 5px;
+  font-size: 14px;
+  color: var(--muted);
+}
+
+.row-between {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.muted,
+.mini-muted {
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.mini-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text);
+  margin-bottom: 10px;
+}
+
+/* pills */
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 28px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  border: 1px solid transparent;
+  white-space: nowrap;
+}
+
+.pill-soft,
+.pill-muted {
+  background: var(--warm-bg-2);
+  color: #5A554F;
+  border-color: var(--border-line);
+}
+
+.pill-good {
+  background: var(--accent-soft);
+  color: #2f6b4f;
+  border-color: #bcd9c8;
+}
+
+.pill-warn {
+  background: var(--warning-soft);
+  color: #8a6420;
+  border-color: #e7cd9c;
+}
+
+.pill-amber,
+.band-yellow,
+.band-amber {
+  background: var(--warning-soft);
+  color: #8a6420;
+  border-color: #e7cd9c;
+}
+
+.band-green {
+  background: var(--accent-soft);
+  color: #2f6b4f;
+  border-color: #bcd9c8;
+}
+
+.band-red {
+  background: var(--danger-soft);
+  color: var(--terracotta-2);
+  border-color: #e8b9b1;
+}
+
+.band-muted {
+  background: var(--warm-bg-2);
+  color: var(--slate-warm);
+  border-color: var(--border-line);
+}
+
+/* buttons — pill-shaped, warm */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: 1px solid var(--border-line);
+  background: #fff;
+  color: var(--navy);
+  min-height: 42px;
+  padding: 0 20px;
+  border-radius: 50px;
+  font-family: var(--font-sans);
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.32s var(--ease);
+}
+
+.btn:hover {
+  background: #fff;
+  border-color: var(--terracotta);
+  color: var(--terracotta);
+  transform: translateY(-2px);
+  box-shadow: 0 12px 26px -16px rgba(30, 50, 70, 0.28);
+}
+
+.btn-primary {
+  background: var(--terracotta);
+  border-color: var(--terracotta);
+  color: #fff;
+  box-shadow: 0 6px 18px rgba(184, 86, 75, 0.28);
+}
+
+.btn-primary:hover {
+  background: var(--terracotta-2);
+  border-color: var(--terracotta-2);
+  color: #fff;
+  transform: translateY(-2px);
+  box-shadow: 0 12px 28px rgba(184, 86, 75, 0.34);
+}
+
+.btn:disabled,
+.btn[disabled] {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+.btn:disabled:hover,
+.btn[disabled]:hover {
+  transform: none;
+  box-shadow: none;
+  border-color: var(--border-line);
+  color: var(--navy);
+}
+
+/* Single chevron that rotates with the collapse, instead of swapping glyphs */
+.panel-chev {
+  display: inline-block;
+  color: var(--slate-warm);
+  transition: transform 0.35s var(--ease);
+}
+
+.panel-chev.is-collapsed {
+  transform: rotate(-90deg);
+}
+
+/* Block list rows — hover feedback + selected state */
+.block-row {
+  transition: background 0.18s var(--ease), box-shadow 0.18s var(--ease);
+}
+
+.block-row:hover {
+  background: var(--warm-bg-2);
+  box-shadow: inset 3px 0 0 var(--terracotta);
+}
+
+.block-row.is-selected {
+  background: var(--primary-soft);
+  box-shadow: inset 3px 0 0 var(--terracotta);
+}
+
+/* Document export tiles — same hover language as the KPI cards */
+.doc-card {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  transition: box-shadow 0.35s var(--ease), border-color 0.35s var(--ease);
+}
+
+.doc-card:hover {
+  border-color: var(--border-line);
+  box-shadow: var(--shadow-soft);
+}
+
+.btn-ghost {
+  width: 100%;
+}
+
+/* inputs */
+.input {
+  width: 100%;
+  min-height: 42px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: #fff;
+  color: var(--text);
+  padding: 10px 12px;
+  outline: none;
+  transition: border-color 0.18s ease, box-shadow 0.18s ease;
+}
+
+.input:focus {
+  border-color: var(--terracotta);
+  box-shadow: 0 0 0 3px rgba(184, 86, 75, 0.30);
+}
+
+/* tables */
+.table-wrap {
+  overflow: auto;
+  width: 100%;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 620px;
+}
+
+.table thead th {
+  text-align: left;
+  font-size: 12px;
+  color: var(--muted);
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--border);
+  background: var(--warm-bg-2);
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+
+.table tbody td {
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--border-soft);
+  font-size: 14px;
+  color: var(--text);
+  vertical-align: top;
+}
+
+.td-key {
+  font-weight: 800;
+  color: var(--text);
+}
+
+.raw-table {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.raw-title {
+  font-size: 15px;
+  font-weight: 800;
+  color: var(--text);
+}
