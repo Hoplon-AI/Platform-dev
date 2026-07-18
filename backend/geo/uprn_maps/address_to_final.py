@@ -25,7 +25,7 @@ from backend.geo.uprn_maps.os_datahub_functions import (
     get_uprns_from_addresses,
     get_coordinates_from_uprns,
 )
-from backend.geo.uprn_maps.uprn_to_epc import get_epc_from_uprn, get_epcs_from_uprns
+from backend.geo.uprn_maps.uprn_to_new_epc import get_epc_from_uprn, get_epcs_from_uprns
 from backend.geo.uprn_maps.uprn_to_height import get_building_from_coords, get_buildings_from_coords_batch
 from backend.geo.uprn_maps.uprn_to_listed import get_listed_building_status, get_listed_building_statuses
 from backend.geo.uprn_maps.cross_reference import cross_reference, cross_reference_batch
@@ -127,6 +127,8 @@ def get_final_info_from_address(address: str, email: str, places_key: str, ngd_k
         "built_form": epc.get("built-form"),
         "wall_construction": epc.get("walls-description") or ngd.get("constructionmaterial"),
         "roof_construction": epc.get("roof-description") or ngd.get("roofmaterial_primarymaterial"),
+        "floor_construction": epc.get("floor-description"),
+        "glazing": epc.get("glazing-description"),
         "age_band": epc.get("construction-age-band") or ngd.get("buildingage_period"),
         "year_of_build": ngd.get("buildingage_year"),
         "basement": ngd.get("basementpresence"),
@@ -137,6 +139,7 @@ def get_final_info_from_address(address: str, email: str, places_key: str, ngd_k
         "epc_potential_rating": epc.get("potential-energy-rating"),
         "total_floor_area_m2": epc.get("total-floor-area"),
         "main_fuel": epc.get("main-fuel"),
+        "secondary_heating": epc.get("secondary-heating"),
         "extension_count": epc.get("extension-count"),
         "lighting_cost_current": epc.get("lighting-cost-current"),
         "heating_cost_current": epc.get("heating-cost-current"),
@@ -217,6 +220,8 @@ def get_final_info_from_uprn(uprn: str | int, email: str, places_key: str, ngd_k
         "built_form": epc.get("built-form"),
         "wall_construction": epc.get("walls-description") or ngd.get("constructionmaterial"),
         "roof_construction": epc.get("roof-description") or ngd.get("roofmaterial_primarymaterial"),
+        "floor_construction": epc.get("floor-description"),
+        "glazing": epc.get("glazing-description"),
         "age_band": epc.get("construction-age-band") or ngd.get("buildingage_period"),
         "year_of_build": ngd.get("buildingage_year"),
         "basement": ngd.get("basementpresence"),
@@ -226,6 +231,7 @@ def get_final_info_from_uprn(uprn: str | int, email: str, places_key: str, ngd_k
         "epc_potential_rating": epc.get("potential-energy-rating"),
         "total_floor_area_m2": epc.get("total-floor-area"),
         "main_fuel": epc.get("main-fuel"),
+        "secondary_heating": epc.get("secondary-heating"),
         "extension_count": epc.get("extension-count"),
         "lighting_cost_current": epc.get("lighting-cost-current"),
         "heating_cost_current": epc.get("heating-cost-current"),
@@ -306,6 +312,8 @@ def _merge_property_result(
         "built_form": epc.get("built-form"),
         "wall_construction": epc.get("walls-description") or ngd.get("constructionmaterial"),
         "roof_construction": epc.get("roof-description") or ngd.get("roofmaterial_primarymaterial"),
+        "floor_construction": epc.get("floor-description"),
+        "glazing": epc.get("glazing-description"),
         "age_band": epc.get("construction-age-band") or ngd.get("buildingage_period"),
         "year_of_build": ngd.get("buildingage_year"),
         "basement": ngd.get("basementpresence"),
@@ -316,6 +324,7 @@ def _merge_property_result(
         "epc_potential_rating": epc.get("potential-energy-rating"),
         "total_floor_area_m2": epc.get("total-floor-area"),
         "main_fuel": epc.get("main-fuel"),
+        "secondary_heating": epc.get("secondary-heating"),
         "extension_count": epc.get("extension-count"),
         "lighting_cost_current": epc.get("lighting-cost-current"),
         "heating_cost_current": epc.get("heating-cost-current"),

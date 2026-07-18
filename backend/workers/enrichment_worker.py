@@ -131,7 +131,7 @@ def _call_os_places(address: str, postcode: str, api_key: str) -> dict | None:
 def _call_epc(uprn: str, email: str, api_key: str) -> dict | None:
     """UPRN → most recent EPC certificate (England/Wales only)."""
     try:
-        from backend.geo.uprn_maps.uprn_to_epc import get_epc_from_uprn
+        from backend.geo.uprn_maps.uprn_to_new_epc import get_epc_from_uprn
         result = get_epc_from_uprn(uprn, email, api_key)
         return result[0] if isinstance(result, list) and result else None
     except Exception as exc:
