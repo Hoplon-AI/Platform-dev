@@ -278,7 +278,7 @@ async def get_properties(
                 is_listed, listed_grade, listed_name, listed_reference,
                 flood_risk_band, flood_risk_source,
                 enrichment_status, enrichment_source, enriched_at, metadata,
-                building_geometry, os_construction_material
+                building_geometry, os_construction_material, basement
             FROM silver.properties
             WHERE ha_id = $1
               AND ($2::uuid IS NULL OR portfolio_id = $2::uuid)
