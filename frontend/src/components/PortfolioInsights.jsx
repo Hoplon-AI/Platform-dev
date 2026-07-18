@@ -297,7 +297,7 @@ function StatTile({ label, value }) {
   );
 }
 
-export function PortfolioInsightsPanel({ properties }) {
+export function PortfolioInsightsPanel({ properties, segmentTitle }) {
   const model = useMemo(() => {
     const list = Array.isArray(properties) ? properties : [];
     const n = list.length;
@@ -422,7 +422,7 @@ export function PortfolioInsightsPanel({ properties }) {
             gap: 16,
           }}
         >
-          <DonutCard title="Property type" data={model.propertyType} />
+          <DonutCard title={segmentTitle || "Property type"} data={model.propertyType} />
           <DonutCard title="Occupancy" data={model.occupancy} />
           <DonutCard title="Wall construction" data={model.wall} />
           <DonutCard title="Roof construction" data={model.roof} />

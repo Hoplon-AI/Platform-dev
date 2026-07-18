@@ -207,6 +207,18 @@ export default function BlockAnalysisPage({ ingestionResult, latestFireRiskPaylo
     );
   }
 
+  // Count-line noun follows the active type chip ("23 houses", not "23 blocks");
+  // with no type filter a mixed book is counted as "properties".
+  const TYPE_NOUNS = {
+    block: ["block", "blocks"],
+    house: ["house", "houses"],
+    bungalow: ["bungalow", "bungalows"],
+    flat: ["standalone flat", "standalone flats"],
+  };
+  const [nounOne, nounMany] =
+    TYPE_NOUNS[typeFilter] ||
+    (standaloneCount > 0 ? ["property", "properties"] : ["block", "blocks"]);
+
   return (
     <>
       <div className="main-head">
@@ -267,7 +279,7 @@ export default function BlockAnalysisPage({ ingestionResult, latestFireRiskPaylo
           </div>
 
           <div className="ba-meta">
-            {visible.length} {visible.length === 1 ? "block" : "blocks"}
+            {visible.length} {visible.length === 1 ? nounOne : nounMany}
             {query ? ` matching “${query}”` : ""}
             {bandFilter !== "all" ? ` · ${bandFilter === "none" ? "unrated" : bandFilter} only` : ""}
             {sort.key ? ` · sorted by ${sort.key} (${sort.dir})` : " · sorted by risk"}

@@ -28,6 +28,8 @@ export default function App() {
   const [showLanding, setShowLanding] = useState(true);
   const [authUser, setAuthUser] = useState(null);
   const [activeNav, setActiveNav] = useState("uploads");
+  // Mobile off-canvas drawer state — only relevant below the 900px breakpoint.
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   // Track which tabs have been opened. Once a tab is visited we keep it mounted
   // (just hidden) so its state — map position, selections, scroll — survives
   // switching tabs instead of resetting on every remount.
@@ -646,28 +648,47 @@ export default function App() {
   return (
     <div className="app">
       <div className="topbar">
+        <button
+          className="nav-toggle"
+          onClick={() => setSidebarOpen(true)}
+          aria-label="Open navigation"
+        >
+          ☰
+        </button>
         <div className="topbar-left">Upload SOVs, analyse exposure, assess portfolio risk.</div>
         <div className="topbar-right">{loadedMeta}</div>
       </div>
 
       <div className="shell">
+        {sidebarOpen && (
+          <div className="sidebar-backdrop" onClick={() => setSidebarOpen(false)} />
+        )}
         <Sidebar
           accessibleHAs={accessibleHAs}
           selectedHaId={selectedHaId}
           activeNav={activeNav}
           ingestionResult={ingestionResult}
           authUser={authUser}
+          open={sidebarOpen}
+          onClose={() => setSidebarOpen(false)}
           onSelectHa={(haId) => {
             setSelectedHaId(haId);
             setIngestionResult(null);
             setActiveNav("uploads");
             setUploadStage("SOV");
+            setSidebarOpen(false);
             // Load the new HA's latest portfolio — switching must never leave
             // the workspace empty when the HA already has data.
             loadPropertiesFromApi(null, haId);
           }}
-          onUploadDocuments={goToNextUpload}
-          onNavigate={setActiveNav}
+          onUploadDocuments={() => {
+            setSidebarOpen(false);
+            goToNextUpload();
+          }}
+          onNavigate={(nav) => {
+            setActiveNav(nav);
+            setSidebarOpen(false);
+          }}
           onSignOut={() => {
             localStorage.removeItem("equirisk_token");
             localStorage.removeItem("equirisk_user");
@@ -675,6 +696,7 @@ export default function App() {
             sessionStorage.removeItem("equirisk_user");
             sessionStorage.removeItem("equirisk:sovFileName");
             sovFileNameRef.current = null;
+            setSidebarOpen(false);
             setAuthUser(null);
             setIngestionResult(null);
             setAccessibleHAs([]);

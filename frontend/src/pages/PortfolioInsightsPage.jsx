@@ -107,7 +107,11 @@ export default function PortfolioInsightsPage({ ingestionResult, onUploadNew, ha
         </div>
       )}
 
-      <PortfolioInsightsPanel properties={properties} />
+      {/* Property-type donut heading mirrors the "Show insights for" selection */}
+      <PortfolioInsightsPanel
+        properties={properties}
+        segmentTitle={`${segment.label} (${properties.length})`}
+      />
 
       <PortfolioAnalysisWindow
         tenancyRows={tenancyRows}
