@@ -107,6 +107,8 @@ export default function PortfolioDashboard({
             null,
           block_reference: key || "",
           representativeProperty,
+          // ponytail: flats in a block share a footprint — take the first present.
+          geometry: items.find((p) => p.building_geometry)?.building_geometry ?? null,
         };
       })
       .sort((a, b) => b.totalValue - a.totalValue);

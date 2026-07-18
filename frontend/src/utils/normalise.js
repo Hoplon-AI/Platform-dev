@@ -111,6 +111,7 @@ export const normaliseProperty = (row, index = 0) => {
     height_roofbase_m: toNumberOrNull(row.height_roofbase_m),
     height_confidence: row.height_confidence ?? "",
     building_footprint_m2: toNumberOrNull(row.building_footprint_m2),
+    building_geometry: row.building_geometry ?? null,
     is_listed: typeof row.is_listed === "boolean" ? row.is_listed : row.is_listed ?? null,
     listed_grade: row.listed_grade ?? "",
     listed_name: row.listed_name ?? "",

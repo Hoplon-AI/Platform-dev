@@ -12,6 +12,7 @@ import {
   BLOCK_ZOOM,
   FOCUSED_ZOOM,
   BUILDINGS_URL,
+  POLYGON_ZOOM,
   PROPERTY_TYPE_COLORS,
 } from "../constants/map.js";
 import {
@@ -78,6 +79,7 @@ export default function PortfolioMap({
   onViewChangeRef.current = onViewChange;
   const pointLayerRef = useRef(null);
   const buildingsLayerRef = useRef(null);
+  const blockPolyLayerRef = useRef(null);
   const overviewBlockLayerRef = useRef(null);
   const selectedMarkerRef = useRef(null);
   const lastFitSignatureRef = useRef("");
@@ -152,6 +154,7 @@ export default function PortfolioMap({
       zoomControl: true,
       attributionControl: false,
       minZoom: 4, // stop zooming out far enough to see repeated globe copies
+      maxZoom: 20, // markercluster needs a finite map maxZoom or it throws on add
     }).setView(DEFAULT_CENTER, DEFAULT_ZOOM);
 
     L.tileLayer("https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png", {
@@ -387,6 +390,7 @@ export default function PortfolioMap({
     buildingsLayerRef.current = L.layerGroup().addTo(map);
     overviewBlockLayerRef.current = L.layerGroup().addTo(map);
     pointLayerRef.current = L.layerGroup().addTo(map);
+    blockPolyLayerRef.current = L.layerGroup().addTo(map);
 
     // Staggered invalidateSize to handle grid/flex layout settling
     setTimeout(() => map.invalidateSize(), 0);
@@ -398,6 +402,7 @@ export default function PortfolioMap({
       map.remove();
       mapRef.current = null;
       buildingsLayerRef.current = null;
+      blockPolyLayerRef.current = null;
       overviewBlockLayerRef.current = null;
       pointLayerRef.current = null;
     };
@@ -582,6 +587,72 @@ export default function PortfolioMap({
     visiblePoints.length,
     riskColorBy,
   ]);
+
+  // Risk map: at close zoom, replace block count-bubbles with footprint polygons
+  // colored by risk (reusing the same color the ring uses). Blocks without a
+  // stored footprint keep their bubble. Declared after the main render effect so
+  // it has the final say on the bubble layer's visibility.
+  useEffect(() => {
+    const map = mapRef.current;
+    const polyLayer = blockPolyLayerRef.current;
+    const pointLayer = pointLayerRef.current;
+    if (!map || !polyLayer || !pointLayer) return;
+
+    const colorFor = (raw) => (riskColorBy ? blockRingColor(raw, riskColorBy) : riskColor(raw));
+
+    const render = () => {
+      polyLayer.clearLayers();
+      const closeZoom =
+        activeMode === "blocks" && blockPoints.length > 0 && map.getZoom() >= POLYGON_ZOOM;
+
+      if (!closeZoom) {
+        if (!map.hasLayer(pointLayer)) map.addLayer(pointLayer); // bubbles back
+        return;
+      }
+      if (map.hasLayer(pointLayer)) map.removeLayer(pointLayer); // hide bubbles
+
+      const zoom = map.getZoom();
+      blockPoints.forEach((point) => {
+        const color = colorFor(point.raw);
+        const tip = buildBlockTooltipHtml(point, Boolean(riskColorBy));
+        let layer;
+        if (point.raw.geometry) {
+          layer = L.geoJSON(point.raw.geometry, {
+            style: { color, weight: 1.5, fillColor: color, fillOpacity: 0.5, opacity: 0.95 },
+          });
+        } else {
+          // No footprint → keep the count bubble (graceful degradation).
+          layer = L.marker([point.lat, point.lon], {
+            icon: createBlockCountIcon(point, zoom, false, 1, 1, color),
+            keyboard: false,
+          });
+        }
+        layer.bindTooltip(tip, { direction: "top", sticky: true, opacity: 0.97 });
+        // Same interactions as the block bubble, so clicking a polygon behaves as before.
+        const isSelected = sameBlock(selectedBlock, point.raw);
+        layer.on("click", () => {
+          if (!isSelected) {
+            onSelectBlock?.(point.raw);
+            onSelectProperty?.(null);
+          }
+        });
+        layer.bindPopup(buildFlatListPopupHtml(point, Boolean(riskColorBy)), { maxWidth: 320 });
+        attachFlatListPopupHandlers(layer, point, onSelectProperty);
+        layer.addTo(polyLayer);
+      });
+    };
+
+    render();
+    map.on("zoomend moveend", render);
+    return () => {
+      map.off("zoomend moveend", render);
+      // If the map was torn down (StrictMode remount / unmount), mapRef no longer
+      // points at it — don't touch a dead map or Leaflet throws on a missing pane.
+      if (mapRef.current !== map) return;
+      polyLayer.clearLayers();
+      if (!map.hasLayer(pointLayer)) map.addLayer(pointLayer); // restore bubbles
+    };
+  }, [activeMode, blockPoints, riskColorBy, selectedBlock]);
 
   useEffect(() => {
     const map = mapRef.current;

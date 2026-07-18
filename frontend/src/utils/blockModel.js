@@ -330,6 +330,9 @@ export const buildBlocks = (properties = [], fireDocuments = []) => {
         null,
       isListed: items.some((p) => p.is_listed === true || p.listed_grade),
       listedGrade: items.find((p) => isPresent(p.listed_grade))?.listed_grade ?? null,
+      // ponytail: flats in a block share a footprint — take the first; refine to
+      // the parent_uprn's geometry if a block ever spans two buildings.
+      geometry: items.find((p) => p.building_geometry)?.building_geometry ?? null,
       representativeProperty,
     };
   });
