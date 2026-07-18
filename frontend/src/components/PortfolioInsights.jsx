@@ -317,6 +317,8 @@ export function PortfolioInsightsPanel({ properties }) {
     const occupancy = countBy(list, (p) => clean(p.occupancy_type));
     const wall = countBy(list, (p) => normaliseWall(p.wall_construction));
     const roof = countBy(list, (p) => clean(p.roof_construction));
+    // OS NGD constructionmaterial on its own (unmerged), enrichment-only.
+    const osConstruction = countBy(list, (p) => normaliseWall(p.os_construction_material));
 
     const ageRows = ordered(
       countBy(list, (p) => ageBand(p.year_of_build)),
@@ -370,6 +372,8 @@ export function PortfolioInsightsPanel({ properties }) {
       occupancy,
       wall,
       roof,
+      osConstruction,
+      osConstructionCaption: coverage(osConstruction),
       ageRows,
       storeyRows,
       flood,
@@ -443,6 +447,13 @@ export function PortfolioInsightsPanel({ properties }) {
           <DonutCard title="Occupancy" data={model.occupancy} />
           <DonutCard title="Wall construction" data={model.wall} />
           <DonutCard title="Roof construction" data={model.roof} />
+          <DonutCard
+            title="OS construction material"
+            data={model.osConstruction}
+            caption={model.osConstructionCaption}
+            enrichedOnly
+          />
+
           <BarCard title="Age band" data={model.ageRows} />
           <BarCard
             title="Flats by building storeys"

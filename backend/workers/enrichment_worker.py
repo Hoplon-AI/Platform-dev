@@ -415,6 +415,9 @@ def enrich_single_property(
         updates["height_roofbase_m"] = ngd_result.get("height_relativeroofbase_m")
         updates["height_confidence"] = ngd_result.get("height_confidencelevel")
         updates["building_footprint_m2"] = ngd_result.get("geometry_area_m2")
+        # Keep OS constructionmaterial raw, before SoV-priority merge buries it in
+        # wall_construction — lets the insights panel chart OS construction on its own.
+        updates["os_construction_material"] = ngd_result.get("constructionmaterial")
         geom = _reproject_geometry(ngd_result.get("_geometry"))
         if geom:
             updates["building_geometry"] = psycopg2.extras.Json(geom)

@@ -240,7 +240,7 @@ async def get_properties(
                 is_listed, listed_grade, listed_name, listed_reference,
                 flood_risk_band, flood_risk_source,
                 enrichment_status, enrichment_source, enriched_at, metadata,
-                building_geometry
+                building_geometry, os_construction_material
             FROM silver.properties
             WHERE ha_id = $1
             ORDER BY block_reference, property_reference
