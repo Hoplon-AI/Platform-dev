@@ -48,6 +48,11 @@ export default function PropertyDetails({
     const blockPostcode = rep?.post_code || rep?.postcode || "";
     const blockAddrDisplay = [blockAddr, blockPostcode].filter(Boolean).join(", ") || selectedBlock.name || selectedBlock.label;
     const blockOverall = worstBandMeta(blockFire.fra, blockFire.fraew);
+    // Basement derived from the block's flats (NGD basementpresence): any flat
+    // with a basement → Yes; OS captured the building but no basement → No;
+    // OS has no data for this building → —.
+    const basements = (selectedBlock.properties || []).map((p) => p.basement).filter((b) => typeof b === "boolean");
+    const basementLabel = basements.length === 0 ? "—" : basements.some(Boolean) ? "Yes" : "No";
 
     return (
       <div className="details-body">
@@ -83,6 +88,7 @@ export default function PropertyDetails({
               }
             />
             <MiniStat label="UPRN" value={isPresent(selectedBlock.parent_uprn) ? selectedBlock.parent_uprn : "—"} />
+            <MiniStat label="Basement" value={basementLabel} />
           </div>
 
           {Number.isFinite(lat) && Number.isFinite(lon) ? (
