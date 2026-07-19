@@ -911,7 +911,7 @@ async def ingest_document(
 
     # ── Step 5: Process based on user selection ───────────────────────────
 
-    # SoV → sov_processor_v2 → auto-enrich (background, limit 50)
+    # SoV → sov_processor_v2 → auto-enrich (background, all rows)
     if document_type == "sov":
         pool = DatabasePool.get_pool()
 
@@ -936,10 +936,13 @@ async def ingest_document(
         # dashboard once enrichment finishes. We mark the job "running"
         # synchronously (before returning) so a re-upload never sees a previous
         # run's stale "complete" during the gap before the task starts.
+        # limit=0 → enrich EVERY pending row of the portfolio, not just the first
+        # 50 — otherwise larger books silently ship with unenriched tails (no
+        # UPRN/NGD basement/footprint) until someone runs the endpoint manually.
         from backend.api.enrichment.enrichment_router import _run_background, _active_jobs
-        _active_jobs[ha_id] = {"status": "running", "result": None, "target": 50}
-        background_tasks.add_task(_run_background, ha_id, 50, resolved_portfolio_id)
-        logger.info("[INGEST] SoV done — enrichment queued for ha_id=%s limit=50", ha_id)
+        _active_jobs[ha_id] = {"status": "running", "result": None, "target": 0}
+        background_tasks.add_task(_run_background, ha_id, 0, resolved_portfolio_id)
+        logger.info("[INGEST] SoV done — enrichment queued for ha_id=%s limit=0 (all)", ha_id)
 
         # Fetch property rows back so the frontend can render them immediately
         async with pool.acquire() as conn:
