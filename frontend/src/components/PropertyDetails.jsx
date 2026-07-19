@@ -188,6 +188,9 @@ export default function PropertyDetails({
           {isPresent(property?.flood_risk_band) ? (
             <KeyValueCard label="Flood risk" value={property.flood_risk_band} />
           ) : null}
+          {typeof property?.basement === "boolean" ? (
+            <KeyValueCard label="Basement" value={property.basement ? "Yes" : "No"} />
+          ) : null}
         </div>
       </div>
 
