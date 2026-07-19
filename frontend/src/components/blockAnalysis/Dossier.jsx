@@ -36,6 +36,15 @@ import { ActionList } from "./ActionCard";
 import { ConfidenceBadge, WarningsPanel, SourceMark } from "./Citations";
 import { isLowConfidence } from "./citationsModel";
 
+// Basement derived from the block's flats (NGD basementpresence): any flat with
+// a basement → Yes; OS data present without one → No; no OS coverage → —.
+const basementLabel = (block) => {
+  const flags = (block.properties || [])
+    .map((p) => p.basement)
+    .filter((b) => typeof b === "boolean");
+  return flags.length === 0 ? "—" : flags.some(Boolean) ? "Yes" : "No";
+};
+
 // Wrap a KV value with its source mark; value untouched when there is
 // nothing to cite, so KV's own "—" placeholder behaviour is preserved.
 // Low-confidence fields (< 70% or unverifiable) are highlighted red.
@@ -160,6 +169,7 @@ export default function Dossier({ block, onSelectProperty }) {
           <div>
             <KV label="Total insured value" value={`£${fmtMoney(block.totalValue)}`} tip={G.tiv} />
             <KV label="Listed building" value={block.isListed ? `Yes${block.listedGrade ? ` (Grade ${block.listedGrade})` : ""}` : "No"} tip={G.listed} />
+            <KV label="Basement" value={basementLabel(block)} />
             <KV label="Parent UPRN" value={block.parent_uprn} />
             <KV label="Coordinates" value={block.hasValidCoords ? `${fmt(block.lat, 5)}, ${fmt(block.lon, 5)}` : "—"} />
           </div>
